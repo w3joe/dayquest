@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { DRAFT_STORAGE_KEY, isReadyDraft, parseStoredDraft } from "@/lib/draft";
 
 // Integration boundary: B replaces this page with the NDJSON generation log.
 // Retain dayquest:draft so uploaded assets and the prepared sprite survive navigation.
@@ -9,8 +10,8 @@ export default function GeneratingBoundary() {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     try {
-      const draft = JSON.parse(sessionStorage.getItem("dayquest:draft") ?? "null");
-      setReady(Boolean(draft?.spriteUrl));
+      const draft = parseStoredDraft(sessionStorage.getItem(DRAFT_STORAGE_KEY));
+      setReady(isReadyDraft(draft));
     } catch { setReady(false); }
   }, []);
   return <main className="page-shell">

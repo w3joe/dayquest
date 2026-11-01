@@ -17,14 +17,20 @@ Before navigating to `/generating`, Today writes this JSON to `sessionStorage["d
 }
 ```
 
-The `sessionId` ties temporary uploads and the fit-check sprite to one draft. It is not an account or security token. `spriteUrl` is the successfully generated back-facing sprite, rather than the uploaded source photograph. End My Day requires completed fit-check processing. B should handle absent/malformed drafts with an actionable return to Today, and must not persist source photos or draft identifiers in share URLs. B maps upload kind/URL entries into its generation request, incorporates the ready sprite into the published manifest, then navigates to `/day/<id>` only after manifest and assets are published. B owns generation events and replay behavior from §6.1.
+The `sessionId` ties temporary uploads and the fit-check sprite to one draft. It is not an account or security token. `spriteUrl` is the successfully generated back-facing sprite, rather than the uploaded source photograph. End My Day requires completed fit-check processing and a successfully loaded 32×48 sprite image, and synchronously saves the validated draft before navigation. B should handle absent/malformed drafts with an actionable return to Today, and must not persist source photos or draft identifiers in share URLs. B maps upload kind/URL entries into its generation request, incorporates the ready sprite into the published manifest, then navigates to `/day/<id>` only after manifest and assets are published. B owns generation events and replay behavior from §6.1.
+
+Photo replacements keep the previous committed photo and sprite until the new upload succeeds. Failed uploads offer Retry photo or Keep previous photo (Discard photo for a failed first upload). Pending changes block End My Day. A committed fit change invalidates the old sprite; generation uses the latest committed front/back pair. Failed sprite downloads offer Reload image without another generation call, or Retry character to regenerate.
+
+`lib/draft.ts` is the browser-safe shared contract: import `DRAFT_STORAGE_KEY`, `Draft`, `ReadyDraft`, `UploadKind`, `parseStoredDraft`, `parseDraft`, and `isReadyDraft`. Restore with `parseStoredDraft(sessionStorage.getItem(DRAFT_STORAGE_KEY))` inside a storage-access try/catch. It returns a validated draft or `null`, without throwing for malformed JSON. Validation rejects invalid UUIDv4 sessions, duplicate/unknown upload kinds, unsafe URL schemes, and sprites without a front fit. URLs must be absolute HTTP(S) without credentials/fragments, or the exact development `/api/assets/uploads/<sessionId>/<kind|player>-<uuid>.png` path. This validates structure, not image reachability or authenticity; Today also checks sprite loading before navigation. Session storage is untrusted and is never server authorization.
+
+Incomplete drafts omit `spriteUrl` and remain restorable in Today. B must require `isReadyDraft(draft)` before starting generation, then publish the player asset with the world. Storage may be denied, so keep that access inside a try/catch and offer a return to Today. The current `/generating` boundary consumes the shared parser and continues to report that B's pipeline is pending; it does not invent generation success.
 
 ## Upload and character endpoints
 
 - `POST /api/upload`: multipart `photo`, `kind`, `sessionId`; returns `{ url }` only after storage succeeds. Supported kinds are the five upload slots above. `sessionId` is a UUIDv4 created by Today.
 - `POST /api/fit-check`: multipart `photo` (front), optional `backPhoto`, `sessionId`; returns `{ spriteUrl }`. Front and back together must be at most 4 MB. Produces a back-facing 32×48 PNG, preserving aspect ratio with transparent padding, binary alpha and at most 32 colours.
 - JPEG, PNG and WebP only; server verifies decoded format, limits decoded pixels to 20 MP, auto-orients, strips metadata, and stores sanitised photos at up to 2048×2048. Original files are not stored. Error responses are `{ error: string }` with a non-2xx status.
-- The spec's route summary lists `dayId` for fit check, while its Today flow generates the player before a day exists. This implementation supports that pre-day flow through `sessionId`; B receives the returned sprite through the draft. Updating an existing published day's player is not implemented here and must not be assumed by A/B.
+- Fit check uses the pre-day `sessionId` contract in SPEC §8; B receives the returned sprite through the validated draft. Updating an existing published day's player is not implemented here and must not be assumed by A/B.
 - Development without Blob writes to ignored `.data/assets/`; local URLs are served through `/api/assets/`. Production requires Blob and does not expose local files. Missing OpenAI configuration returns 503; there is no generated-character stand-in.
 
 ## B → shared viewer
@@ -59,9 +65,27 @@ The surrounding viewer shows the real manifest's player preview and chapter titl
 
 Deployment and full gameplay verification remain separate gates from a successful build.
 
+## Live fit-check proof
+
+Set `OPENAI_API_KEY` and `BLOB_READ_WRITE_TOKEN` in ignored `.env.local`, then start `npm run dev`. Run this with a real full-body photo:
+
+```sh
+npm run prove:fit-check -- --front /absolute/path/front.jpg
+# After the first successful sprite, include the optional back view:
+npm run prove:fit-check -- --front /absolute/path/front.jpg --back /absolute/path/back.jpg
+# The same check can target the deployed app:
+npm run prove:fit-check -- --front /absolute/path/front.jpg --base-url https://your-app.vercel.app
+```
+
+Each run uploads through the real endpoints and makes one paid image-generation request after verifying photo storage. Local filesystem fallback fails the check. It downloads public Blob assets without cookies, verifies photo metadata removal and the sprite's 32×48 PNG, binary transparency and ≤32 colours, and compares a second anonymous download. Photos, sprite and a report stay under ignored `.data/fit-check-proof/<sessionId>/`. Inspect `fit.png` alongside `player.png` to confirm back-facing orientation and outfit fidelity; those visual checks remain pending in the report until reviewed. This command does not exercise the browser UI or prove complete gameplay.
+
+After that first success, verify in the Today UI: adding a back photo regenerates the sprite; replacing the front invalidates the old sprite and disables End My Day until generation completes; a failed request displays its error and Retry character recovers with the same photos. For a controlled failure, use the browser's network tools to block `/api/fit-check`, upload a photo, then unblock it and click Retry character. Finish by checking the generated day, its images and gameplay in an incognito window after A/B integration and deployment.
+
 
 ## Local verification
 
-Typecheck, all 12 tests and the production build pass. Local HTTP smoke checks cover Today, sanitised photo upload/download, rejected invalid sessions, missing image credentials, unavailable days, a temporary valid manifest loaded through the viewer, and the generating handoff page. The temporary test manifest was removed; no demo world is bundled. Live OpenAI generation, public Blob persistence, browser interaction/visual QA and deployment are unverified.
+Typecheck, all 17 tests (12 original plus five focused draft/replacement checks) and the production build pass. No new test dependencies were added. Local HTTP smoke checks cover Today, sanitised photo upload/download, rejected invalid sessions, missing image credentials, unavailable days, a temporary valid manifest loaded through the viewer, and the generating handoff page. The temporary test manifest was removed; no demo world is bundled. The new checks cover contract validation and replacement rollback helpers; browser interaction and image-load recovery still need manual verification.
+
+On 2026-11-01, a real front fit-check photo was uploaded through the running local app to the public `dayquest-assets` Blob store in `lhr1`, linked to `tanweejoe-7327s-projects/dayquest`. An anonymous download returned the stored PNG (3,380,078 bytes), with metadata removed. The following fit-check request returned HTTP 503 with the actionable missing `OPENAI_API_KEY` error. Evidence is retained locally in ignored `.data/fit-check-proof/49945629-6ceb-4cbf-b135-b7cbcace2f70/report.json`. This proves live photo storage, not live sprite generation or storage of a generated sprite. The OpenAI key is not available; `.env.local` retains its empty placeholder. Browser automation was unavailable, and A/B code was absent from origin. Sprite orientation/outfit review, back-photo/replacement/retry UI checks, A/B integration, deployment and incognito gameplay remain unverified.
 
 The package override pins the Blob SDK's CLI-config dependency to patched Zod 4.6.7; `npm audit` reports zero vulnerabilities with the lockfile.

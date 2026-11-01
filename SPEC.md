@@ -284,12 +284,14 @@ TfL line colours: Bakerloo `#B36305`, Central `#E32017`, Circle `#FFD300`, Distr
 
 | Route | In | Out |
 |---|---|---|
-| `POST /api/upload` | `multipart` photo, `kind` = `fit` \| `fit_back` \| `lunch` \| `landmark` \| `park` | `{ url }`; EXIF stripped, stored under `uploads/<session>/` in Blob |
-| `POST /api/generate-day` | `{ uploads: { kind: url }[] }` (+ reads `data/input.json`) | NDJSON stream of progress events (§6.1); last event has `id`. Writes `days/<id>/day.json` + PNGs to Blob |
-| `POST /api/fit-check` | `multipart` photo, `dayId` | `{ spriteUrl }`; overwrites `player.png` for that day |
+| `POST /api/upload` | `multipart` photo, `sessionId` (UUIDv4), `kind` = `fit` \| `fit_back` \| `lunch` \| `landmark` \| `park` | `{ url }`; EXIF stripped, stored under `uploads/<sessionId>/` in Blob |
+| `POST /api/generate-day` | B maps the validated ready draft `{ sessionId, uploads: { kind, url }[], spriteUrl }` into its request (+ reads `data/input.json`) | NDJSON stream of progress events (§6.1); last event has `id`. Writes `days/<id>/day.json` + PNGs to Blob; publishes the ready sprite as the manifest's player asset |
+| `POST /api/fit-check` | `multipart` photo (front), optional `backPhoto`, `sessionId` (UUIDv4) | `{ spriteUrl }`; stores a new generated player asset for the pre-day draft |
 | `GET /day/[id]` | — | page; fetches `day.json` from Blob (or `public/days/demo/` when `id=demo`) |
 
 Keys (`OPENAI_API_KEY`, `BLOB_READ_WRITE_TOKEN`) are server-side env vars only — never in client code or the repo.
+
+Today creates the draft before a published day exists, so fit check uses `sessionId`, not `dayId`. The browser handoff is `sessionStorage["dayquest:draft"]`; `lib/draft.ts` owns its types and validation. A draft may be incomplete; the ready handoff requires a saved front fit and generated `spriteUrl`. Today checks that the sprite loads before allowing End My Day. B validates the handoff again and owns the generation request mapping; it must not put source photos or session identifiers in share URLs. See `docs/C-INTEGRATION.md` for the contract. Updating an existing published day's player is outside this flow.
 
 ## 9. Team split & timeline (3 people)
 
