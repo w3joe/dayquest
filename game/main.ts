@@ -1,5 +1,6 @@
 import { resolveDayAsset, type DayManifest, type DayScene, type InteractEffect, type TransitLeg, type TravelPoint, type JourneyLeg, type WorldObject } from "@/lib/day";
 import { activeJourney, advanceJourney, checkpointJourney, departureJourney, journeyPhaseDuration, journeyStorageKey, restoreJourney, type JourneyEvent, type JourneyState } from "./journey";
+import { drawWaterShimmer, renderGround } from "./ground-render";
 import { worldCollision } from "./world-layout";
 import { BASE_MAPS, FRAMES, MAP_H, MAP_W, TILE, VIEW_H, VIEW_W, groundBlocked, hash, placeLandmark } from "./maps";
 
@@ -15,7 +16,7 @@ const PAPER = "#f6f1df", INK = "#1f1a2e";
 
 export async function createGame(parent: HTMLElement, manifest: DayManifest, manifestUrl: string, onShare?: () => Promise<void> | undefined): Promise<GameHandle> {
   const images = new Map<string, HTMLImageElement>();
-  const urls = new Set(["/tiles/dq-atlas.png", "/tiles/dq/tree.png", "/transit/bus.png", "/transit/tube.png", "/transit/city.png", "/transit/nelson.png", resolveDayAsset(manifest.player.sprite, manifestUrl)]);
+  const urls = new Set(["/tiles/dq/water.png", "/tiles/dq-atlas.png", "/tiles/dq/tree.png", "/transit/bus.png", "/transit/tube.png", "/transit/city.png", "/transit/nelson.png", resolveDayAsset(manifest.player.sprite, manifestUrl)]);
   if (manifest.journeys?.length) {
     urls.add("/transit/library/bus_stop.png"); urls.add("/transit/library/station.png");
   }
@@ -64,6 +65,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
   let dialogue: (Talk & { shown: number; remaining: string[] }) | undefined;
   let blocked = new Set<string>(), talks = new Map<string, Talk>(), sprites: Sprite[] = [];
   let effects: Effect[] = [];
+  let groundCache: { scene: number; canvas: HTMLCanvasElement } | undefined;
   const lampsOn = new Set<string>(), spoken = new Map<string, number>();
   let transit: { leg: TransitLeg; change?: string; duration: number }[] = [], transitIndex = 0, transitAt = 0;
   let shareNote = "", destroyed = false;
@@ -356,18 +358,19 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     const scene = manifest.scenes[index], world = scene.world!;
     const cameraX = Math.round(Math.max(0, Math.min(world.width * TILE - viewWidth, x - viewWidth / 2)));
     const cameraY = Math.round(Math.max(0, Math.min(world.height * TILE - viewHeight, y - viewHeight * .62)));
-    const materials: Record<string, string> = { g: "grass", f: "flowers", p: "pavement", c: "cobble", r: "road", k: "kerb" };
     ctx.fillStyle = "#85a77b"; ctx.fillRect(0, 0, viewWidth, viewHeight);
     ctx.save(); ctx.translate(-cameraX, -cameraY);
-    for (let row = 0; row < world.height; row++) for (let col = 0; col < world.width; col++) {
-      if (world.ground[row][col] === "w") { ctx.fillStyle = "#568fa4"; ctx.fillRect(col * TILE, row * TILE, TILE, TILE); continue; }
-      ctx.drawImage(picture(`/tiles/dq/library/${materials[world.ground[row][col]] ?? "pavement"}.png`), col * TILE, row * TILE, TILE, TILE);
+    if (groundCache?.scene !== index) groundCache = { scene: index, canvas: renderGround(world, picture) };
+    ctx.drawImage(groundCache.canvas, 0, 0);
+    drawWaterShimmer(ctx, world, elapsed, cameraX, cameraY, viewWidth, viewHeight);
+    // Painted road markings and a pedestrian crossing keep a street legible. Layouts without a road have none.
+    if (world.crossing) {
+      const { col: crossCol, row: crossRow, rows: crossRows } = world.crossing;
+      ctx.fillStyle = "#eee5bc";
+      for (let col = 0; col < world.width; col += 4) if (col < crossCol - 1 || col > crossCol + 4) ctx.fillRect(col * TILE, (crossRow + crossRows / 2) * TILE - 2, 24, 2);
+      ctx.fillStyle = "#ece7d2";
+      for (let row = crossRow; row < crossRow + crossRows; row++) ctx.fillRect(crossCol * TILE, row * TILE + 3, 64, 7);
     }
-    // Painted road markings and a pedestrian crossing keep the street legible.
-    ctx.fillStyle = "#eee5bc";
-    for (let col = 0; col < world.width; col += 4) if (col < 17 || col > 22) ctx.fillRect(col * TILE, 16 * TILE - 2, 24, 2);
-    ctx.fillStyle = "#ece7d2";
-    for (let row = 14; row < 18; row++) ctx.fillRect(18 * TILE, row * TILE + 3, 64, 7);
     if (scene.food) {
       const tile = scene.food.tile;
       ctx.fillStyle = "#48372b"; ctx.fillRect(tile.x * TILE + 1, tile.y * TILE + 10, 14, 9);

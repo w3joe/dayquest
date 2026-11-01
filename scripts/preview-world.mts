@@ -4,7 +4,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { mockScenePlan } from "../pipeline/scene-plan";
 import { pixelateSceneSprite } from "../pipeline/pixelate";
-import { buildWorldLayout } from "../game/world-layout";
+import { buildWorldLayout, templateFor } from "../game/world-layout";
 import { fallbackDesign } from "../pipeline/world-design";
 import { parseDayManifest, type DayManifest } from "../lib/day";
 
@@ -41,7 +41,9 @@ const sheet = await sharp(originalSheet).extract({ left: 0, top: 0, width: 96, h
 await writeFile(path.join(destination, "player_walk.png"), sheet);
 await writeFile(path.join(destination, "player.png"), await sharp(sheet).extract({ left: 0, top: 144, width: 32, height: 48 }).png().toBuffer());
 await writeFile(path.join(destination, "food.png"), await sharp(await readFile(path.join(root, "public", "days", "demo", "s1_food_icon.png"))).resize(32, 32, { kernel: "nearest" }).png().toBuffer());
-blueprint.design = fallbackDesign(blueprint.ground);
+if (process.env.PREVIEW_TEMPLATE) blueprint.template = process.env.PREVIEW_TEMPLATE as never;
+const chosen = templateFor(blueprint);
+blueprint.design = fallbackDesign(chosen.grounds[0], chosen.zones);
 const layout = buildWorldLayout(blueprint, sprites);
 const manifest: DayManifest = {
   id, date: "2026-11-01", player: { name: "Offline sample character", sprite: "player.png", walkSheet: "player_walk.png" },

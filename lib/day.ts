@@ -32,6 +32,8 @@ export type SceneWorld = {
   height: number;
   ground: string[];
   objects: WorldObject[];
+  /** A painted pedestrian crossing and road markings; only for layouts that have a road. */
+  crossing?: { col: number; row: number; rows: number };
 };
 export type DayScene = {
   /** Stable external-provider key, required when a day contains multiple world scenes. */
@@ -57,7 +59,8 @@ export type TravelPoint = {
   tile: Tile;
   approach: Tile;
 };
-export type JourneyLeg = (TransitLeg | { mode: "walk"; from: string; to: string }) & { durationMs?: number };
+/** `estimated` marks a leg that was guessed (for example from photo locations) rather than supplied or recorded. */
+export type JourneyLeg = (TransitLeg | { mode: "walk"; from: string; to: string }) & { durationMs?: number; estimated?: boolean };
 export type Journey = {
   id: string;
   fromSceneId: string;
@@ -134,6 +137,7 @@ function validWorld(value: unknown): value is SceneWorld {
     !Array.isArray(value.ground) || value.ground.length !== value.height ||
     !value.ground.every(row => typeof row === "string" && row.length === value.width && /^[gfpcrkw]+$/.test(row)) ||
     !Array.isArray(value.objects) || value.objects.length === 0 || value.objects.length > 128) return false;
+  if (value.crossing !== undefined && !(object(value.crossing) && integer(value.crossing.col, 1, 120) && integer(value.crossing.row, 1, 120) && integer(value.crossing.rows, 1, 8))) return false;
   const width = value.width * 16, height = value.height * 16;
   const ids = new Set<string>();
   for (const item of value.objects) {

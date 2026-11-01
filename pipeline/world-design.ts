@@ -17,7 +17,7 @@ const clean = (s: unknown, max: number) => (typeof s === "string" ? s.replace(/\
  * Hand-written sets per ground. Warm, short, and free of factual claims about the place, so they are always safe to ship.
  * This is also the fallback when an agent fails or produces something the validator rejects.
  */
-export function fallbackDesign(ground: Ground): WorldDesign {
+export function fallbackDesign(ground: Ground, zones?: { id: string; use: string }[]): WorldDesign {
   const sets: Record<Ground, Omit<WorldDesign, "source">> = {
     street: {
       interactables: [
@@ -53,13 +53,19 @@ export function fallbackDesign(ground: Ground): WorldDesign {
       ],
     },
   };
-  return { ...sets[ground], source: "fallback" };
+  const design = { ...sets[ground], source: "fallback" as const };
+  if (!zones) return design;
+  // The hand-written "near" values name street zones; on another template, pick the closest-purpose zone that exists.
+  const use = (zone?: string) => (zone?.includes("verge") ? "verge" : zone?.includes("plaza") ? "plaza" : "sidewalk");
+  const resolve = (near?: string) => (near && zones.some((z) => z.id === near)) ? near : (zones.find((z) => z.use === use(near)) ?? zones[0])?.id;
+  return { ...design, interactables: design.interactables.map((i) => ({ ...i, near: resolve(i.near) })), npcs: design.npcs.map((n) => ({ ...n, near: resolve(n.near) })) };
 }
 
 export type DesignIssue = string;
 
 /** Strict gate for anything an agent returns. Returns a cleaned design or the reasons it was rejected. */
-export function validateDesign(raw: unknown, ground: Ground, anchors?: string[]): { ok: true; design: WorldDesign } | { ok: false; issues: DesignIssue[] } {
+export function validateDesign(raw: unknown, groundOrGrounds: Ground | Ground[], anchors?: string[]): { ok: true; design: WorldDesign } | { ok: false; issues: DesignIssue[] } {
+  const grounds = Array.isArray(groundOrGrounds) ? groundOrGrounds : [groundOrGrounds];
   const issues: DesignIssue[] = [];
   const r = (raw ?? {}) as { interactables?: unknown; npcs?: unknown };
   const used = new Set<string>();
@@ -68,7 +74,7 @@ export function validateDesign(raw: unknown, ground: Ground, anchors?: string[])
     if (id === undefined) return;
     const found = actorById(id);
     if (!found || found.role !== role) issues.push(`${what}: library sprite "${id}" is not a ${role}`);
-    else if (!found.grounds.includes(ground)) issues.push(`${what}: "${id}" does not suit a ${ground} scene`);
+    else if (!grounds.some((g) => found.grounds.includes(g))) issues.push(`${what}: "${id}" does not suit this kind of place`);
   };
 
   const interactables: DesignInteractable[] = (Array.isArray(r.interactables) ? r.interactables : []).slice(0, 6).map((v: Record<string, unknown>) => ({

@@ -13,6 +13,8 @@ export type LibraryActor = {
   /** Interactables: which effects make sense for this sprite. */
   effects?: InteractEffect[];
   grounds: Ground[];
+  /** Must stand right beside a path or paving (benches, lamps, machines): never floating in open lawn. */
+  besidePath?: boolean;
   /** One line telling a model what this sprite looks like and what it is for. */
   hint: string;
   /** Prompt for the image API, appended to the shared isolated-object style. */
@@ -62,3 +64,6 @@ export const ACTOR_LIBRARY: LibraryActor[] = [
 
 export const actorById = (id: string) => ACTOR_LIBRARY.find((actor) => actor.id === id);
 export const actorSprite = (id: string) => `${ACTOR_DIR}${id}.png`;
+
+const BESIDE_PATH = new Set(["bell", "crossing_button", "bench", "lantern", "vending_machine", "post_box", "jukebox", "telescope"]);
+for (const actor of ACTOR_LIBRARY) if (BESIDE_PATH.has(actor.id)) actor.besidePath = true;

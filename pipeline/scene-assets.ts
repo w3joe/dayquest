@@ -20,6 +20,9 @@ export type SceneAssetSources = {
   styleReferences?: Buffer[];
 };
 
+/** World objects other than the main character share one chibi look: squat, rounded, toy-like, with oversized friendly details. */
+export const CHIBI_WORLD = "Draw it in the same cute CHIBI style as the world's other sprites: squat, rounded, toy-like proportions, chunky roof and oversized friendly windows and doors, simplified but still recognisable, thick dark outline, 2 to 3 flat tones per colour. Do not make it tall, realistic or finely detailed.";
+
 export const WALK_SHEET_PROMPT = `${ISOLATED_OBJECT}
 Create a CHARACTER WALKING SPRITE SHEET. The single-object instruction applies independently to EACH CELL.
 Use exactly THREE equal-width columns and FOUR equal-height rows on the entire canvas: twelve independent frames, no gaps between cells, no labels, no drawn grid lines.
@@ -45,14 +48,15 @@ export function buildSceneAssetJobs(blueprint: SceneBlueprint, sources: SceneAss
     file: `${building.id}.png`,
     kind: "landmark",
     name: building.name,
-    prompt: `${ISOLATED_OBJECT} A detailed, recognisable three-quarter top-down building sprite for a walkable neighbourhood, with readable roof, facade, windows and entrance. ${building.description}. ${building.observed ? "Use the FIRST reference photo for the building's observed shape, materials and distinctive details. Extract only this building, not the photograph's background." : "This is a supporting building imagined to match the setting, not a claim about a real named place. Keep it secondary to the main photographed location."} Additional references show the pixel-art style only. Match their perspective and palette. Fit a 160 by 128 game-sprite footprint. No people, text overlays, ground tile or surrounding buildings.`,
-    references: reference(sources.uploads.landmark),
+    prompt: `${ISOLATED_OBJECT} A recognisable three-quarter top-down building sprite for a walkable neighbourhood, with readable roof, facade, windows and entrance. ${CHIBI_WORLD} ${building.description}. ${building.observed ? "Use the FIRST reference photo for the building's observed shape, materials and distinctive details. Extract only this building, not the photograph's background." : "This is a supporting building imagined to match the setting, not a claim about a real named place. Keep it secondary to the main photographed location."} Additional references show the pixel-art style only. Match their perspective and palette. Fit a 160 by 128 game-sprite footprint. No people, text overlays, ground tile or surrounding buildings.`,
+    // Only the photographed subject sees the photo. Neighbours come from the place research, so they must NOT be redrawn from the same picture.
+    references: building.observed ? reference(sources.uploads.landmark) : styles,
     process: (raw) => processSprite(raw, 160, 128),
   }));
   for (const prop of blueprint.props.filter((candidate) => !candidate.library)) {
     jobs.push({
       id: prop.id, file: `${prop.id}.png`, kind: "landmark", name: prop.name,
-      prompt: `${ISOLATED_OBJECT} A distinctive small neighbourhood prop: ${prop.description}. Match the FIRST location photo's visible details where present. Additional references supply style only. Three-quarter top-down view, compatible with a 32 by 48 game-sprite footprint. No people or buildings.`,
+      prompt: `${ISOLATED_OBJECT} A distinctive small neighbourhood prop: ${prop.description}. ${CHIBI_WORLD} Match the FIRST location photo's visible details where present. Additional references supply style only. Three-quarter top-down view, compatible with a 32 by 48 game-sprite footprint. No people or buildings.`,
       references: reference(sources.uploads.landmark),
       process: (raw) => processSprite(raw, 32, 48),
     });
