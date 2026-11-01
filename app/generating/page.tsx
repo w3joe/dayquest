@@ -47,6 +47,7 @@ export default function GeneratingPage() {
       timer = setTimeout(next, 300);
       return () => { cancelled = true; if (timer) clearTimeout(timer); };
     }
+    let autoRetries = 0;
     async function poll(retry: boolean) {
       const draft = parseStoredDraft(sessionStorage.getItem(DRAFT_STORAGE_KEY));
       if (!isReadyDraft(draft)) { setStatus("no-draft"); return; }
@@ -55,11 +56,28 @@ export default function GeneratingPage() {
         body: JSON.stringify({ ...draft, retry }), signal: controller.signal,
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Your world could not start. Please retry.");
+      if (!response.ok) {
+        const message = result.error || "Your world could not start. Please retry.";
+        if (response.status >= 500 && !/OPENAI_API_KEY|not configured/i.test(message) && autoRetries < 3) {
+          autoRetries++;
+          timer = setTimeout(() => { void poll(true).catch(fail); }, 2500 * autoRetries);
+          return;
+        }
+        throw new Error(message);
+      }
       if (cancelled) return;
       const job = result as WorldJob;
       setEvents(job.events); setProgress({ completed: job.completed, total: job.total });
-      if (job.status === "error") { fail(new Error(job.error || "World creation paused. Retry to continue.")); return; }
+      if (job.status === "error") {
+        const message = job.error || "World creation paused. Retry to continue.";
+        // transient provider failures (5xx, timeouts, rate limits) resume from the saved checkpoint by themselves
+        if (/unavailable right now|timed out|busy/i.test(message) && autoRetries < 3) {
+          autoRetries++;
+          timer = setTimeout(() => { void poll(true).catch(fail); }, 2500 * autoRetries);
+          return;
+        }
+        fail(new Error(message)); return;
+      }
       if (job.status === "done") {
         setStatus("done");
         timer = setTimeout(() => !cancelled && router.push(`/day/${job.id}`), 900);
