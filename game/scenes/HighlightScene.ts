@@ -124,12 +124,21 @@ export class HighlightScene extends Phaser.Scene {
       this.input.keyboard?.off("keydown-ENTER", confirm);
     });
 
+    this.addHud(scene.title, scene.time, manifest.date);
     this.showCard(`${scene.time} · ${scene.title.toUpperCase()}`);
     this.cameras.main.fadeIn(400, 0, 0, 0);
   }
 
+  /** Persistent top corners: where (left) and when (right). Stays under the textbox and above the world. */
+  private addHud(title: string, time: string, date: string) {
+    const style = { fontFamily: FONT, fontSize: "8px", color: "#f6f1df", backgroundColor: "#1f1a2e", padding: { x: 6, y: 5 } } as const;
+    const day = new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(",", "").toUpperCase();
+    this.add.text(4, 4, title.toUpperCase(), style).setOrigin(0).setDepth(9000);
+    this.add.text(VIEW_W - 4, 4, `${time}\n${day}`, { ...style, align: "right", lineSpacing: 4 }).setOrigin(1, 0).setDepth(9000);
+  }
+
   private showCard(label: string) {
-    const text = this.add.text(VIEW_W / 2, 14, label, { fontFamily: FONT, fontSize: "8px", color: "#f6f1df", padding: { x: 8, y: 6 }, backgroundColor: "#1f1a2e" }).setOrigin(0.5, 0).setDepth(10_000);
+    const text = this.add.text(VIEW_W / 2, 36, label, { fontFamily: FONT, fontSize: "8px", color: "#f6f1df", padding: { x: 8, y: 6 }, backgroundColor: "#1f1a2e" }).setOrigin(0.5, 0).setDepth(10_000);
     this.tweens.add({ targets: text, alpha: 0, delay: 1500, duration: 400, onComplete: () => text.destroy() });
   }
 

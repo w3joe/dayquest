@@ -33,6 +33,7 @@ Effort: S under 2 h, M half a day, L a day or more. Impact is for the shape abov
 | C | Scripted video clip of the day | Medium | M | scripted input into `HighlightScene`, canvas `MediaRecorder` |
 | D | Three interactables per scene (Agents SDK ideas) | High | L | manifest field, `HighlightScene`, agent + validator |
 | E | Seasonal scenes (grade and particles first) | High | M | season from date, `HighlightScene` overlay; tile variants later |
+| G | Persistent spaces shelf + postcard tool | High | L | storage, `/spaces`, postcard route and overlay |
 | F | Diary voice, NPC lines, soundtrack from mood, souvenirs, postcard | Medium to High | M to L each | pipeline + game; see section F |
 
 ## Sketches for the top items
@@ -52,6 +53,12 @@ Effort: S under 2 h, M half a day, L a day or more. Impact is for the shape abov
 - **Sound:** background music and sound effects, no narration or speech. Sources are in-code synthesis (Web Audio) and CC0 royalty-free loops. OpenAI has no music or SFX endpoint (its audio API is speech and transcription), so generated sound would need a third party. **No Nintendo music or effects**: they are copyrighted recordings, the spec forbids them, and this repo is public. A git-ignored local folder can hold anyone's personal files without committing them.
 - **Frontend:** polish the existing screens rather than rebuild them, starting with the shared-day page. Warm, cosy, phone-first.
 - **Link preview card:** parked, to revisit later.
+- **Seasons:** colour grade and particles first (autumn for the demo), generated seasonal tilesets later.
+- **Demo weather:** scripted rain, then golden-hour clearing.
+- **Interactables:** the Agents SDK proposes three per scene, a validator guards placement, hand-made defaults are the fallback.
+- **Sender note:** yes. **Reactions, send-one-back, photo mode:** not now.
+- **Persistent spaces and a postcard tool:** wanted (section G).
+- **In-scene HUD:** location top-left, time and date top-right (built).
 - **Weather-aware scenes** and the **demo location package** (see "Two additions"): wanted.
 
 ## More ideas from the team
@@ -97,6 +104,13 @@ The same map should feel different in different seasons. The date and place alre
 - **Postcard ending.** The end card becomes a generated postcard (a scene crop, the sender's note, a stamp with the date and place) that can be saved or sent.
 - **A village of days.** Over time, days join into a small world: a map of every place someone has been, shared with a partner so two people's days sit in the same village.
 - **Companion.** A small pet that follows the player and reacts to weather and landmarks.
+
+### G. Persistent spaces and postcards
+
+- **Spaces that persist.** Every generated day stays a place you can return to: a "My spaces" shelf of past days (cover image, date, place, weather), each one reopening exactly as it was shared. Over time the shelf is a personal atlas, and it is the seed of the "village of days" in section F.
+- **Postcard tool, inside a space.** While standing in any scene, a viewer or the owner can open a small postcard tool: pick a spot or frame the current view, choose a stamp and border, write a short message, and save or share the result as an image or a link. A postcard keeps the scene, the date, the place and the weather, so it reads as "from that day".
+- **Shareable.** Each postcard has its own small link and preview image, so a single moment can be sent without sending the whole day. This is also the natural first use of the link-preview work, which is parked for now.
+- **Care needed.** Postcards must not leak more than the day already does (no exact coordinates), the owner decides whether viewers may make them, and saved cards need a delete.
 
 ## Two additions
 
