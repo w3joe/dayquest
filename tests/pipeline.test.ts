@@ -74,12 +74,27 @@ test("a failing image model falls back to placeholders instead of failing the da
   assert.ok(events.some((e) => e.label.includes("PLACEHOLDER")));
 });
 
-test("Wikipedia references only follow upload.wikimedia.org and never throw", async () => {
-  const fake = (async (url: string) => {
-    if (String(url).includes("/page/summary/")) return Response.json({ originalimage: { source: "https://evil.example/x.png" } });
+test("Wikipedia references follow only Wikimedia image hosts and never throw", async () => {
+  const tiny = await sharp({ create: { width: 4, height: 4, channels: 3, background: "red" } }).jpeg().toBuffer();
+  const wiki = (source: string) => (async (url: string) => {
+    if (String(url).includes("/page/summary/")) return Response.json({ originalimage: { source } });
+    if (String(url) === source) return new Response(new Uint8Array(tiny), { headers: { "content-type": "image/jpeg" } });
     throw new Error("should not fetch");
   }) as typeof fetch;
-  assert.equal(await fetchWikipediaImage("Big Ben", fake), null);
+  for (const host of ["upload", "thumb"]) {
+    const png = await fetchWikipediaImage("Big Ben", wiki(`https://${host}.wikimedia.org/wikipedia/commons/a/ab/Big_Ben.jpg`));
+    assert.equal((await sharp(png!).metadata()).format, "png", host);
+  }
+  assert.equal(await fetchWikipediaImage("Big Ben", wiki("https://evil.example/x.png")), null);
+  // A 15 MB original falls back to the thumbnail instead of going text-only.
+  const original = "https://upload.wikimedia.org/huge.jpg", thumbnail = "https://thumb.wikimedia.org/330px-huge.jpg";
+  const huge = (async (url: string) => {
+    if (String(url).includes("/page/summary/")) return Response.json({ originalimage: { source: original }, thumbnail: { source: thumbnail } });
+    if (String(url) === original) return new Response("x", { headers: { "content-length": String(15 * 1024 * 1024) } });
+    if (String(url) === thumbnail) return new Response(new Uint8Array(tiny));
+    throw new Error("should not fetch");
+  }) as typeof fetch;
+  assert.ok(await fetchWikipediaImage("Red telephone box", huge));
   assert.equal(await fetchWikipediaImage("Big Ben", (async () => { throw new Error("offline"); }) as typeof fetch), null);
   assert.equal(await fetchWikipediaImage(""), null);
 });
