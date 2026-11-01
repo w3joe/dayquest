@@ -24,7 +24,8 @@
 | Transitions | Exit tile on scene edge → 2D pixel **transport loading animation** (red bus w/ route number, or tube train in line colour w/ station names) → next scene |
 | Data in | Hardcoded `data/input.json` (location history, transport legs, workouts) + real uploaded photos |
 | Sharing | `/day/<id>` link, no accounts. Demo day also committed to `public/days/demo/` as fallback |
-| Live on stage | Environment pre-generated. Live: take fit-check photo → sprite generated → walks into the scene |
+| Ingest UI | A **"Today" screen** that visibly ingests the day: location history syncing onto a map, photo upload slots (fit check, lunch, landmark, park), health import, auto-detected transport, then a live generation log. See §6.1 |
+| Live on stage | Environment pre-generated. Live: upload fit check + ramen photo on the Today screen → sprite generated → walks into the scene |
 | Video / Sora | No. Sora API is removed; no download-clip feature |
 | Out of scope | World journal (pitch slide only), accounts, feeds, real HealthKit/Strava, 3D, battle screens |
 
@@ -56,10 +57,14 @@ A Saturday in London. This is what `data/input.json` hardcodes and what gets pre
 ## 3. Architecture
 
 ```
-data/input.json + photos
+Today screen (/)  ── location history (data/input.json) animates in
+                  ── photos  ──► POST /api/upload  (strip EXIF → Blob)
+                  ── fit check ─► POST /api/fit-check (sprite, live)
+                  ── "END MY DAY"
         │
         ▼
-POST /api/generate-day ──► 1. pick highlights (LLM, structured output)
+POST /api/generate-day ──► streams NDJSON progress events to the Generating screen
+                           1. pick highlights (LLM, structured output)
                            2. pick 3 landmarks per highlight (LLM)
                            3. fetch reference images (Wikipedia REST)
                            4. gpt-image-2.5 edits (transparent PNG)
@@ -76,10 +81,13 @@ POST /api/fit-check (photo) ──► gpt-image-2.5 → post-process → player.
 
 ```
 app/
-  page.tsx                 # "End my day" + fit-check upload
+  page.tsx                 # Today screen: timeline, upload slots, health, transport, END MY DAY
+  generating/page.tsx      # retro progress log reading the generate-day stream
   day/[id]/page.tsx        # loads day.json, mounts Phaser
+  api/upload/route.ts
   api/generate-day/route.ts
   api/fit-check/route.ts
+components/today/          # LocationSync, UploadSlot, HealthCard, TransportCard
 game/
   main.ts                  # Phaser config (pixelArt: true, zoom 3)
   scenes/HighlightScene.ts # one scene, parameterised by a highlight
@@ -235,7 +243,35 @@ Strip EXIF from every uploaded photo before storing (`sharp().rotate()` drops me
 - **Exit tile:** a path tile at the map edge; stepping on it → fade out → `TransitScene` → next `HighlightScene`. After scene 3 → end card with **Share** button (copies `location.href`).
 - **Stretch:** parallax skyline layer behind the top of the map; ambient chiptune loop.
 
-## 7. Transport transitions (owner: C)
+## 6.1 Today screen: ingesting the day (owner: C)
+
+The judges should *see* the day's data going in. Same pixel font and 9-slice boxes as the game, laid out like a retro menu. Sections, top to bottom:
+
+1. **Location sync.** On load: `SYNCING LOCATION HISTORY…` with a chunky pixel progress bar, then a pixelated map of central London (one static image, pixelated with `pixelate.ts`) where stops from `input.json` pop in one by one in time order, joined by a dotted route. Beside it a timeline ticks in: `10:00 PARLIAMENT SQUARE ✓`, `12:40 KANADA-YA ✓`, … Data is hardcoded; the animation is what sells it.
+2. **Today's photos.** Upload slots styled as quest cards, each with a check box:
+   - `FIT CHECK` (required): front photo, optional back photo
+   - `LUNCH`: the ramen photo
+   - `LANDMARK` and `PARK` (optional)
+
+   Each slot is `<input type="file" accept="image/*" capture="environment">` plus drag-and-drop. On upload: the thumbnail appears **pixelated in the browser** (canvas, nearest-neighbour) as instant feedback, `exifr` reads the photo's time client-side and matches it to the nearest stop (`MATCHED TO 12:40 · KANADA-YA`), then the file goes to `/api/upload` and the quest ticks off. Uploading the fit check also fires `/api/fit-check` so the sprite is ready by the time the day is generated.
+3. **Health.** `IMPORT FROM HEALTH` button → 1.5 s fake sync → card shows the hardcoded walk: `WALK · 3.8 KM · 75 MIN · 5,200 STEPS`.
+4. **Transport.** Auto-detected legs with line chips: a red `BUS 24` chip, a red `CENTRAL` chip and a brown `BAKERLOO` chip.
+5. **`END MY DAY`** button (enabled once the fit check is in) → `/generating`.
+
+**Generating screen** (owner: B). Reads the NDJSON stream from `/api/generate-day` and prints a retro log, one line per event, with thumbnails popping in as each image finishes:
+
+```
+> PICKING TODAY'S 3 HIGHLIGHTS…        WESTMINSTER · KANADA-YA · REGENT'S PARK
+> FINDING LANDMARKS NEAR WESTMINSTER… BIG BEN · LONDON EYE · PHONE BOX
+> PAINTING BIG BEN…                    [thumb]
+> PIXELATING…                          ✓
+> BUILDING YOUR WORLD…                 → /day/<id>
+```
+
+Event shape: `{ "step": "highlights" | "landmarks" | "image" | "pixelate" | "done", "label": string, "thumb"?: string, "id"?: string }`.
+For the demo, `/generating?replay=demo` replays `public/days/demo/events.ndjson` (recorded from the real pre-generation run) with the timing compressed, so the log is genuine output, just not live.
+
+## 7. Transport transitions (owner: A)
 
 `TransitScene` (~4 s per leg, skippable with Space) plays each entry in `transit[i].legs` in order:
 - **Bus (1 → 2):** red double-decker drives left→right over a scrolling skyline (Whitehall → Nelson's Column → Charing Cross Road). Blind reads `24 HAMPSTEAD HEATH`; caption `PARLIAMENT SQUARE → TOTTENHAM COURT ROAD`.
@@ -248,7 +284,8 @@ TfL line colours: Bakerloo `#B36305`, Central `#E32017`, Circle `#FFD300`, Distr
 
 | Route | In | Out |
 |---|---|---|
-| `POST /api/generate-day` | none (reads `data/input.json` + photos) | `{ id }`; writes `days/<id>/day.json` + PNGs to Vercel Blob |
+| `POST /api/upload` | `multipart` photo, `kind` = `fit` \| `fit_back` \| `lunch` \| `landmark` \| `park` | `{ url }`; EXIF stripped, stored under `uploads/<session>/` in Blob |
+| `POST /api/generate-day` | `{ uploads: { kind: url }[] }` (+ reads `data/input.json`) | NDJSON stream of progress events (§6.1); last event has `id`. Writes `days/<id>/day.json` + PNGs to Blob |
 | `POST /api/fit-check` | `multipart` photo, `dayId` | `{ spriteUrl }`; overwrites `player.png` for that day |
 | `GET /day/[id]` | — | page; fetches `day.json` from Blob (or `public/days/demo/` when `id=demo`) |
 
@@ -256,22 +293,23 @@ Keys (`OPENAI_API_KEY`, `BLOB_READ_WRITE_TOKEN`) are server-side env vars only �
 
 ## 9. Team split & timeline (3 people)
 
-| Time | **A — Game** | **B — Pipeline** | **C — Character, transit, ship** |
+| Time | **A — Game + transit** | **B — Pipeline + generating log** | **C — Today screen, character, ship** |
 |---|---|---|---|
-| 0:00–0:15 | **All:** agree §4 contracts, scaffold Next.js + Phaser, A commits fake `public/days/demo/day.json` | | |
-| 0:15–1:30 | One walkable scene: base map, Grid Engine, depth sort, placeholder landmarks, textbox | Highlight/landmark LLM call + Wikipedia refs + first landmark end-to-end through `pixelate.ts` | `/api/fit-check` → front sprite working; shared `pixelate.ts` with B |
-| 1:30–2:30 | 3 base maps, exit tiles, scene cards, food icon in textbox | Full `/api/generate-day` → Blob; food icons | `TransitScene` bus + tube, `/day/[id]` route |
-| 2:30–3:15 | Wire real `day.json`, polish 2.5D (shadows, depth) | Pre-generate demo day, lock prompts, commit to `public/days/demo/` | Deploy to Vercel, test share link in incognito |
+| 0:00–0:15 | **All:** agree §4 contracts + §6.1 event shape, scaffold Next.js + Phaser, A commits fake `public/days/demo/day.json` | | |
+| 0:15–1:30 | One walkable scene: base map, Grid Engine, depth sort, placeholder landmarks, textbox | Highlight/landmark LLM call + Wikipedia refs + first landmark end-to-end through `pixelate.ts` | `/api/upload` + `/api/fit-check` → back-facing sprite; Today screen layout with upload slots |
+| 1:30–2:30 | 3 base maps, exit tiles, scene cards, `TransitScene` bus + tube | Full `/api/generate-day` streaming NDJSON → Blob; food sprites; `/generating` log screen | Location sync animation, EXIF matching, health + transport cards, `/day/[id]` route |
+| 2:30–3:15 | Wire real `day.json`, food on the table, polish 2.5D (shadows, depth) | Pre-generate demo day, record `events.ndjson`, lock prompts | Deploy to Vercel, run the full flow end to end, test share link in incognito |
 | 3:15–4:00 | **Feature freeze. All:** README, Codex screenshots, record 90 s video, strip keys/EXIF, submit | | |
 
-**Cut order if behind:** food icon → per-line tube colour (one generic train) → depth sort/shadows → Vercel Blob (serve only the committed demo day).
+**Cut order if behind:** food in the world (keep textbox icon) → per-line tube colour (one generic train) → pixel map in location sync (keep the ticking timeline) → depth sort/shadows → Vercel Blob (serve only the committed demo day).
 
 ## 10. 90-second demo script
 
 1. **0–10 s** — Problem: "My partner's in London, I'm not. I know where she is, I can't *see* her day."
-2. **10–55 s** — Open her share link. Walk up into scene 1 (Big Ben, London Eye, Shard on the skyline; read a textbox) → exit tile → **bus 24** animation → scene 2 (Kanada-Ya, ramen bowl on the table, textbox) → **Central → Bakerloo** animation → scene 3 (Regent's Park, walk stats).
-3. **55–80 s** — "Now me." Take a fit-check photo → (cut the wait) → back-facing sprite appears and walks into the scene.
-4. **80–90 s** — Hit **Share**, show the link. "Every day becomes a place you can visit." (World journal = one-line vision.)
+2. **10–30 s** — **Today screen, live.** Location history syncs onto the pixel map. Upload the fit check and the ramen photo; both pixelate instantly and match to their stops. Import the walk; transport chips appear. Hit **END MY DAY**.
+3. **30–40 s** — **Generating log** (cut down): highlights picked, landmarks found, Big Ben and the ramen bowl pop in as pixel art.
+4. **40–80 s** — **Play the day.** The back-facing sprite (from the fit check) walks up into Westminster (Big Ben, London Eye, Shard on the skyline; read a textbox) → exit tile → **bus 24** → Kanada-Ya (ramen bowl on the table, textbox) → **Central → Bakerloo** → Regent's Park (walk stats).
+5. **80–90 s** — Hit **Share**, show the link. "Every day becomes a place you can visit." (World journal = one-line vision.)
 
 ## 11. Submission checklist
 

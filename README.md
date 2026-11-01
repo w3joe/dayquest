@@ -14,6 +14,7 @@
 - _TODO: fill in at feature freeze_
 - Pipeline: day data → LLM picks 3 highlights (tourist spot, meal, park) + nearby landmarks → reference photos → `gpt-image-2.5` → pixel post-process → `day.json`
 - Game: Phaser 3 + Grid Engine scenes with AI-generated landmarks, depth sorting, textboxes
+- Today screen: location history sync, photo uploads (fit check, lunch), health import, transport detection
 - Fit check → back-facing player sprite
 - Transport loading animations (bus / tube line)
 - Shareable `/day/<id>` links
@@ -38,9 +39,9 @@ Regenerate the demo day: `POST /api/generate-day` (reads `data/input.json`).
 
 | Name | Role |
 |---|---|
-| _TODO_ | Game (Phaser scenes) |
-| _TODO_ | Pipeline (LLM + image gen) |
-| _TODO_ | Character, transit animations, deploy |
+| _TODO_ | Game + transit animations |
+| _TODO_ | Pipeline + generating log |
+| _TODO_ | Today screen (ingest), character, deploy |
 
 Contact: _TODO_
 
