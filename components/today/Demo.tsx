@@ -6,12 +6,12 @@ import RealMap from "./RealMap";
 
 /** Sample photos, notes and location history shown on the Demo page. */
 export const DEMO_UPLOADS = [
-  { kind: "lunch", url: "/ui/food.png", note: "tonkotsu ramen and gyoza" },
-  { kind: "landmark", url: "/ui/landmark.png", note: "Big Ben from the bridge" },
+  { kind: "lunch", url: "/demo/food.jpg", note: "four bowls at Kanada-Ya, table 30" },
+  { kind: "landmark", url: "/demo/place.jpg", note: "Big Ben from the South Bank" },
   { kind: "extra", url: "/ui/flower.png", note: "rose garden" },
   { kind: "extra", url: "/ui/heart.png", note: "best day" },
 ];
-export const DEMO_FIT = { url: "/ui/shirt.png", note: "cozy saturday fit" };
+export const DEMO_FIT = { url: "/demo/fit.jpg", note: "red puffer, ready for London" };
 export const DEMO_SPRITE = "/days/demo/player.png";
 export const DEMO_PLACES = { name: "demo", count: day.locations.length, range: "London" };
 

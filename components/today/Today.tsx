@@ -16,7 +16,7 @@ import GalleryCard from "./GalleryCard";
 import { useGallery } from "./useGallery";
 import { ACCEPTED_TYPES, MAX_PHOTO_BYTES, matchPhoto, preparePhoto, preview , ACCEPT_ATTR, isAcceptedPhoto } from "./photo-tools";
 import PixelSprite, { type SpriteName } from "./pixel";
-import { DEMO_FIT_DELAY_MS, DEMO_MODE, DEMO_SPRITE_URL } from "../../lib/demo";
+import { DEMO_FIT_DELAY_MS, DEMO_MODE, DEMO_SPRITE_URL, markDemoRun } from "../../lib/demo";
 
 type Kind = Extract<UploadKind, "fit">;
 const quests: { kind: Kind; name: string; sprite: SpriteName }[] = [{ kind: "fit", name: "Fit", sprite: "shirt" }];
@@ -239,6 +239,7 @@ export default function Today({ demo = false }: { demo?: boolean }) {
   function finishDay() {
     if (!canFinish || Object.keys(pendingFiles.current).length || generationRunning.current) return;
     if (DEMO_MODE) { sfx.fanfare(); router.push("/generating"); return; }
+    markDemoRun(false);   // a real run: never replay the demo script
     const draft = {
       sessionId,
       uploads: [...Object.entries(uploadedUrls.current).map(([kind, url]) => ({ kind, url, note: notes[kind as Kind] })), ...gallery.saved],
@@ -289,6 +290,6 @@ export default function Today({ demo = false }: { demo?: boolean }) {
       {places && !demo && <p className="dq-cta-hint">Location history is previewed here. It is not used to build your world yet.</p>}
       {demo && <DemoRoute />}
     </section>
-    {demo ? <div className="dq-cta"><button type="button" className="dq-big-button" onClick={() => { sfx.fanfare(); router.push("/generating?demo=1"); }}>Create my world <PixelSprite name="star" size={1.5}/></button><Link href="/" className="dq-small-button">Try it with your photos</Link></div> : <div className="dq-cta"><p className="dq-cta-hint" aria-live="polite">{finishHint}</p>{storageError && <p className="dq-error" role="alert">{storageError}</p>}<button type="button" className="dq-big-button" disabled={!canFinish} onClick={finishDay}>Create my world <PixelSprite name="star" size={1.5}/></button></div>}
+    {demo ? <div className="dq-cta"><button type="button" className="dq-big-button" onClick={() => { sfx.fanfare(); markDemoRun(true); router.push("/generating?demo=1"); }}>Create my world <PixelSprite name="star" size={1.5}/></button><Link href="/" className="dq-small-button">Try it with your photos</Link></div> : <div className="dq-cta"><p className="dq-cta-hint" aria-live="polite">{finishHint}</p>{storageError && <p className="dq-error" role="alert">{storageError}</p>}<button type="button" className="dq-big-button" disabled={!canFinish} onClick={finishDay}>Create my world <PixelSprite name="star" size={1.5}/></button></div>}
   </AppShell>;
 }

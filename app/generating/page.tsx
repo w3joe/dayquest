@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { GenerateEvent } from "@/pipeline/types";
 import type { WorldJob } from "@/lib/world-job";
 import { DRAFT_STORAGE_KEY, isReadyDraft, parseStoredDraft } from "@/lib/draft";
-import { DEMO_DAY, DEMO_EVENTS, isDemoRun } from "@/lib/demo";
+import { DEMO_DAY, DEMO_EVENTS, isDemoRun, markDemoRun } from "@/lib/demo";
 import AppShell from "@/components/today/AppShell";
 import PixelSprite from "@/components/today/pixel";
 import styles from "./generating.module.css";
@@ -59,7 +59,7 @@ export default function GeneratingPage() {
       if (cancelled) return;
       const job = result as WorldJob;
       setEvents(job.events); setProgress({ completed: job.completed, total: job.total });
-      if (job.status === "error") { setError(job.error || "World creation paused. Retry to continue."); setStatus("error"); return; }
+      if (job.status === "error") { fail(new Error(job.error || "World creation paused. Retry to continue.")); return; }
       if (job.status === "done") {
         setStatus("done");
         timer = setTimeout(() => !cancelled && router.push(`/day/${job.id}`), 900);
@@ -69,7 +69,10 @@ export default function GeneratingPage() {
     }
     function fail(failure: unknown) {
       if (cancelled || controller.signal.aborted) return;
-      setError(failure instanceof Error ? failure.message : "Connection interrupted. Retry to continue from your saved sprites.");
+      const message = failure instanceof Error ? failure.message : "Connection interrupted. Retry to continue from your saved sprites.";
+      // no API key on this server: show the prebuilt demo world instead of a dead end
+      if (/OPENAI_API_KEY|not configured/i.test(message)) { markDemoRun(true); router.replace("/generating?demo=1"); setAttempt(n => n + 1); return; }
+      setError(message);
       setStatus("error");
     }
     // StrictMode's initial cleanup runs before the first POST.
@@ -109,6 +112,6 @@ export default function GeneratingPage() {
       {event.step === "done" && <span className={styles.arrow}>→</span>}
     </li>)}{status === "running" && <li><span className={styles.prompt}>&gt;</span><span className={styles.label}>{progress.total > 0 && progress.completed === progress.total ? "Preparing interactions and finishing your world…" : "Creating the next piece…"}<span className={styles.cursor}>▌</span></span></li>}</ol>
     {status === "error" && error && <p role="alert" className={`${styles.error} ${styles.alert}`}>{error}</p>}
-    {status === "error" && <p className={styles.actions}><button type="button" className="dq-big-button" onClick={() => setAttempt(n => n + 1)}>Continue building</button><Link href="/" className="dq-small-button">Back to Today</Link></p>}
+    {status === "error" && <p className={styles.actions}><button type="button" className="dq-big-button" onClick={() => setAttempt(n => n + 1)}>Continue building</button><button type="button" className="dq-small-button" onClick={() => { markDemoRun(true); router.replace("/generating?demo=1"); setAttempt(n => n + 1); }}>See the demo world</button><Link href="/" className="dq-small-button">Back to Today</Link></p>}
   </section></AppShell>;
 }

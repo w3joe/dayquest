@@ -6,7 +6,15 @@ import type { GenerateEvent } from "../pipeline/types";
  * section's run (/generating?demo=1 → /day/demo) is scripted, so the live Try me path stays real. */
 export const DEMO_MODE = false;
 /** True when this page load is the Demo section's scripted run. */
-export const isDemoRun = () => DEMO_MODE || (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("demo"));
+export const DEMO_RUN_KEY = "dayquest:demo-run";
+export const isDemoRun = () => {
+  if (DEMO_MODE) return true;
+  if (typeof window === "undefined") return false;
+  // the Demo section marks its run, so a reload of /generating without ?demo still replays the script
+  try { if (sessionStorage.getItem(DEMO_RUN_KEY) === "1") return true; } catch { /* storage blocked */ }
+  return new URLSearchParams(window.location.search).has("demo");
+};
+export function markDemoRun(on: boolean) { try { if (on) sessionStorage.setItem(DEMO_RUN_KEY, "1"); else sessionStorage.removeItem(DEMO_RUN_KEY); } catch { /* storage blocked */ } }
 
 const ART = "/london-25d";
 const asset = (scene: string, name: string) => `${ART}/scenes/${scene}/assets/${name}.png`;
