@@ -1,0 +1,148 @@
+{
+  "user": {
+    "name": "LUCAS",
+    "fitCheckPhoto": "photos/fit.jpg",
+    "fitCheckBackPhoto": "photos/fit_back.jpg"
+  },
+  "date": "2026-11-07",
+  "locations": [
+    {
+      "t": "10:00",
+      "lat": 51.5007,
+      "lng": -0.1246,
+      "label": "Elizabeth Tower / Parliament Square"
+    },
+    {
+      "t": "10:25",
+      "lat": 51.5009,
+      "lng": -0.122,
+      "label": "Westminster Bridge"
+    },
+    {
+      "t": "10:45",
+      "lat": 51.5033,
+      "lng": -0.1196,
+      "label": "London Eye"
+    },
+    {
+      "t": "12:05",
+      "lat": 51.501,
+      "lng": -0.126,
+      "label": "Parliament Square bus stop"
+    },
+    {
+      "t": "12:30",
+      "lat": 51.5163,
+      "lng": -0.1303,
+      "label": "Tottenham Court Road Station"
+    },
+    {
+      "t": "12:40",
+      "lat": 51.5157,
+      "lng": -0.1281,
+      "label": "Kanada-Ya, 64 St Giles High St"
+    },
+    {
+      "t": "13:40",
+      "lat": 51.5165,
+      "lng": -0.131,
+      "label": "Tottenham Court Road Station"
+    },
+    {
+      "t": "13:50",
+      "lat": 51.5152,
+      "lng": -0.1419,
+      "label": "Oxford Circus Station"
+    },
+    {
+      "t": "14:00",
+      "lat": 51.5234,
+      "lng": -0.1466,
+      "label": "Regent's Park Station"
+    },
+    {
+      "t": "14:15",
+      "lat": 51.5268,
+      "lng": -0.153,
+      "label": "Queen Mary's Gardens"
+    },
+    {
+      "t": "14:50",
+      "lat": 51.5274,
+      "lng": -0.1555,
+      "label": "Triton Fountain"
+    },
+    {
+      "t": "15:20",
+      "lat": 51.5262,
+      "lng": -0.159,
+      "label": "Regent's Park Boating Lake"
+    }
+  ],
+  "transport": [
+    {
+      "from": "Parliament Square",
+      "to": "Tottenham Court Road Station",
+      "mode": "bus",
+      "route": "24",
+      "destination": "Hampstead Heath",
+      "via": [
+        "Whitehall",
+        "Trafalgar Square",
+        "Charing Cross Road"
+      ]
+    },
+    {
+      "from": "Tottenham Court Road",
+      "to": "Oxford Circus",
+      "mode": "tube",
+      "line": "Central",
+      "stations": [
+        "Tottenham Court Road",
+        "Oxford Circus"
+      ]
+    },
+    {
+      "from": "Oxford Circus",
+      "to": "Regent's Park",
+      "mode": "tube",
+      "line": "Bakerloo",
+      "stations": [
+        "Oxford Circus",
+        "Regent's Park"
+      ]
+    }
+  ],
+  "photos": [
+    {
+      "path": "photos/westminster.jpg",
+      "t": "10:20",
+      "note": "Big Ben from the bridge"
+    },
+    {
+      "path": "photos/eye.jpg",
+      "t": "11:10",
+      "note": "view from the top of the Eye"
+    },
+    {
+      "path": "photos/ramen.jpg",
+      "t": "12:55",
+      "note": "tonkotsu ramen and gyoza"
+    },
+    {
+      "path": "photos/park.jpg",
+      "t": "14:30",
+      "note": "rose garden"
+    }
+  ],
+  "workouts": [
+    {
+      "t": "14:15",
+      "type": "walk",
+      "distanceKm": 3.8,
+      "durationMin": 75,
+      "steps": 5200
+    }
+  ],
+  "notes": "Saturday tourist day. Lunch order: tonkotsu ramen + gyoza."
+}
