@@ -1,0 +1,34 @@
+{
+  "id": "transport-preview",
+  "date": "2026-11-01",
+  "notice": "Development fixture. Sample locations and journeys; not real travel history.",
+  "locations": [
+    { "id": "sample-high-street", "title": "Sample High Street", "time": "10:00", "ground": "street" },
+    { "id": "sample-lunch", "title": "Sample Lunch Corner", "time": "12:00", "ground": "plaza" },
+    { "id": "sample-gardens", "title": "Sample Gardens", "time": "14:00", "ground": "park" },
+    { "id": "sample-evening", "title": "Sample Evening Street", "time": "16:00", "ground": "street" }
+  ],
+  "connections": [
+    {
+      "id": "sample-bus",
+      "fromSceneId": "sample-high-street",
+      "toSceneId": "sample-lunch",
+      "legs": [{ "mode": "bus", "route": "24", "destination": "Sample Lunch Corner", "from": "Sample High Street stop", "to": "Sample Lunch stop", "durationMs": 4000 }]
+    },
+    {
+      "id": "sample-tube-change",
+      "fromSceneId": "sample-lunch",
+      "toSceneId": "sample-gardens",
+      "legs": [
+        { "mode": "tube", "line": "Central", "color": "#E32017", "stations": ["Sample Lunch station", "Sample Interchange"], "durationMs": 3500 },
+        { "mode": "tube", "line": "Bakerloo", "color": "#B36305", "stations": ["Sample Interchange", "Sample Gardens station"], "durationMs": 3500 }
+      ]
+    },
+    {
+      "id": "sample-walk",
+      "fromSceneId": "sample-gardens",
+      "toSceneId": "sample-evening",
+      "legs": [{ "mode": "walk", "from": "Sample Gardens path", "to": "Sample Evening path", "durationMs": 3500 }]
+    }
+  ]
+}
