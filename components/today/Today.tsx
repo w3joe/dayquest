@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import day from "../../data/input.json";
+import { uuidv4 } from "@/lib/uuid";
 
 type Kind = "fit" | "fit_back" | "lunch" | "landmark" | "park";
 type Photo = { url?: string; preview?: string; matching?: string; error?: string; busy?: boolean; manualMatch?: boolean };
@@ -105,7 +106,7 @@ export default function Today() {
         }
       }
     } catch { /* Start a fresh draft if old storage is invalid. */ }
-    setSessionId(crypto.randomUUID());
+    setSessionId(uuidv4());
     }, []);
   useEffect(() => {
     mounted.current = true;

@@ -39,5 +39,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     scene: [BootScene, HighlightScene, TransitScene, EndScene],
     callbacks: { preBoot: (g) => { g.registry.set("manifest", manifest); g.registry.set("manifestUrl", manifestUrl); } },
   });
+  // Test seam for scripted browser checks; absent from production builds.
+  if (process.env.NODE_ENV !== "production") (window as unknown as { __dayquest?: Phaser.Game }).__dayquest = game;
   return { destroy: () => game.destroy(true) };
 }
