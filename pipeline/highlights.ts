@@ -79,7 +79,7 @@ export function normalizePlan(raw: unknown): DayPlan {
 /** Live: one Responses API call with structured output (§5.1). */
 export async function planWithLLM(input: DayInput, client = new OpenAI({ timeout: 60_000, maxRetries: 1 })): Promise<DayPlan> {
   const response = await client.responses.create({
-    model: process.env.OPENAI_TEXT_MODEL || "gpt-5.4-mini",
+    model: process.env.OPENAI_TEXT_MODEL || "gpt-6-astra",
     instructions: HIGHLIGHTS_PROMPT,
     input: JSON.stringify(input),
     text: { format: { type: "json_schema", name: "day_plan", strict: true, schema: PLAN_SCHEMA as unknown as Record<string, unknown> } },

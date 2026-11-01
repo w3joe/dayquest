@@ -115,7 +115,7 @@ Set `OPENAI_API_KEY` in `.env.local`, with API credits and access to the configu
 | Variable | Purpose |
 | --- | --- |
 | `OPENAI_API_KEY` | Required for character, scene and artwork generation. Keep it server-side. |
-| `OPENAI_TEXT_MODEL` | Scene and interaction planning; defaults to `gpt-5.4-mini`. |
+| `OPENAI_TEXT_MODEL` | Scene and interaction planning; defaults to `gpt-6-astra`. |
 | `OPENAI_IMAGE_MODEL` | Character and sprite generation; defaults to `gpt-image-2.5-flare`. |
 | `BLOB_READ_WRITE_TOKEN` | Public Vercel Blob storage; required in production. |
 | `BLOB_BASE_URL` | The same store's public base URL; required in production. |

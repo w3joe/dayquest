@@ -6,7 +6,7 @@
 
 | Env | `mock` (default) | `live` |
 |---|---|---|
-| `PIPELINE_TEXT` | §2.1 template plan built from `data/input.json` | One Responses API call with structured output (`OPENAI_TEXT_MODEL`, default `gpt-5.4-mini`); falls back to the template on any error |
+| `PIPELINE_TEXT` | §2.1 template plan built from `data/input.json` | One Responses API call with structured output (`OPENAI_TEXT_MODEL`, default `gpt-6-astra`); falls back to the template on any error |
 | `PIPELINE_IMAGES` | Deterministic placeholder silhouettes drawn with sharp | `images.edit` with Wikipedia + user photo references (`OPENAI_IMAGE_MODEL`); a failed sprite falls back to a placeholder and the log says `(PLACEHOLDER)` |
 
 Live modes also need `OPENAI_API_KEY`.

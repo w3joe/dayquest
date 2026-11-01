@@ -43,7 +43,7 @@ export function worldJobId(draft: ReadyDraft, catalogFingerprint = loadInteracti
   const uploads = [...draft.uploads].sort((a, b) => a.kind.localeCompare(b.kind));
   return createHash("sha256").update(JSON.stringify({ version: 4, catalogFingerprint, session: draft.sessionId, uploads, player: draft.spriteUrl,
     worldDesign: process.env.WORLD_DESIGN_AGENTS === "live" ? "agents" : "template",
-    imageModel: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2.5-flare", textModel: process.env.OPENAI_TEXT_MODEL || "gpt-5.4-mini" })).digest("hex").slice(0, 32);
+    imageModel: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2.5-flare", textModel: process.env.OPENAI_TEXT_MODEL || "gpt-6-astra" })).digest("hex").slice(0, 32);
 }
 
 function initialState(id: string): JobState {

@@ -16,7 +16,7 @@ import type { SimulatedWorld } from "./world-sim";
  *
  * Models choose WHAT appears and roughly WHERE (`near`); code decides exact positions, enforces physics, and has the last word.
  * It never throws: any failure degrades to a smaller, hand-written design that is itself inspected.
- * Repairs and the final tuning pass use a stronger model (default `gpt-6-astra`, set OPENAI_DIRECTOR_STRONG_MODEL) when the first pass is not enough.
+ * Repairs and the final tuning pass have a separate model override (`OPENAI_DIRECTOR_STRONG_MODEL`); both tiers default to `gpt-6-astra`.
  */
 export type TraceStep = { agent: "brief" | "compose" | "design" | "validator" | "critic" | "inspector" | "tuner" | "fallback"; summary: string; issues?: string[]; ms: number; model?: string };
 export type SceneBrief = { mood: string; standout: string; tone: string; seasonal: string; cautions: string[] };
@@ -119,7 +119,7 @@ const normalise = (raw: z.infer<typeof designSchema>) => ({
   npcs: raw.npcs.map((n) => ({ ...n, library: orNull(n.library), description: orNull(n.description) })),
 });
 
-const modelFor = (tier: Tier) => tier === "strong" ? process.env.OPENAI_DIRECTOR_STRONG_MODEL || "gpt-6-astra" : process.env.OPENAI_TEXT_MODEL || "gpt-5.4-mini";
+const modelFor = (tier: Tier) => tier === "strong" ? process.env.OPENAI_DIRECTOR_STRONG_MODEL || "gpt-6-astra" : process.env.OPENAI_TEXT_MODEL || "gpt-6-astra";
 
 /** Production runner: one Agents SDK agent per call with structured output. A strong-tier failure retries once on the default model. */
 export function agentsRunner(): AgentRunner {

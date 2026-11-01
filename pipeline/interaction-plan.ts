@@ -77,7 +77,7 @@ export async function planSceneInteractions(scene: DayScene, catalog: Interactio
   try {
     const api = client ?? new OpenAI({ timeout: 60_000, maxRetries: 0 });
     const response = await api.responses.create({
-      model: process.env.OPENAI_TEXT_MODEL || "gpt-5.4-mini", instructions: INTERACTION_PLAN_PROMPT,
+      model: process.env.OPENAI_TEXT_MODEL || "gpt-6-astra", instructions: INTERACTION_PLAN_PROMPT,
       input: [{ role: "user", content: JSON.stringify({
         scene: { title: scene.title, objects: scene.world.objects.filter(item => eligible.has(item.id)).map(item => ({ id: item.id, name: item.name, description: item.text ?? "", removable: item.removable === true })),
           food: scene.food && eligible.has("food") ? { id: "food", name: scene.food.name ?? null,

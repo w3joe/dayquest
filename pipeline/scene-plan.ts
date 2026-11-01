@@ -116,7 +116,7 @@ export async function planScene(input: ScenePlanInput, client: ScenePlannerClien
     content.push({ type: "input_text", text: label }, { type: "input_image", image_url: `data:image/jpeg;base64,${jpeg.toString("base64")}`, detail: "high" });
   }
   const response = await client.responses.create({
-    model: process.env.OPENAI_TEXT_MODEL || "gpt-5.4-mini", instructions: SCENE_PLAN_PROMPT,
+    model: process.env.OPENAI_TEXT_MODEL || "gpt-6-astra", instructions: SCENE_PLAN_PROMPT,
     input: [{ role: "user", content }],
     text: { format: { type: "json_schema", name: "photo_scene", strict: true, schema: SCENE_PLAN_SCHEMA as unknown as Record<string, unknown> } },
   });
