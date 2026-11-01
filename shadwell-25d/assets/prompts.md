@@ -49,3 +49,51 @@ Tiles add the tile suffix:
 
 - `tile_paving`, `tile_grass`, `tile_flowers`, `tile_asphalt`: the first attempts (`raw/*_v1.png`) drew whole garden/crossroads scenes instead of a plain texture (grass inside paving, bricks inside grass, a crossroads with lawns for asphalt). Regenerated with the "ONLY … Nothing else: …" wording above.
 - `test_lamp.png`: the first test call, used to check the route works. Not used in the game.
+
+## Full prompts
+
+Each final prompt sent to `image_gen` is the style prefix + the asset's own text + its ending (object suffix for sprites, tile suffix for tiles; `shawn_walk` and `shawn_thumbs` carry their own ending inline), joined with no extra separators. `tools/jobs.py` holds the exact joined strings (`STYLE + JOBS[name]`, and `STYLE + REF_JOBS[name]` for the thumbs-up). The Codex session records confirm each of the 31 prompts reached `image_gen` unchanged (its `revisedPrompt` equals the prompt sent).
+
+## Superseded and test prompts (verbatim from the Codex session records)
+
+### First-attempt tiles (`raw/*_v1.png`)
+
+These are the complete prompts `image_gen` received for the first attempts, before the retries above.
+
+**tile_paving_v1**
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. Sandy beige square paving slabs, 2x2 large slabs with thin darker grout lines, very subtle speckle. This is a single seamless repeating ground texture tile viewed straight down (orthographic, no perspective), filling the entire square image edge to edge, designed on a 16x16 grid of big pixels so it tiles seamlessly on all four sides. No border, no objects, no text. Square 1024x1024.
+```
+
+**tile_asphalt_v1**
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. Dark blue-grey asphalt road surface, smooth with a few tiny lighter specks. This is a single seamless repeating ground texture tile viewed straight down (orthographic, no perspective), filling the entire square image edge to edge, designed on a 16x16 grid of big pixels so it tiles seamlessly on all four sides. No border, no objects, no text. Square 1024x1024.
+```
+
+**tile_grass_v1**
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. Bright teal-green lawn grass with a few small darker grass tufts (little 'v' shaped blades) scattered evenly. This is a single seamless repeating ground texture tile viewed straight down (orthographic, no perspective), filling the entire square image edge to edge, designed on a 16x16 grid of big pixels so it tiles seamlessly on all four sides. No border, no objects, no text. Square 1024x1024.
+```
+
+**tile_flowers_v1**
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. Flower bed: rich brown soil densely planted with small round pixel flowers in yellow, cream and pink with green leaves. This is a single seamless repeating ground texture tile viewed straight down (orthographic, no perspective), filling the entire square image edge to edge, designed on a 16x16 grid of big pixels so it tiles seamlessly on all four sides. No border, no objects, no text. Square 1024x1024.
+```
+
+### Test lamp (`raw/test_lamp.png`)
+
+My request to Codex (the whole message given to `codex exec`):
+
+```text
+Use your built-in image_gen tool (not the CLI, no API key) to generate ONE image: a pixel-art black heritage street lamp post, top-down 3/4 handheld RPG style, dark 1px outline, flat magenta #FF00FF background. Then copy the generated PNG file to ./assets/raw/test_lamp.png. Reply with just the final path.
+```
+
+The prompt Codex wrote from it and passed to `image_gen`:
+
+```text
+Generate ONE image. Use case: stylized-concept. Asset type: pixel-art RPG prop sprite. Subject: a single black heritage street lamp post, ornate traditional cast iron base and shaft with a classic lantern on top. Style: top-down 3/4 handheld RPG pixel art, crisp square pixel edges, dark 1px outline, restrained flat pixel shading. Composition: entire lamp visible, centered, isolated with space around it. Background: perfectly flat solid magenta #FF00FF across the entire canvas. No ground, scenery, text, watermark, gradients, antialiasing or extra objects.
+```
