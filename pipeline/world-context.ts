@@ -1,3 +1,4 @@
+import { buildWorldKit, type WorldKit } from "../lib/world-kit";
 import { ACTOR_LIBRARY, type Ground, type LibraryActor } from "../lib/actor-library";
 import { buildWorldLayout, buildingAnchors, templateFor, worldAscii } from "../game/world-layout";
 import { TEMPLATE_IDS, TEMPLATES } from "../game/layout-templates";
@@ -15,6 +16,7 @@ export type PlaceFacts = { known: boolean; summary: string; features: string[]; 
 export type Environment = { season?: Season; weather?: Weather; location?: LocationContext; notes?: string; place?: PlaceFacts };
 
 export type WorldContext = {
+  construction: WorldKit;
   user: { name: string; date: string; notes?: string };
   /** The kind of place chosen for this scene, and the others that were available. */
   template: { id: string; label: string; describe: string; grounds: Ground[]; alternatives: { id: string; describe: string }[] };
@@ -60,6 +62,7 @@ export function buildWorldContext(blueprint: SceneBlueprint, input: { name: stri
   const library = ACTOR_LIBRARY.filter((a) => template.grounds.some((g) => a.grounds.includes(g)) && (SEASONAL[a.id]?.includes(season) ?? true))
     .map(({ id, name, role, hint, effects }) => ({ id, name, role, hint, effects }));
   return {
+    construction: buildWorldKit(blueprint),
     template: { id: template.id, label: template.label, describe: template.describe, grounds: template.grounds,
       alternatives: TEMPLATE_IDS.filter((id) => id !== template.id).map((id) => ({ id, describe: TEMPLATES[id].describe })) },
     place: env.place,
@@ -85,6 +88,7 @@ export function buildWorldContext(blueprint: SceneBlueprint, input: { name: stri
       "Weather and season change what is sensible: no sunbathing or picnics in rain, no snowman outside winter, no kite in a storm.",
     ],
     rules: [
+      "Use construction.blocks as building blocks: respect each purpose, ground, nearby anchor, footprint, front-path connection and shared style. Place supporting actors beside relevant blocks instead of scattering them uniformly.",
       "Only use facts present in this context. Never invent a named business, person, event or travel route.",
       "Every line is warm, kind and short. No jokes at anyone's expense, no links, no contact details, no all-capitals.",
       "Exactly 3 interactables with at least 2 different effects, and 1 to 3 NPCs.",

@@ -1,3 +1,4 @@
+import { BLOCK_AREAS, defaultBlockUsage, parseBlockUsage } from "../lib/world-kit";
 import OpenAI from "openai";
 import sharp from "sharp";
 import type { SceneBlueprint, ScenePlanInput } from "./scene-types";
@@ -10,9 +11,14 @@ Describe exactly three individual building or large scenic sprites. The first is
 Describe each asset separately as a transparent cutout for a coherent three-quarter top-down street scene, with enough visible detail to match the photograph. Do not bake the whole background or road into a building sprite.
 Choose up to six distinctive props. Reuse a library prop for generic lamp, tree, bollard, cycle_stand, aboard, hedge, bin_grey, bin_purple, car_red, car_blue. Set library:null for a distinctive photographed object that needs a custom sprite. Do not add invented logos or readable text.
 Only include food if LUNCH is provided; identify the visible food conservatively, describe its appearance, and write a short personal observation grounded in the photograph. No inferred restaurant or eating history. If no LUNCH, food:null.
-If no photos are provided, plan a modest generic street for the user's outfit with no factual claims about a place. time should be "12:00" unless the user explicitly supplies a time. Return the structured inventory, not geometry.`;
+If no photos are provided, plan a modest generic street for the user's outfit with no factual claims about a place. time should be "12:00" unless the user explicitly supplies a time. Return the structured inventory, not geometry.
+Treat every sprite as a reusable building block for ONE cohesive world, not an independent diorama. For each building and prop supply usage: area (frontage, path_edge, greenery, roadside, waterfront or open), a short purpose explaining how it belongs in the scene, and near (building_0, building_1, building_2 or null). These building IDs refer to the inventory order. Buildings use frontage with near:null and face the shared walking space. A shop sign or cycle stand belongs near its associated building; vegetation belongs on greenery, cars on roadside, and a water-related object at waterfront only when the source supports that context. Never use near on a building or invent a photographed relationship. Describe assets at one common scale and perspective; the engine supplies continuous ground, entry paths and shadows.`;
 
 const string = { type: "string" };
+const usageSchema = { type: "object", additionalProperties: false, required: ["area", "purpose", "near"], properties: {
+  area: { type: "string", enum: BLOCK_AREAS }, purpose: { type: "string", maxLength: 240 },
+  near: { type: ["string", "null"], enum: ["building_0", "building_1", "building_2", null] },
+} };
 export const SCENE_PLAN_SCHEMA = {
   type: "object", additionalProperties: false,
   required: ["title", "locationName", "description", "time", "ground", "buildings", "props", "food"],
@@ -21,13 +27,13 @@ export const SCENE_PLAN_SCHEMA = {
     ground: { type: "string", enum: ["street", "park", "plaza"] },
     buildings: {
       type: "array", minItems: 3, maxItems: 3,
-      items: { type: "object", additionalProperties: false, required: ["name", "description", "observed"],
-        properties: { name: string, description: string, observed: { type: "boolean" } } },
+      items: { type: "object", additionalProperties: false, required: ["name", "description", "observed", "usage"],
+        properties: { name: string, description: string, observed: { type: "boolean" }, usage: usageSchema } },
     },
     props: {
       type: "array", minItems: 0, maxItems: 6,
-      items: { type: "object", additionalProperties: false, required: ["name", "description", "library"],
-        properties: { name: string, description: string, library: { type: ["string", "null"], enum: ["lamp", "tree", "bollard", "cycle_stand", "aboard", "hedge", "bin_grey", "bin_purple", "car_red", "car_blue", null] } } },
+      items: { type: "object", additionalProperties: false, required: ["name", "description", "library", "usage"],
+        properties: { name: string, description: string, usage: usageSchema, library: { type: ["string", "null"], enum: ["lamp", "tree", "bollard", "cycle_stand", "aboard", "hedge", "bin_grey", "bin_purple", "car_red", "car_blue", null] } } },
     },
     food: { type: ["object", "null"], additionalProperties: false, required: ["name", "description", "text"],
       properties: { name: string, description: string, text: string } },
@@ -50,15 +56,19 @@ export function normalizeScenePlan(raw: unknown, input: ScenePlanInput): SceneBl
     typeof raw.time !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(raw.time)) throw new Error("Invalid scene plan");
   const buildings = raw.buildings.map((building, i) => {
     if (!record(building) || typeof building.observed !== "boolean") throw new Error("Invalid scene plan building");
+    const usage = parseBlockUsage(building.usage, { area: "frontage", purpose: "A scenic anchor facing the shared walking space." });
+    if (usage.area !== "frontage" || usage.near) throw new Error("Invalid building block usage");
     return { id: `building_${i}`, name: requiredText(building.name, "building name", 100),
-      description: requiredText(building.description, "building description"), observed: Boolean(input.landmark) && building.observed };
+      description: requiredText(building.description, "building description"), observed: Boolean(input.landmark) && building.observed,
+      usage };
   });
   const props = raw.props.map((prop, i) => {
     if (!record(prop) || (prop.library !== null && prop.library !== undefined && !LIBRARY_PROPS.includes(String(prop.library)))) {
       throw new Error("Invalid scene plan prop");
     }
     return { id: `prop_${i}`, name: requiredText(prop.name, "prop name", 100),
-      description: requiredText(prop.description, "prop description"), ...(prop.library ? { library: prop.library as string } : {}) };
+      description: requiredText(prop.description, "prop description"), ...(prop.library ? { library: prop.library as string } : {}),
+      usage: parseBlockUsage(prop.usage, defaultBlockUsage(typeof prop.library === "string" ? prop.library : undefined)) };
   });
   let food: SceneBlueprint["food"];
   if (input.lunch) {

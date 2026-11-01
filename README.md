@@ -6,7 +6,8 @@
 
 <p>Turn the places you went, the things you ate, and the outfit you wore<br />into a little pixel world for someone you love to explore.</p>
 
-<p><a href="https://dayquest-pi.vercel.app/"><strong>Try DayQuest ↗</strong></a> · <a href="https://dayquest-pi.vercel.app/demo">Explore the demo</a></p>
+<p><strong>🎮 Live demo: <a href="https://dayquest-pi.vercel.app/">dayquest-pi.vercel.app ↗</a></strong></p>
+<p><a href="https://dayquest-pi.vercel.app/demo">View a sample day</a></p>
 
 <p>
   <a href="#why-dayquest">Why we built it</a> ·
@@ -135,7 +136,7 @@ npm run build
 
 Development and production builds also prepare the shared game art and validate interaction assets locally.
 
-Deployment is manual. Follow the [deployment guide](docs/DEPLOYMENT.md) for the existing Vercel project, environment setup and `npm run deploy:vercel`. That command deploys committed `origin/main`; pushes do not trigger deployments.
+Pushes to `main` automatically deploy to production through Vercel's GitHub integration once the repository is connected. Other branches do not trigger deployments. See the [deployment guide](docs/DEPLOYMENT.md) for the GitHub connection, environment setup and the optional `npm run deploy:vercel` manual fallback.
 
 ## A little further into the code
 
