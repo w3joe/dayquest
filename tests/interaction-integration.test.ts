@@ -3,6 +3,8 @@ import test from "node:test";
 import { actionAvailable, advanceInteraction, beginInteraction, commitInteraction, emptyInteractionProgress, lookupInteractionAsset, restoreInteractionProgress, visibleInteractionScene } from "../game/interactions";
 import { advanceJourney, checkpointJourney, restoreJourney } from "../game/journey";
 import { parseDayManifest, type DayManifest } from "../lib/day";
+import { photoWorldInteractionCatalog } from "../lib/interaction-assets";
+import { loadInteractionCatalog } from "../lib/server/interaction-catalog";
 import { composeWorldItinerary, importWorldPlayer, importWorldScene } from "../pipeline/compose-itinerary";
 import { planSceneInteractions } from "../pipeline/interaction-plan";
 import { mockScenePlan } from "../pipeline/scene-plan";
@@ -17,13 +19,11 @@ async function publishLocation(id: string): Promise<DayManifest> {
     images: { live: false, async generate() { throw new Error("saved sprite generation must not repeat"); } },
     store: { manifestUrl: `https://${id}.example/day.json`, async put(name, bytes) { saved.set(name, bytes); } },
     async planInteractions(scene) {
-      return planSceneInteractions(scene, { version: 1, assets: [
-        { id: "held_lunch", src: "held-lunch.png", kind: "prop", width: 16, height: 16, description: "The supplied lunch prop for carrying." },
-      ] }, { responses: { async create() {
+      return planSceneInteractions(scene, photoWorldInteractionCatalog(scene, loadInteractionCatalog().catalog), { responses: { async create() {
         plannerCalls++;
         return { status: "completed", output_text: JSON.stringify({ actions: [
           { id: "take_lunch", targetId: "food", label: "Take your lunch along", repeatable: false,
-            steps: [{ type: "attach", assetId: "held_lunch" }, { type: "setObject", state: "hidden" }, { type: "say", text: "Ready for the next stop." }] },
+            steps: [{ type: "attach", assetId: "generated_food" }, { type: "setObject", state: "hidden" }, { type: "say", text: "Ready for the next stop." }] },
         ] }) };
       } } });
     },
@@ -64,9 +64,9 @@ test("published item actions survive location import, bus travel and refresh wit
   const reloadedTravel = restoreJourney(day, JSON.stringify(checkpointJourney(day, travel)));
   const reloadedItems = restoreInteractionProgress(day, JSON.stringify(progress));
   assert.equal(reloadedTravel.sceneId, "second");
-  assert.deepEqual(reloadedItems.carried, { sceneId: "first", assetId: "held_lunch" });
-  assert.equal(lookupInteractionAsset(day, reloadedItems.carried)!.src, "https://first.example/days/a/held-lunch.png");
-  assert.equal(day.scenes[1].interactionPack!.catalog.assets[0].src, "https://second.example/days/b/held-lunch.png");
+  assert.deepEqual(reloadedItems.carried, { sceneId: "first", assetId: "generated_food" });
+  assert.equal(lookupInteractionAsset(day, reloadedItems.carried)!.src, "https://first.example/days/a/food.png");
+  assert.equal(day.scenes[1].interactionPack!.catalog.assets.find(asset => asset.id === "generated_food")!.src, "https://second.example/days/b/food.png");
   assert.equal(visibleInteractionScene(day.scenes[0], "first", reloadedItems).food, undefined);
   assert.ok(visibleInteractionScene(day.scenes[1], "second", reloadedItems).food);
   assert.equal(actionAvailable(action, "first", reloadedItems), false);

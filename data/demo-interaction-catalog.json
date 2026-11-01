@@ -2,6 +2,16 @@
   "version": 1,
   "assets": [
     {
+      "id": "ramen_bowl_v1",
+      "src": "/interactions/library/ramen-bowl-v1.png",
+      "kind": "prop",
+      "width": 18,
+      "height": 17,
+      "anchor": { "x": 9, "y": 8 },
+      "description": "DEMO ONLY: a fixed sample ramen bowl for the offline Lucas preview. Live meals use their own photo-generated food sprite.",
+      "tags": ["demo-only", "ramen", "bowl", "held", "static"]
+    },
+    {
       "id": "lucas_photo_v1",
       "src": "/interactions/library/lucas-photo-demo-v1.png",
       "kind": "pose",

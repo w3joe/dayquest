@@ -2,16 +2,6 @@
   "version": 1,
   "assets": [
     {
-      "id": "ramen_bowl_v1",
-      "src": "/interactions/library/ramen-bowl-v1.png",
-      "kind": "prop",
-      "width": 18,
-      "height": 17,
-      "anchor": { "x": 9, "y": 8 },
-      "description": "A separate small black bowl of ramen with pale broth, noodles, egg and chopsticks. Suitable for holding only when the scene explicitly identifies matching ramen; not a substitute for an unknown meal. This is a static held prop, not an eating pose or proof that food was consumed.",
-      "tags": ["ramen", "noodles", "bowl", "held", "static"]
-    },
-    {
       "id": "steam_v1",
       "src": "/interactions/library/steam-v1.png",
       "kind": "effect",

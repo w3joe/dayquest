@@ -1,7 +1,7 @@
 {
   "version": 1,
   "sources": [
-    { "assetId": "ramen_bowl_v1", "source": "london-25d/assets/kanada-ya/ramen_bowl.png" },
+    { "catalog": "demo", "assetId": "ramen_bowl_v1", "source": "london-25d/assets/kanada-ya/ramen_bowl.png" },
     { "assetId": "steam_v1", "source": "london-25d/assets/shared/fx_steam.png" },
     { "assetId": "sparkle_v1", "source": "london-25d/assets/shared/fx_sparkle.png" },
     { "assetId": "heart_v1", "source": "london-25d/assets/shared/fx_heart.png" },

@@ -17,9 +17,9 @@ scenes[0].world!.objects.push({ id: "sample_snack_display", name: "Sample ramen 
   text: "A sample ramen bowl from the supplied London asset library." });
 
 const supplied = parseInteractionCatalog(JSON.parse(await readFile(path.join(process.cwd(), "data", "interaction-catalog.json"), "utf8")));
-const demoPoses = parseInteractionCatalog(JSON.parse(await readFile(path.join(process.cwd(), "data", "demo-interaction-catalog.json"), "utf8")));
+const demoAssets = parseInteractionCatalog(JSON.parse(await readFile(path.join(process.cwd(), "data", "demo-interaction-catalog.json"), "utf8")));
 // These supplied poses match the fixed Lucas/Shawn preview actor. Production photo avatars use only the shared prop/effect catalogue.
-const catalog: InteractionCatalog = { version: 1, assets: [...supplied.assets, ...demoPoses.assets] };
+const catalog: InteractionCatalog = { version: 1, assets: [...supplied.assets, ...demoAssets.assets] };
 scenes[0].interactionPack = compileInteractionPack(scenes[0], { actions: [
   { id: "inspect_snack", targetId: "sample_snack_display", label: "Look at the sample ramen", repeatable: true,
     requires: { notCompleted: ["take_snack"] },

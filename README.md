@@ -97,6 +97,6 @@ Bus-stop and station sprites are pre-generated and shared across journeys. Build
 
 ### Generated item interactions
 
-World scenes can carry contextual action sequences composed from a fixed asset catalogue. The supplied London library provides a ramen prop and four shared effects; its character-specific poses are isolated to the matching Lucas preview. Scenes without suitable artwork retain text interactions. [Interaction integration](docs/INTERACTION-INTEGRATION.md) describes asset delivery, scene handoff, sequence instructions and saved outcomes. Run `npm run assets:check` when adding artwork.
+World scenes can carry contextual action sequences composed from shared generic effects and their own dynamically generated assets. Characters, buildings, meals and distinctive photo objects retain their generated artwork; fixed food and character poses are confined to offline samples. Live pickup uses the scene's generated meal sprite. [Interaction integration](docs/INTERACTION-INTEGRATION.md) describes asset delivery, scene handoff, sequence instructions and saved outcomes. Run `npm run assets:check` when adding artwork.
 
 Run `npm run preview:interactions` and visit `http://localhost:3000/day/interaction-preview` with the development server running. This offline fixture uses supplied artwork to demonstrate choosing actions, approaching an item, temporary effects, Lucas's photo/wave/point poses, carrying a prop, cancellation and progress across travel. It makes no API calls.

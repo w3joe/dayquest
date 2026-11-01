@@ -16,6 +16,7 @@ import { planScene } from "../../pipeline/scene-plan";
 import type { UploadKind } from "../../pipeline/types";
 import { loadInteractionCatalog } from "./interaction-catalog";
 import { planSceneInteractions } from "../../pipeline/interaction-plan";
+import { photoWorldInteractionCatalog } from "../interaction-assets";
 
 type JobState = WorldJob & { checkpoint: WorldCheckpoint; date: string };
 // Greater than the route's 300s maximum; a timed-out request cannot overlap the next worker.
@@ -94,7 +95,7 @@ async function processWorldStep(state: JobState, draft: ReadyDraft, lease: strin
     if (worldJobId(draft, fingerprint) !== state.id) throw new RequestError("The interaction catalogue changed while this world was being created. Return to Today to start the updated world.", 409);
     const deps = { plan: (input: Parameters<typeof planScene>[0]) => planScene(input, new OpenAI({ timeout: 60_000, maxRetries: 0 })),
       images: openAIImageGenerator(new OpenAI({ timeout: 110_000, maxRetries: 0 })), store: storeForDay(state.id), styleReferences,
-      planInteractions: (scene: Parameters<typeof planSceneInteractions>[0]) => planSceneInteractions(scene, catalog) };
+      planInteractions: (scene: Parameters<typeof planSceneInteractions>[0]) => planSceneInteractions(scene, photoWorldInteractionCatalog(scene, catalog)) };
     if (state.checkpoint.blueprint && buildSceneAssetJobs(state.checkpoint.blueprint, input).some(job => !state.checkpoint.assets[job.id])) {
       await advanceWorldAssetBatch(input, state.checkpoint, deps, async (checkpoint, event, total) => {
         const next: JobState = { ...progress, checkpoint, total, completed: Object.keys(checkpoint.assets).length,
