@@ -40,7 +40,7 @@ export type DemoScene = { time: string; kind: string; title: string; landmarks: 
 
 export const DEMO_DAY = {
   id: "demo",
-  name: "Shawn",
+  name: "Lucas",
   date: "Saturday in London",
   game: `${ART}/index.html?scene=westminster&autostart`,
   scenes: [

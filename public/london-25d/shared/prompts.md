@@ -14,7 +14,7 @@ Tile ending:
 
 > This is a single seamless repeating ground texture tile viewed straight down (orthographic, no perspective), filling the entire square image edge to edge, designed on a 16x16 grid of big pixels so it tiles seamlessly on all four sides. No border, no objects, no text. Square 1024x1024.
 
-## Calls (5)
+## Calls (8)
 
 ### bench (2026-11-01 14-38-32)
 
@@ -46,6 +46,24 @@ Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. 
 Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. A very tall granite column with a bronze Corinthian capital and a small statue of an admiral on top, on a square stone base with four bronze lions at the corners. Very tall and thin, portrait 1024x1536. Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.
 ```
 
+### national_gallery (2026-11-01 15-16-12)
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. A grand neoclassical gallery building on a London square: long pale Portland stone facade, a central portico with tall columns and a triangular pediment, a small green-grey dome above, wide steps in front. Very wide landscape 1536x1024. Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.
+```
+
+### tube_tunnel (2026-11-01 15-16-12)
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. ONLY the wall of a London Underground tube tunnel seen from the side: dark grey curved cast-iron tunnel lining segments with bolted ribs, two thick black cables running horizontally along it, a small warm lamp in the middle. Nothing else: no train, no platform, no people, no text. This is a single seamless repeating ground texture tile viewed straight down (orthographic, no perspective), filling the entire square image edge to edge, designed on a 16x16 grid of big pixels so it tiles seamlessly on all four sides. No border, no objects, no text. Square 1024x1024.
+```
+
+### skyline (2026-11-01 15-16-12)
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. A long row of distant London city buildings seen from street level as a backdrop: a mix of Victorian brick terraces, pale Portland stone offices, a few modern glass blocks, chimney pots, two thin church spires and a construction crane, all standing on one flat horizontal baseline, slightly hazy and lighter in tone as if a few streets away. The row spans the full width and repeats seamlessly left-right. Very wide landscape 1536x1024. Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.
+```
+
 ## Notes
 
-The other shared sprites (Shawn's walk sheet, the Shadwell tiles and props) are copied unchanged from ../shadwell-25d/assets; their prompts are in ../shadwell-25d/assets/prompts.md.
+skyline is drawn as a repeating backdrop behind the far side of Westminster and St Giles High Street, and on the bus transit; process.py blends it 22% towards the sky colour so it reads as a few streets away. The other shared sprites (Shawn's walk sheet, the Shadwell tiles and props) are copied unchanged from ../shadwell-25d/assets; their prompts are in ../shadwell-25d/assets/prompts.md.

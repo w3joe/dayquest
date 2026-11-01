@@ -9,7 +9,9 @@
   const FW = 32, FH = 48;
   const DIR_ROW = { down: 0, left: 1, right: 2, up: 3 };
   const HIT = { w: 14, h: 6 };
-  const SHARED = ["shawn", "bus", "tube_train", "nelson"];
+  const SHARED = ["shawn", "bus", "tube_train", "nelson", "skyline", "national_gallery", "tube_tunnel",
+    "tile_paving", "tile_asphalt", "tile_kerb", "shop_corner", "shop_cafe", "shop_laundry", "tree"];
+  const MARGIN = 24; // tiles of ground drawn past each map edge, so the canvas never shows empty space
 
   const scenes = [];
   const DQ = (window.DQ = { T, scenes, scene: (def) => scenes.push(def) });
@@ -63,7 +65,6 @@
     scale = Math.max(1, Math.floor(Math.min(w / BASE_W, h / BASE_H)));
     viewW = Math.ceil(w / scale);
     viewH = Math.ceil(h / scale);
-    if (world) { viewW = Math.min(world.W, viewW); viewH = Math.min(world.H, viewH); }
     canvas.width = viewW;
     canvas.height = viewH;
     canvas.style.width = viewW * scale + "px";
@@ -93,7 +94,9 @@
         const im = img[name];
         if (!im) throw new Error(`${def.id}: asset ${name} not listed in assets`);
         const e = { name, im, x: Math.round(x), y: Math.round(baseY), w: im.width, h: im.height,
-          invented: !!o.invented, shadow: o.shadow ?? "ellipse", flip: !!o.flip, z: o.z ?? 0 };
+          invented: !!o.invented, shadow: o.shadow ?? "ellipse", flip: !!o.flip, z: o.z ?? 0,
+          // "ground": flat things (stairs, decals, rugs) drawn under everything that stands up
+          layer: o.layer === "ground" ? "ground" : "upright" };
         const depth = o.depth ?? Math.min(12, Math.round(im.height * 0.3));
         const [fx, fw] = o.foot ?? [Math.round(im.width * 0.1), Math.round(im.width * 0.8)];
         e.box = o.solid === false ? null : { x: e.x + fx, y: e.y - depth, w: fw, h: depth };
@@ -117,23 +120,28 @@
         return m;
       },
       // drawn behind everything, before the ground; parallax 0 = fixed to the world, 1 = fixed to the screen
-      backdrop(name, x, y, o = {}) { w.backdrops.push({ im: img[name], x, y, p: o.parallax ?? 0.3, invented: !!o.invented }); },
+      // repeatX: tile the backdrop across the whole map width (city skylines)
+      backdrop(name, x, y, o = {}) { w.backdrops.push({ im: img[name], x, y, p: o.parallax ?? 0.3, invented: !!o.invented, repeatX: !!o.repeatX }); },
+      // a hazy row of city rooftops standing on the line y, across the whole map
+      skyline(y, o = {}) { w.backdrops.push({ im: img.skyline, x: 0, y: y - img.skyline.height, p: o.parallax ?? 0.15, invented: !!o.invented, repeatX: true }); },
     };
     def.build(api);
     // ground
     const g = document.createElement("canvas");
-    g.width = w.W; g.height = w.H;
+    g.width = w.W + 2 * MARGIN * T; g.height = w.H + 2 * MARGIN * T;
     const gc = g.getContext("2d");
     gc.imageSmoothingEnabled = false;
-    for (let r = 0; r < def.rows; r++) {
-      for (let c = 0; c < def.cols; c++) {
-        let t = def.ground(c, r);
+    for (let r = -MARGIN; r < def.rows + MARGIN; r++) {
+      for (let c = -MARGIN; c < def.cols + MARGIN; c++) {
+        const inside = r >= 0 && c >= 0 && r < def.rows && c < def.cols;
+        // past the edge, repeat the nearest edge tile (keeps texture alignment via c, r)
+        let t = def.ground(Math.min(def.cols - 1, Math.max(0, c)), Math.min(def.rows - 1, Math.max(0, r)));
         if (!t) continue;
         if (typeof t === "string") t = { tile: t };
-        if (t.solid) w.solid[r * def.cols + c] = 1;
+        if (t.solid && inside) w.solid[r * def.cols + c] = 1;
         const im = img[t.tile];
         if (!im) throw new Error(`${def.id}: tile ${t.tile} not listed in assets`);
-        const x = c * T, y = r * T;
+        const x = (c + MARGIN) * T, y = (r + MARGIN) * T;
         gc.save();
         if (t.flipY) { gc.translate(x, y + T); gc.scale(1, -1); } else gc.translate(x, y);
         // textures bigger than a tile cover several cells; draw the matching part
@@ -317,30 +325,49 @@
     const p = Math.min(1, tr.t / (leg.frames || 240));
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
+    const I = world.img;
+    // repeat an image across the screen, scrolled by `off` px
+    const strip = (im, off, y, step = im.width) => { for (let x = -(((off % step) + step) % step); x < w; x += step) ctx.drawImage(im, Math.round(x), Math.round(y)); };
     if (leg.mode === "bus") {
-      ctx.fillStyle = "#9fd3ff"; ctx.fillRect(0, 0, w, h);
-      // Nelson's Column slides past behind the bus
-      const n = world.img.nelson;
-      ctx.drawImage(n, Math.round(w * 0.9 - p * (w * 0.9 + n.width)), Math.round(h * 0.62 - n.height));
-      ctx.fillStyle = "#c9b38a"; ctx.fillRect(0, Math.round(h * 0.62), w, 8);
-      ctx.fillStyle = "#454c5c"; ctx.fillRect(0, Math.round(h * 0.62) + 8, w, h);
-      ctx.fillStyle = "#f2c94c";
-      for (let x = -((tr.t * 3) % 40); x < w; x += 40) ctx.fillRect(x, Math.round(h * 0.74), 20, 2);
-      const b = world.img.bus, bx = Math.round(w / 2 - b.width / 2), by = Math.round(h * 0.72 - b.height + (tr.t % 20 < 10 ? 0 : 1));
+      // Whitehall → Trafalgar Square → Charing Cross Road: layered street scrolling past the bus
+      const kerbY = Math.round(h * 0.66), baseY = kerbY - 2 * T, off = tr.t * 2.2;
+      ctx.fillStyle = "#a9d4f5"; ctx.fillRect(0, 0, w, h);
+      strip(I.skyline, off * 0.25, baseY - I.skyline.height - 6, I.skyline.width - 1);
+      for (let x = -((off % T) + T) % T; x < w; x += T) {
+        ctx.drawImage(I.tile_paving, x, baseY); ctx.drawImage(I.tile_paving, x, baseY + T);
+        ctx.drawImage(I.tile_kerb, x, kerbY);
+        for (let y = kerbY + T; y < h; y += T) ctx.drawImage(I.tile_asphalt, x, y);
+      }
+      // the street front: terraces, then the square with the gallery and Nelson's Column, then terraces again
+      const row = [["shop_cafe", 0], ["shop_corner", 84], ["shop_laundry", 178], ["national_gallery", 330], ["shop_cafe", 700], ["shop_corner", 784], ["shop_laundry", 878]];
+      const x0 = w * 0.55 - off + 120;
+      for (const [n, x] of row) ctx.drawImage(I[n], Math.round(x0 + x), baseY - I[n].height + 4);
+      for (const tx of [300, 640]) ctx.drawImage(I.tree, Math.round(x0 + tx), baseY + 10 - I.tree.height);
+      const n = I.nelson;
+      ctx.fillStyle = "rgba(20,16,40,.22)"; ctx.beginPath(); ctx.ellipse(Math.round(x0 + 480 + n.width / 2 + 3), baseY + 26, n.width * 0.55, 6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.drawImage(n, Math.round(x0 + 480), baseY + 26 - n.height);
+      const b = I.bus, bx = Math.round(w / 2 - b.width / 2), by = Math.round(kerbY + T * 1.6 - b.height + (tr.t % 20 < 10 ? 0 : 1));
+      ctx.fillStyle = "rgba(20,16,40,.25)"; ctx.fillRect(bx + 8, by + b.height - 3, b.width - 8, 6);
       ctx.drawImage(b, bx, by);
       // destination blind
-      ctx.fillStyle = "#111"; ctx.fillRect(bx + b.width - 62, by + 6, 52, 9);
+      ctx.fillStyle = "#111"; ctx.fillRect(bx + b.width - 74, by + 7, 50, 9);
       ctx.fillStyle = "#ffd23f"; ctx.font = "bold 7px monospace";
-      ctx.fillText(`${leg.route} ${leg.destination}`.toUpperCase().slice(0, 14), bx + b.width - 60, by + 13);
+      ctx.fillText(`${leg.route} ${leg.destination}`.toUpperCase().slice(0, 13), bx + b.width - 72, by + 14);
     } else {
-      ctx.fillStyle = "#2a2430"; ctx.fillRect(0, 0, w, h);
+      // tube tunnel: cast-iron rings rush past, train runs on the track
+      const off = tr.t * 7;
+      for (let y = 0; y < h; y += I.tube_tunnel.height) strip(I.tube_tunnel, off, y);
+      const railY = Math.round(h * 0.7);
+      ctx.fillStyle = "#1c1820"; ctx.fillRect(0, railY, w, h - railY);
+      ctx.fillStyle = "#8d8a92"; ctx.fillRect(0, railY + 6, w, 2); ctx.fillRect(0, railY + 16, w, 2);
       ctx.fillStyle = "#3a3340";
-      for (let x = -((tr.t * 6) % 64); x < w; x += 64) ctx.fillRect(x, Math.round(h * 0.3), 30, Math.round(h * 0.3));
-      const im = leg.line === "Bakerloo" ? world.train.tube : world.img.tube_train;
-      const tx = Math.round(-im.width + p * (w + im.width * 2) * 0.75);
-      ctx.drawImage(im, tx, Math.round(h * 0.62 - im.height));
-      ctx.drawImage(im, tx - im.width + 2, Math.round(h * 0.62 - im.height));
-      ctx.fillStyle = "#5b5148"; ctx.fillRect(0, Math.round(h * 0.62), w, h);
+      for (let x = -((off * 1.4) % 24); x < w; x += 24) ctx.fillRect(Math.round(x), railY + 4, 6, 18);
+      const im = leg.line === "Bakerloo" ? world.train.tube : I.tube_train;
+      const tx = Math.round(-im.width * 2 + p * (w + im.width * 3));
+      ctx.drawImage(im, tx, railY + 8 - im.height);
+      ctx.drawImage(im, tx - im.width + 2, railY + 8 - im.height);
+      // a soft light pool from the train
+      ctx.fillStyle = "rgba(255,230,160,.08)"; ctx.fillRect(tx - im.width, railY - im.height - 12, im.width * 2 + 30, im.height + 20);
     }
     // caption
     ctx.fillStyle = "rgba(251,247,236,.95)";
@@ -421,16 +448,24 @@
     if (mode === "transit") { drawTransit(); return; }
     if (!world) return;
     const d = world.def;
-    cam.x = Math.round(Math.max(0, Math.min(world.W - viewW, player.x - viewW / 2)));
-    cam.y = Math.round(Math.max(0, Math.min(world.H - viewH, player.y - 24 - viewH / 2)));
+    // follow the player; a map smaller than the screen is centred instead
+    cam.x = Math.round(world.W <= viewW ? (world.W - viewW) / 2 : Math.max(0, Math.min(world.W - viewW, player.x - viewW / 2)));
+    cam.y = Math.round(world.H <= viewH ? (world.H - viewH) / 2 : Math.max(0, Math.min(world.H - viewH, player.y - 24 - viewH / 2)));
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = d.sky || "#14121a";
     ctx.fillRect(0, 0, viewW, viewH);
-    for (const b of world.backdrops) ctx.drawImage(b.im, Math.round(b.x - cam.x * (1 - b.p)), Math.round(b.y - cam.y));
-    ctx.drawImage(world.ground, cam.x, cam.y, viewW, viewH, 0, 0, viewW, viewH);
+    for (const b of world.backdrops) {
+      const bx = Math.round(b.x - cam.x * (1 - b.p)), by = Math.round(b.y - cam.y);
+      if (!b.repeatX) { ctx.drawImage(b.im, bx, by); continue; }
+      const iw = b.im.width;
+      for (let x = ((bx % iw) + iw) % iw - iw; x < viewW; x += iw - 1) ctx.drawImage(b.im, x, by);
+    }
+    ctx.drawImage(world.ground, cam.x + MARGIN * T, cam.y + MARGIN * T, viewW, viewH, 0, 0, viewW, viewH);
     ctx.translate(-cam.x, -cam.y);
+    for (const e of world.entities) if (e.layer === "ground") drawSprite(e.im, e.x, e.y - e.h, e.flip);
 
     for (const e of world.entities) {
+      if (e.layer === "ground") continue;
       if (e.shadow === "ellipse") drawShadow(e.x + e.w / 2, e.y, e.w * 0.8);
       else if (e.shadow === "base") { ctx.fillStyle = "rgba(20, 16, 40, 0.22)"; ctx.fillRect(e.x + 3, e.y - 2, e.w, 7); }
     }
@@ -438,7 +473,7 @@
     drawShadow(player.x, player.y, 18);
 
     const list = [];
-    for (const e of world.entities) list.push({ y: e.y + e.z, e });
+    for (const e of world.entities) if (e.layer !== "ground") list.push({ y: e.y + e.z, e });
     for (const m of world.movers) if (m.visible) list.push({ y: m.y + m.z, m });
     list.push({ y: player.y, player: true });
     list.sort((a, b) => a.y - b.y);

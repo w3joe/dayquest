@@ -6,16 +6,16 @@ Goal: the core DayQuest journey plays end to end in about 2 minutes, with no gen
 
 | # | Screen | Route | What happens in the demo | Mocked |
 |---|---|---|---|---|
-| 1 | Today | `/` | Location history syncs onto the map (existing animation). Tap **Use the demo day** (or add any 3 photos) to fill fit, lunch and place. The character step "stitches" for ~2 s, then shows Shawn's sprite. Import Health shows the walk. Transport chips are already there. | Uploads stay in the browser (local preview only, nothing is sent). Fit check returns the prebuilt Shawn sprite after a scripted delay. |
+| 1 | Today | `/` | Location history syncs onto the map (existing animation). Tap **Use the demo day** (or add any 3 photos) to fill fit, lunch and place. The character step "stitches" for ~2 s, then shows Lucas's sprite. Import Health shows the walk. Transport chips are already there. | Uploads stay in the browser (local preview only, nothing is sent). Fit check returns the prebuilt player sprite after a scripted delay. |
 | 2 | Generating | `/generating` | A scripted log ticks through the real pipeline steps (finding landmarks, references, pixelating each sprite) with thumbnails of the actual prebuilt sprites and a progress bar. It takes ~8 s, then goes on to the day. | `/api/world-jobs` is never called. The events are a fixed script in `lib/demo.ts`. |
-| 3 | Shared day | `/day/demo` | Title, date, Shawn's sprite, **Share this day** (copies the link). The playable world sits below, then the itinerary of 3 places. | Static manifest in `lib/demo.ts`; no Blob fetch. |
+| 3 | Shared day | `/day/demo` | Title, date, Lucas's sprite, **Share this day** (copies the link). The playable world sits below, then the itinerary of 3 places. | Static manifest in `lib/demo.ts`; no Blob fetch. |
 | 4 | Game (inside screen 3) | `/london-25d/index.html?scene=westminster&autostart` in an iframe | Westminster (10:30) → bus 24 transit → Kanada-Ya (12:40; walk in through the door to the interior with table 30 and the four bowls) → Central + Bakerloo transit → Regent's Park (14:15; walk stats) → end card. A scene picker is reachable from **Scenes** / Esc. | Nothing. These are the prebuilt assets, played by the vanilla canvas engine. |
 
 ## Where each scene plugs in
 
 - `public/london-25d/` is a copy of `../openai-hack/london-25d` without `assets/raw/`, `logs/` or tools, made by `scripts/sync-london-25d.sh`:
   - `engine/` holds the shared engine.
-  - `shared/assets/` holds Shawn and the shared props.
+  - `shared/assets/` holds the player sheet and the shared props.
   - `scenes/westminster/` is scene 1.
   - `scenes/kanada-ya/` is scene 2: the street plus the `kanada-ya-inside` interior.
   - `scenes/regents-park/` is scene 3.

@@ -56,6 +56,8 @@
     },
 
     build(w) {
+      // rooftops of the streets behind the south-side frontages (generic, invented)
+      w.skyline(BASE + 4, { parallax: 0.12, invented: true });
       const { img, W } = w;
       const front = (name, x, o = {}) => w.add(name, x, BASE, { depth: 30, shadow: "base", foot: [0, img[name].width], ...o });
 
@@ -107,7 +109,7 @@
       w.add("bin_grey", 620, (ROW_KERB_BOTTOM + 1) * T + 18, {});
 
       // Tottenham Court Road entrance on the north pavement, west end (towards St Giles Circus)
-      const te = w.add("tube_entrance", 860, ROWS * T - 2, { solid: false, shadow: "none" });
+      const te = w.add("tube_entrance", 860, ROWS * T - 2, { solid: false, shadow: "none", layer: "ground" }); // stairs go down: drawn under the player
       w.block(te.x + 4, te.y - te.h + 30, te.w - 8, 10);           // back railing
       w.talk(te.x - 10, te.y - 40, TEXT.tube);
       w.exit(te.x + 22, te.y - 50, 44, 30, { label: "TUBE" });
@@ -175,7 +177,7 @@
       w.add("long_table", lx, ly, { depth: 26, invented: true, foot: [4, img.long_table.width - 8] });
       w.talk(d.x + d.w / 2, ly + 2, IN.diners);
 
-      // Shawn's table 30, from the photo
+      // the player's table 30, from the meal photo
       const tx = Math.round((W - img.table30.width) / 2), ty = 12 * T + 8;
       const fr = w.add("friend", Math.round(W / 2 - img.friend.width / 2), ty - img.table30.height + 14, { depth: 8, z: -1 });
       const t30 = w.add("table30", tx, ty, { depth: 28, foot: [4, img.table30.width - 8] });

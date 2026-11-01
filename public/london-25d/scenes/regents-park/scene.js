@@ -66,7 +66,7 @@
       const midX = (WALK_C0 + 2) * T; // centre line of the walk
       const fenceY = FENCE_R * T + 18;
 
-      // ---- Jubilee Gates (bottom centre): Shawn starts just inside them, facing up the walk ----
+      // ---- Jubilee Gates (bottom centre): the player starts just inside them, facing up the walk ----
       const g = img.jubilee_gates;
       const gx = midX - g.width / 2;
       w.add("jubilee_gates", gx, fenceY, { shadow: "base", depth: g.height - 24, foot: [0, g.width] });
