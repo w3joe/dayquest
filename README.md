@@ -25,6 +25,8 @@ _TODO: one concrete example — prompt, what Codex produced, screenshot of the d
 
 ## Setup
 
+Run checks in GitHub manually, then deploy using your existing Vercel login with `npm run deploy:vercel`. See [deployment instructions](docs/DEPLOYMENT.md). Pushes do not trigger deployments. The assigned production address is `https://dayquest-pi.vercel.app`.
+
 ```bash
 git clone https://github.com/w3joe/dayquest.git
 cd dayquest
