@@ -6,7 +6,8 @@
 
 <p>Turn the places you went, the things you ate, and the outfit you wore<br />into a little pixel world for someone you love to explore.</p>
 
-<p><a href="https://dayquest-pi.vercel.app/"><strong>Try DayQuest ↗</strong></a> · <a href="https://dayquest-pi.vercel.app/demo">Explore the demo</a></p>
+<p><strong>🎮 Live demo: <a href="https://dayquest-pi.vercel.app/">dayquest-pi.vercel.app ↗</a></strong></p>
+<p><a href="https://dayquest-pi.vercel.app/demo">View a sample day</a></p>
 
 <p>
   <a href="#why-dayquest">Why we built it</a> ·
