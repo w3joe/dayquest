@@ -71,7 +71,7 @@
       w.talk(ky.x + ky.w * 0.12, BASE, TEXT.blade);
       // the door: walk in to enter the restaurant
       const doorX = Math.round(ky.x + ky.w * 0.62);
-      w.door(doorX - 12, BASE + 2, 24, 10, { to: "kanada-ya-inside", at: { x: 384, y: 16 * T - 30, dir: "up" }, label: "IN" });
+      w.door(doorX - 12, BASE + 2, 24, 10, { to: "kanada-ya-inside", at: { x: IC * T / 2, y: IR * T - 30, dir: "up" }, label: "IN" });   // the interior's own entrance (same as its spawn)
       // outdoor table with the tonkotsu bowl (spec; the real pavement has wooden benches)
       const tb = w.add("table", ky.x + ky.w + 4, BASE + 40, { depth: 12, invented: true });
       const bowlBase = tb.y - tb.h + img.ramen_bowl.height + 4;

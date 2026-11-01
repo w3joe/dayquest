@@ -295,7 +295,19 @@
     pickerEl.hidden = true; endEl.hidden = true;
     world = await buildScene(def);
     const sp = at || def.spawn;
-    player.x = sp.x; player.y = sp.y; player.dir = sp.dir || "up"; player.still = 0;
+    player.x = sp.x; player.y = sp.y; player.dir = sp.dir || "up"; player.still = 0; player.act = null;
+    // guard: a spawn point outside the map or inside something solid moves to the nearest free spot
+    const top = (def.walkTop ?? 0) + 10;
+    player.x = Math.max(12, Math.min(world.W - 12, player.x));
+    player.y = Math.max(top, Math.min(world.H - 6, player.y));
+    if (collides(player.x, player.y)) {
+      found: for (let r = 8; r < 400; r += 8) {
+        for (let a = 0; a < 16; a++) {
+          const x = player.x + Math.cos((a / 16) * Math.PI * 2) * r, y = player.y + Math.sin((a / 16) * Math.PI * 2) * r;
+          if (x > 12 && x < world.W - 12 && y > top && y < world.H - 6 && !collides(x, y)) { player.x = x; player.y = y; break found; }
+        }
+      }
+    }
     resize();
     mode = "play";
     bannerEl.textContent = def.card || def.title;
