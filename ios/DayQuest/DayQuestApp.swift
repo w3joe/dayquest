@@ -11,7 +11,7 @@ struct DayQuestApp: App {
         WindowGroup {
             RootView()
                 .environment(delegate.engine)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { delegate.engine.checkEndOfDay() }

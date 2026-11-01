@@ -38,6 +38,13 @@ final class TraceStore {
         save()
     }
 
+    func setFit(sessionId: String, fitURL: String?, spriteURL: String?) {
+        day.sessionId = sessionId
+        day.fitURL = fitURL
+        day.spriteURL = spriteURL
+        save()
+    }
+
     func reset() {
         day = DayFile(date: TraceStore.todayKey())
         save()
@@ -47,7 +54,10 @@ final class TraceStore {
     /// Replaces today with the demo trace. With `animated`, points drip in so the map fills up on stage.
     @MainActor
     func seedDemo(animated: Bool) async {
-        reset()
+        day.points = []
+        day.labels = [:]
+        day.generatedId = nil
+        rebuildStops()
         let points = DemoTrace.points(on: Date())
         guard animated else {
             day.points = points
@@ -103,13 +113,21 @@ final class TraceStore {
         }
     }
 
-    /// The `day` field for POST /api/generate-day.
-    func requestDay(name: String) -> [String: Any] {
-        [
-            "date": day.date,
-            "name": name,
-            "locations": stops.map { ["t": DayFormat.time.string(from: $0.arrival), "lat": $0.lat, "lng": $0.lng, "label": $0.label] },
+    /// Body for POST /api/generate-day: the web draft fields (when there is a fit check) plus the trace.
+    func requestBody(name: String) -> [String: Any] {
+        var body: [String: Any] = [
+            "day": [
+                "date": day.date,
+                "name": name,
+                "locations": stops.map { ["t": DayFormat.time.string(from: $0.arrival), "lat": $0.lat, "lng": $0.lng, "label": $0.label] },
+            ],
         ]
+        if let sessionId = day.sessionId, let fitURL = day.fitURL {
+            body["sessionId"] = sessionId
+            body["uploads"] = [["kind": "fit", "url": fitURL]]
+            if let spriteURL = day.spriteURL { body["spriteUrl"] = spriteURL }
+        }
+        return body
     }
 
     // MARK: Persistence

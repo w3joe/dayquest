@@ -11,10 +11,10 @@ struct DayResultView: View {
             if let url = engine.dayURL(id) {
                 WebView(url: url).ignoresSafeArea(edges: .bottom)
             } else {
-                Text("Server URL is not valid.").font(Theme.pixel(13))
+                Text("Server URL is not valid.").font(Theme.mono(13))
             }
         }
-        .background(Theme.ink)
+        .background(Theme.paper)
         .navigationTitle("TODAY")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -34,7 +34,7 @@ struct WebView: UIViewRepresentable {
         config.mediaTypesRequiringUserActionForPlayback = []
         let view = WKWebView(frame: .zero, configuration: config)
         view.isOpaque = false
-        view.backgroundColor = UIColor(Theme.ink)
+        view.backgroundColor = UIColor(Theme.paper)
         view.scrollView.contentInsetAdjustmentBehavior = .never
         view.load(URLRequest(url: url))
         return view

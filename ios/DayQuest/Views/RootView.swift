@@ -8,7 +8,7 @@ struct RootView: View {
         @Bindable var engine = engine
         NavigationStack {
             TodayView()
-                .navigationTitle("DAYQUEST")
+                .toolbarBackground(Theme.paper, for: .navigationBar)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -19,7 +19,7 @@ struct RootView: View {
                     DayResultView(id: id)
                 }
         }
-        .tint(Theme.accent)
+        .tint(Theme.green)
         .sheet(isPresented: $showSettings) { SettingsView() }
         .onAppear { engine.requestNotifications() }
     }

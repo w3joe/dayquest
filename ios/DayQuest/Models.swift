@@ -36,6 +36,10 @@ struct DayFile: Codable {
     var points: [TracePoint] = []
     var labels: [String: String] = [:]
     var generatedId: String?
+    /// Fit check for /api/upload + /api/fit-check; asset URLs are tied to this session id.
+    var sessionId: String?
+    var fitURL: String?
+    var spriteURL: String?
 }
 
 /// §6.1 generating-log event streamed from /api/generate-day.

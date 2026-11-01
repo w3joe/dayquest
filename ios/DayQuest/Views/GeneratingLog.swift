@@ -5,20 +5,24 @@ struct GeneratingLog: View {
     @Environment(DayEngine.self) private var engine
 
     var body: some View {
-        QuestCard(title: engine.running ? "> BUILDING YOUR WORLD…" : "> GENERATION LOG") {
-            ForEach(engine.log) { event in
-                HStack(spacing: 10) {
-                    if let image = thumbnail(event.thumb) {
-                        Image(uiImage: image).interpolation(.none).resizable().scaledToFit().frame(width: 32, height: 32)
+        Panel(eyebrow: "04 / BUILDING", title: engine.running ? "Building your world…" : "How it was built.",
+              trailing: engine.running ? "WORKING" : engine.failure == nil ? "DONE" : nil) {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(engine.log) { event in
+                    HStack(spacing: 10) {
+                        if let image = thumbnail(event.thumb) {
+                            Image(uiImage: image).interpolation(.none).resizable().scaledToFit().frame(width: 28, height: 28)
+                                .background(Color(hex: 0xE4E8D7))
+                        }
+                        Text("> \(event.label)")
+                            .font(Theme.mono(10))
+                            .foregroundStyle(event.step == "error" ? Theme.error : event.step == "done" ? Theme.tick : Theme.ink)
                     }
-                    Text("> \(event.label)")
-                        .font(Theme.pixel(12, .regular))
-                        .foregroundStyle(event.step == "error" ? Theme.route : event.step == "done" ? Theme.ok : Theme.edge)
                 }
-            }
-            if engine.running { ProgressView().tint(Theme.accent) }
-            if let failure = engine.failure {
-                Text(failure).font(Theme.pixel(12, .regular)).foregroundStyle(Theme.route)
+                if engine.running { ProgressView().tint(Theme.green) }
+                if let failure = engine.failure {
+                    Text(failure).font(Theme.body(11)).foregroundStyle(Theme.error)
+                }
             }
         }
     }

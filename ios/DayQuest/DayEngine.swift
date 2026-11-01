@@ -14,6 +14,15 @@ final class DayEngine {
     let store = TraceStore()
     let recorder: LocationRecorder
 
+    struct FitState {
+        var preview: UIImage?
+        var sprite: UIImage?
+        var uploadURL: String?
+        var busy = false
+        var error: String?
+    }
+
+    private(set) var fit = FitState()
     private(set) var log: [GenerateEvent] = []
     private(set) var running = false
     private(set) var failure: String?
@@ -34,6 +43,16 @@ final class DayEngine {
         autoGenerate = defaults.object(forKey: "autoGenerate") as? Bool ?? true
         recorder = LocationRecorder(store: store)
         recorder.onPoint = { [weak self] in self?.checkEndOfDay() }
+        fit.uploadURL = store.day.fitURL
+        Task { await loadSprite() }
+    }
+
+    /// How far through the day we are, for the progress bar (08:00 → end of day).
+    var dayProgress: Double {
+        if generatedId != nil { return 1 }
+        guard let start = Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: Date()) else { return 0 }
+        let total = endOfDay.timeIntervalSince(start)
+        return total > 0 ? min(1, max(0, Date().timeIntervalSince(start) / total)) : 1
     }
 
     /// Demo only: an end of day a few seconds away, not persisted.
@@ -87,12 +106,15 @@ final class DayEngine {
         var request = URLRequest(url: url, timeoutInterval: 300)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: ["uploads": [], "day": store.requestDay(name: playerName)])
+        request.httpBody = try? JSONSerialization.data(withJSONObject: store.requestBody(name: playerName))
 
         do {
             let (bytes, response) = try await URLSession.shared.bytes(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                failure = "Server answered \((response as? HTTPURLResponse)?.statusCode ?? 0)."
+                var text = ""
+                for try await line in bytes.lines { text += line }
+                let message = (try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])?["error"] as? String
+                failure = message ?? "Server answered \((response as? HTTPURLResponse)?.statusCode ?? 0)."
                 return
             }
             for try await line in bytes.lines {
@@ -112,10 +134,84 @@ final class DayEngine {
 
     func clearResult() {
         store.reset()
+        fit = FitState()
         endOverride = nil
         log = []
         failure = nil
         presentedDayId = nil
+    }
+
+    // MARK: Fit check (same endpoints as the web Today screen)
+
+    private func url(_ path: String) -> URL? {
+        if path.hasPrefix("http") { return URL(string: path) }
+        return URL(string: serverURL.trimmingCharacters(in: .init(charactersIn: "/")) + path)
+    }
+
+    @MainActor
+    func makeCharacter(from data: Data) async {
+        guard let image = UIImage(data: data), let jpeg = Self.jpeg(image) else {
+            fit.error = "Choose a JPEG, PNG or HEIC photo."
+            return
+        }
+        let sessionId = store.day.sessionId ?? UUID().uuidString.lowercased()
+        fit = FitState(preview: Self.pixelPreview(image), busy: true)
+        do {
+            let upload = try await postPhoto("/api/upload", jpeg: jpeg, fields: ["kind": "fit", "sessionId": sessionId], key: "url")
+            fit.uploadURL = upload
+            store.setFit(sessionId: sessionId, fitURL: upload, spriteURL: nil)
+            let sprite = try await postPhoto("/api/fit-check", jpeg: jpeg, fields: ["sessionId": sessionId], key: "spriteUrl")
+            store.setFit(sessionId: sessionId, fitURL: upload, spriteURL: sprite)
+            await loadSprite()
+        } catch {
+            fit.error = error.localizedDescription
+        }
+        fit.busy = false
+    }
+
+    @MainActor
+    private func loadSprite() async {
+        guard let path = store.day.spriteURL, let url = url(path),
+              let (data, _) = try? await URLSession.shared.data(from: url) else { return }
+        fit.sprite = UIImage(data: data)
+    }
+
+    private func postPhoto(_ path: String, jpeg: Data, fields: [String: String], key: String) async throws -> String {
+        guard let url = url(path) else { throw DayError("Server URL is not valid.") }
+        let boundary = UUID().uuidString
+        var body = Data()
+        for (name, value) in fields {
+            body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n".data(using: .utf8)!)
+        }
+        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"fit.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(jpeg)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        var request = URLRequest(url: url, timeoutInterval: 180)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        let (data, response) = try await URLSession.shared.upload(for: request, from: body)
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        guard (response as? HTTPURLResponse)?.statusCode == 200, let value = json?[key] as? String else {
+            throw DayError(json?["error"] as? String ?? "Could not reach the server. Please try again.")
+        }
+        return value
+    }
+
+    /// The server takes ≤ 4 MB; 1600 px JPEG keeps well under that.
+    private static func jpeg(_ image: UIImage) -> Data? {
+        let scale = min(1, 1600 / max(image.size.width, image.size.height))
+        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        return UIGraphicsImageRenderer(size: size).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
+            .jpegData(compressionQuality: 0.85)
+    }
+
+    /// Same idea as the web preview: shrink to 96 px, shown with nearest-neighbour scaling.
+    private static func pixelPreview(_ image: UIImage) -> UIImage {
+        let scale = 96 / max(image.size.width, image.size.height)
+        let size = CGSize(width: max(1, image.size.width * scale), height: max(1, image.size.height * scale))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
     }
 
     // MARK: Notifications and background refresh
@@ -157,4 +253,10 @@ final class DayEngine {
         }
         task.expirationHandler = { work.cancel() }
     }
+}
+
+struct DayError: LocalizedError {
+    let message: String
+    init(_ message: String) { self.message = message }
+    var errorDescription: String? { message }
 }
