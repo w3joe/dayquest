@@ -11,3 +11,6 @@ next-env.d.ts
 # Locally generated days (demo is committed)
 public/days/*
 !public/days/demo/
+
+# Raw image generations for the Shadwell scene (42 MB); processed sprites live in shadwell-25d/assets/
+shadwell-25d/assets/raw/
