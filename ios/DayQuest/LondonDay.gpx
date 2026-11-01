@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<gpx version="1.1" creator="DayQuest">
+  <!-- Simulator route for Xcode: Debug > Simulate Location > LondonDay. Same stops as data/input.json. -->
+  <wpt lat="51.5007" lon="-0.1246"><time>2026-11-07T10:00:00Z</time></wpt>
+  <wpt lat="51.5009" lon="-0.1220"><time>2026-11-07T10:01:00Z</time></wpt>
+  <wpt lat="51.5033" lon="-0.1196"><time>2026-11-07T10:02:00Z</time></wpt>
+  <wpt lat="51.5010" lon="-0.1260"><time>2026-11-07T10:03:00Z</time></wpt>
+  <wpt lat="51.5080" lon="-0.1281"><time>2026-11-07T10:04:00Z</time></wpt>
+  <wpt lat="51.5163" lon="-0.1303"><time>2026-11-07T10:05:00Z</time></wpt>
+  <wpt lat="51.5157" lon="-0.1281"><time>2026-11-07T10:06:00Z</time></wpt>
+  <wpt lat="51.5152" lon="-0.1419"><time>2026-11-07T10:07:00Z</time></wpt>
+  <wpt lat="51.5234" lon="-0.1466"><time>2026-11-07T10:08:00Z</time></wpt>
+  <wpt lat="51.5262" lon="-0.1530"><time>2026-11-07T10:09:00Z</time></wpt>
+  <wpt lat="51.5250" lon="-0.1590"><time>2026-11-07T10:10:00Z</time></wpt>
+</gpx>

@@ -9,9 +9,29 @@ import type { DayInput, GenerateEvent, UploadKind } from "@/pipeline/types";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-type Body = { uploads?: { kind: string; url: string }[]; spriteUrl?: string };
+type TracedDay = { date?: string; name?: string; locations?: DayInput["locations"]; workouts?: DayInput["workouts"] };
+type Body = { uploads?: { kind: string; url: string }[]; spriteUrl?: string; day?: TracedDay };
 
-/** §8: { uploads, spriteUrl } → NDJSON stream of §6.1 events; the last has the new day's id. */
+/** A recorded day from the iOS app replaces data/input.json's date, name, locations and workouts. */
+function applyTracedDay(input: DayInput, day: TracedDay | undefined): DayInput {
+  if (!day || typeof day !== "object") return input;
+  const locations = Array.isArray(day.locations)
+    ? day.locations.filter((l) => typeof l?.t === "string" && Number.isFinite(l.lat) && Number.isFinite(l.lng) && typeof l.label === "string").slice(0, 200)
+    : [];
+  if (Array.isArray(day.locations) && locations.length === 0) throw new RequestError("day.locations needs at least one { t, lat, lng, label } stop.");
+  const workouts = Array.isArray(day.workouts)
+    ? day.workouts.filter((w) => typeof w?.t === "string" && typeof w.type === "string" && [w.distanceKm, w.durationMin, w.steps].every(Number.isFinite))
+    : [];
+  return {
+    ...input,
+    date: typeof day.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(day.date) ? day.date : input.date,
+    user: { ...input.user, name: typeof day.name === "string" && day.name.trim() ? day.name.trim().slice(0, 12).toUpperCase() : input.user.name },
+    locations: locations.length ? locations : input.locations,
+    workouts: workouts.length ? workouts : input.workouts,
+  };
+}
+
+/** §8: { uploads, spriteUrl, day? } → NDJSON stream of §6.1 events; the last has the new day's id. */
 export async function POST(request: Request) {
   try {
     const body = (await request.json().catch(() => null)) as Body | null;
@@ -25,7 +45,8 @@ export async function POST(request: Request) {
       if (bytes) uploads[upload.kind as UploadKind] = bytes;
     }
     const player = body.spriteUrl ? await loadStoredAsset(body.spriteUrl) ?? undefined : undefined;
-    const input = JSON.parse(await readFile(path.join(process.cwd(), "data", "input.json"), "utf8")) as DayInput;
+    const template = JSON.parse(await readFile(path.join(process.cwd(), "data", "input.json"), "utf8")) as DayInput;
+    const input = applyTracedDay(template, body.day);
     const id = newDayId();
     const store = storeForDay(id);
 

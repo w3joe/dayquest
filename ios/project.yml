@@ -1,0 +1,42 @@
+name: DayQuest
+options:
+  bundleIdPrefix: app.dayquest
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    # Set your team in Xcode (Signing & Capabilities) or here before installing on a device.
+    DEVELOPMENT_TEAM: ""
+targets:
+  DayQuest:
+    type: application
+    platform: iOS
+    sources:
+      - path: DayQuest
+        excludes: ["*.gpx"]
+      - path: DayQuest/LondonDay.gpx
+        buildPhase: none
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.dayquest.ios
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: DayQuest
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "DayQuest records where you go today so it can turn your day into a map you can play."
+        INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription: "DayQuest keeps recording in the background through the day, then builds your map automatically when the day ends."
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "DayQuest talks to the DayQuest server on your network to build your day."
+    info:
+      path: DayQuest/Info.plist
+      properties:
+        UIBackgroundModes: [location, fetch]
+        BGTaskSchedulerPermittedIdentifiers: [app.dayquest.ios.end-of-day]
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true

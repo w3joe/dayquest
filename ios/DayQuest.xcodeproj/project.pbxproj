@@ -1,0 +1,362 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0FE6EA7BD668EBD1B1EEC952 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DADCAC11C847190A47960A45 /* TodayView.swift */; };
+		1B7570A5F4667ABF83B537FC /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3FFF489F3A56E2349F8D038 /* RootView.swift */; };
+		4D1725CD2CE56835202627E5 /* DayQuestApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A9D8086E6319A923C015F13 /* DayQuestApp.swift */; };
+		4D2117A6B2D91A53D88C7B11 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CACD4E67A20CC82378A6503A /* Theme.swift */; };
+		7571D781F4D8D1E914B5C080 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFE5898D2DC5F2D6BB0E8694 /* SettingsView.swift */; };
+		7952CC9F4F01223787C5C9CA /* GeneratingLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7FA61BC99CAF47708A516EC /* GeneratingLog.swift */; };
+		88ABE58139286635FFDEE813 /* TraceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB237800B5C64ED4238FA709 /* TraceStore.swift */; };
+		9135FF0C6C536B63A6BF603E /* DemoTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A206FF8455916281247E757D /* DemoTrace.swift */; };
+		AD164CDCA65592E1D4B17BE0 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = E51E80C9BF24BE5F8FF5C331 /* Models.swift */; };
+		B76331A6B28775D86E19B1A4 /* DayEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF29CA97378083374731AAF /* DayEngine.swift */; };
+		BCDF4679E30529A0B6D81E0C /* DayResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2365BB0C503C2A794F91562A /* DayResultView.swift */; };
+		CFBA1494776999C4AE4E1BD9 /* LocationRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 909D79F6AABC4BACC143E987 /* LocationRecorder.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		1FF29CA97378083374731AAF /* DayEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayEngine.swift; sourceTree = "<group>"; };
+		2365BB0C503C2A794F91562A /* DayResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayResultView.swift; sourceTree = "<group>"; };
+		366221AB1402F703E8BA8EBE /* LondonDay.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = LondonDay.gpx; sourceTree = "<group>"; };
+		5A9D8086E6319A923C015F13 /* DayQuestApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayQuestApp.swift; sourceTree = "<group>"; };
+		909D79F6AABC4BACC143E987 /* LocationRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationRecorder.swift; sourceTree = "<group>"; };
+		A206FF8455916281247E757D /* DemoTrace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoTrace.swift; sourceTree = "<group>"; };
+		BFE5898D2DC5F2D6BB0E8694 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		CACD4E67A20CC82378A6503A /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		DADCAC11C847190A47960A45 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		E30481DE83CC2796D3B4F564 /* DayQuest.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = DayQuest.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E3FFF489F3A56E2349F8D038 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		E51E80C9BF24BE5F8FF5C331 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		E7FA61BC99CAF47708A516EC /* GeneratingLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneratingLog.swift; sourceTree = "<group>"; };
+		F86AE97FB6CEAF5F8E09AD16 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		FB237800B5C64ED4238FA709 /* TraceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TraceStore.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		2B200C4C04F90D66340D57F7 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				2365BB0C503C2A794F91562A /* DayResultView.swift */,
+				E7FA61BC99CAF47708A516EC /* GeneratingLog.swift */,
+				E3FFF489F3A56E2349F8D038 /* RootView.swift */,
+				BFE5898D2DC5F2D6BB0E8694 /* SettingsView.swift */,
+				CACD4E67A20CC82378A6503A /* Theme.swift */,
+				DADCAC11C847190A47960A45 /* TodayView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		364FF1D00B892BB55698024A /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E30481DE83CC2796D3B4F564 /* DayQuest.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D8DE4994F51E6A6689F0B6E2 /* DayQuest */ = {
+			isa = PBXGroup;
+			children = (
+				1FF29CA97378083374731AAF /* DayEngine.swift */,
+				5A9D8086E6319A923C015F13 /* DayQuestApp.swift */,
+				A206FF8455916281247E757D /* DemoTrace.swift */,
+				F86AE97FB6CEAF5F8E09AD16 /* Info.plist */,
+				909D79F6AABC4BACC143E987 /* LocationRecorder.swift */,
+				366221AB1402F703E8BA8EBE /* LondonDay.gpx */,
+				E51E80C9BF24BE5F8FF5C331 /* Models.swift */,
+				FB237800B5C64ED4238FA709 /* TraceStore.swift */,
+				2B200C4C04F90D66340D57F7 /* Views */,
+			);
+			path = DayQuest;
+			sourceTree = "<group>";
+		};
+		E4A2D8E7A1D9324DC47E1AAC = {
+			isa = PBXGroup;
+			children = (
+				D8DE4994F51E6A6689F0B6E2 /* DayQuest */,
+				364FF1D00B892BB55698024A /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		93C24E73CBCF78EB5E99EB53 /* DayQuest */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FC39699CA57A1603212FEB76 /* Build configuration list for PBXNativeTarget "DayQuest" */;
+			buildPhases = (
+				0CDFCF84D06121E239344C28 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DayQuest;
+			packageProductDependencies = (
+			);
+			productName = DayQuest;
+			productReference = E30481DE83CC2796D3B4F564 /* DayQuest.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B696C7F7C45DCE5879E838D3 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					93C24E73CBCF78EB5E99EB53 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = EF91B0056F9A07E5755C9D3B /* Build configuration list for PBXProject "DayQuest" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = E4A2D8E7A1D9324DC47E1AAC;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 364FF1D00B892BB55698024A /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				93C24E73CBCF78EB5E99EB53 /* DayQuest */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		0CDFCF84D06121E239344C28 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B76331A6B28775D86E19B1A4 /* DayEngine.swift in Sources */,
+				4D1725CD2CE56835202627E5 /* DayQuestApp.swift in Sources */,
+				BCDF4679E30529A0B6D81E0C /* DayResultView.swift in Sources */,
+				9135FF0C6C536B63A6BF603E /* DemoTrace.swift in Sources */,
+				7952CC9F4F01223787C5C9CA /* GeneratingLog.swift in Sources */,
+				CFBA1494776999C4AE4E1BD9 /* LocationRecorder.swift in Sources */,
+				AD164CDCA65592E1D4B17BE0 /* Models.swift in Sources */,
+				1B7570A5F4667ABF83B537FC /* RootView.swift in Sources */,
+				7571D781F4D8D1E914B5C080 /* SettingsView.swift in Sources */,
+				4D2117A6B2D91A53D88C7B11 /* Theme.swift in Sources */,
+				0FE6EA7BD668EBD1B1EEC952 /* TodayView.swift in Sources */,
+				88ABE58139286635FFDEE813 /* TraceStore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1D0CE3C9C59BC6DBBE9A94BD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DayQuest/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DayQuest;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "DayQuest talks to the DayQuest server on your network to build your day.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "DayQuest keeps recording in the background through the day, then builds your map automatically when the day ends.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "DayQuest records where you go today so it can turn your day into a map you can play.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.dayquest.ios;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		5578664DFFC1491A63ECA1C5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DayQuest/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DayQuest;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "DayQuest talks to the DayQuest server on your network to build your day.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "DayQuest keeps recording in the background through the day, then builds your map automatically when the day ends.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "DayQuest records where you go today so it can turn your day into a map you can play.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.dayquest.ios;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		68D5C4F29FB285F5EACCA906 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		C7572DC8F1BBA7884E2DB970 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		EF91B0056F9A07E5755C9D3B /* Build configuration list for PBXProject "DayQuest" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				68D5C4F29FB285F5EACCA906 /* Debug */,
+				C7572DC8F1BBA7884E2DB970 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FC39699CA57A1603212FEB76 /* Build configuration list for PBXNativeTarget "DayQuest" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5578664DFFC1491A63ECA1C5 /* Debug */,
+				1D0CE3C9C59BC6DBBE9A94BD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B696C7F7C45DCE5879E838D3 /* Project object */;
+}
