@@ -10,7 +10,7 @@ export function localAssetPath(segments: string[]): string {
   // Only paths produced by storeSessionAsset are readable. No public filesystem access.
   if (segments.length !== 3 || segments[0] !== "uploads" ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(segments[1]) ||
-      !/^(fit|fit_back|lunch|landmark|park|player)-[0-9a-f-]{36}\.png$/.test(segments[2])) {
+      !/^(fit|fit_back|lunch|landmark|park|extra|player)-[0-9a-f-]{36}\.png$/.test(segments[2])) {
     throw new RequestError("Asset not found.", 404);
   }
   return path.join(LOCAL_ROOT, ...segments);

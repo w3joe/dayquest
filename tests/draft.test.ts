@@ -38,3 +38,13 @@ test("rejects unsafe or foreign local URLs in uploads and sprite handoff", () =>
     assert.equal(isReadyDraft({ sessionId, uploads: [fit], spriteUrl: url }), false);
   }
 });
+
+test("allows several photos per slot and an extra slot, but only one fit", () => {
+  const url = (kind: string, n: number) => `/api/assets/uploads/${sessionId}/${kind}-12345678-1234-4567-8901-12345678901${n}.png`;
+  const draft = { sessionId, uploads: [{ kind: "fit", url: url("fit", 0) }, { kind: "lunch", url: url("lunch", 1), note: "  ramen  " }, { kind: "lunch", url: url("lunch", 2) }, { kind: "extra", url: url("extra", 3) }] };
+  assert.equal(parseDraft(draft)?.uploads.length, 4);
+  assert.equal(parseDraft(draft)?.uploads[1].note, "ramen");
+  assert.equal(parseDraft({ sessionId, uploads: [draft.uploads[0], { kind: "fit", url: url("fit", 1) }] }), null);
+  const many = Array.from({ length: 13 }, (_, i) => ({ kind: "extra", url: `https://assets.example.com/extra-${i}.png` }));
+  assert.equal(parseDraft({ sessionId, uploads: many }), null);
+});

@@ -31,5 +31,5 @@ export type PlannedScene = Pick<DayScene, "kind" | "title" | "time" | "base"> & 
 };
 export type DayPlan = { scenes: PlannedScene[] };
 
-export type UploadKind = "fit" | "fit_back" | "lunch" | "landmark" | "park";
+export type UploadKind = "fit" | "fit_back" | "lunch" | "landmark" | "park" | "extra";
 export type { DayManifest };
