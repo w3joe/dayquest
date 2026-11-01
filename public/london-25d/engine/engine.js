@@ -11,7 +11,7 @@
   const HIT = { w: 14, h: 6 };
   const SHARED = ["shawn", "bus", "tube_train", "nelson", "skyline", "national_gallery", "tube_tunnel",
     "tile_paving", "tile_asphalt", "tile_kerb", "shop_corner", "shop_cafe", "shop_laundry", "tree"];
-  const OPTIONAL = ["actions", "fx_steam", "fx_sparkle", "fx_heart", "fx_flash"]; // loaded if present
+  const OPTIONAL = ["actions", "fx_steam", "fx_sparkle", "fx_heart", "fx_flash", "skyline_far", "terrace_strip"]; // loaded if present
   const NPC_VEHICLES = ["black_cab", "delivery_bike"];
   const SITTABLE = ["bench", "deckchair", "chair"];
   // player action strips in shared/assets/actions.png (4 cols x 6 rows of 32x48)
@@ -165,7 +165,13 @@
       // repeatX: tile the backdrop across the whole map width (city skylines)
       backdrop(name, x, y, o = {}) { w.backdrops.push({ im: img[name], x, y, p: o.parallax ?? 0.3, invented: !!o.invented, repeatX: !!o.repeatX }); },
       // a hazy row of city rooftops standing on the line y, across the whole map
-      skyline(y, o = {}) { w.backdrops.push({ im: img.skyline, x: 0, y: y - img.skyline.height, p: o.parallax ?? 0.15, invented: !!o.invented, repeatX: true }); },
+      // depth: a hazy far skyline (only roofs and spires show) behind a continuous terrace that meets the ground at y
+      skyline(y, o = {}) {
+        const far = img.skyline_far || img.skyline, row = img.terrace_strip;
+        const roof = row ? y - row.height + 24 : y;
+        w.backdrops.push({ im: far, x: 0, y: roof + 40 - far.height, p: o.parallax ?? 0.3, invented: !!o.invented, repeatX: true });
+        if (row) w.backdrops.push({ im: row, x: 0, y: y - row.height, p: 0, invented: !!o.invented, repeatX: true, ground: true });
+      },
     };
     def.build(api);
     // ground
@@ -324,7 +330,8 @@
     else {
       // benches and deckchairs seat the player, with or without a line to read
       const seat = nearbySeat();
-      if (seat) startAction("sit", { seat: { x: seat.x + seat.w / 2, y: seat.y + 2 } });
+      // a deckchair's seat is low and set back: sit into it rather than in front of it
+      if (seat) startAction("sit", { seat: { x: seat.x + seat.w / 2, y: seat.name === "deckchair" ? seat.y - 6 : seat.y + 2 } });
     }
     if (!s) return;
     if (s.text) {
@@ -402,7 +409,10 @@
       // Whitehall → Trafalgar Square → Charing Cross Road: layered street scrolling past the bus
       const kerbY = Math.round(h * 0.66), baseY = kerbY - 2 * T, off = tr.t * 2.2;
       ctx.fillStyle = "#a9d4f5"; ctx.fillRect(0, 0, w, h);
-      strip(I.skyline, off * 0.25, baseY - I.skyline.height - 6, I.skyline.width - 1);
+      const far = I.skyline_far || I.skyline, terr = I.terrace_strip;
+      const roof = terr ? baseY + 4 - terr.height + 24 : baseY;
+      strip(far, off * 0.3, roof + 40 - far.height, far.width - 1);
+      if (terr) strip(terr, off * 0.85, baseY + 4 - terr.height, terr.width - 1);
       for (let x = -((off % T) + T) % T; x < w; x += T) {
         ctx.drawImage(I.tile_paving, x, baseY); ctx.drawImage(I.tile_paving, x, baseY + T);
         ctx.drawImage(I.tile_kerb, x, kerbY);
@@ -427,7 +437,7 @@
       // tube tunnel: cast-iron rings rush past, train runs on the track
       const off = tr.t * 7;
       for (let y = 0; y < h; y += I.tube_tunnel.height) strip(I.tube_tunnel, off, y);
-      const railY = Math.round(h * 0.7);
+      const railY = Math.round(h * 0.84);
       ctx.fillStyle = "#1c1820"; ctx.fillRect(0, railY, w, h - railY);
       ctx.fillStyle = "#8d8a92"; ctx.fillRect(0, railY + 6, w, 2); ctx.fillRect(0, railY + 16, w, 2);
       ctx.fillStyle = "#3a3340";
@@ -513,6 +523,10 @@
 
   // ---------- draw ----------
   const cam = { x: 0, y: 0 };
+  function shade(hex, k) {
+    const n = parseInt(hex.slice(1), 16), f = (v) => Math.max(0, Math.min(255, Math.round(v * (1 + k))));
+    return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+  }
   function drawShadow(cx, by, w) {
     ctx.fillStyle = "rgba(20, 16, 40, 0.24)";
     ctx.beginPath();
@@ -532,7 +546,11 @@
     cam.x = Math.round(world.W <= viewW ? (world.W - viewW) / 2 : Math.max(0, Math.min(world.W - viewW, player.x - viewW / 2)));
     cam.y = Math.round(world.H <= viewH ? (world.H - viewH) / 2 : Math.max(0, Math.min(world.H - viewH, player.y - 24 - viewH / 2)));
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = d.sky || "#14121a";
+    // soft vertical sky gradient: deeper blue at the top of the world, the scene's sky colour at the horizon
+    const sky = ctx.createLinearGradient(0, -cam.y, 0, -cam.y + world.H * 0.45);
+    sky.addColorStop(0, d.skyTop || shade(d.sky || "#14121a", -0.18));
+    sky.addColorStop(1, d.sky || "#14121a");
+    ctx.fillStyle = sky;
     ctx.fillRect(0, 0, viewW, viewH);
     for (const b of world.backdrops) {
       const bx = Math.round(b.x - cam.x * (1 - b.p)), by = Math.round(b.y - cam.y);
@@ -582,7 +600,7 @@
       ctx.fillStyle = "#221c28"; ctx.fillText(e.label, bx + 4, by + 9);
     }
 
-    const s = !dialogue && nearbyTalk();
+    const s = !dialogue && !player.act && nearbyTalk();
     if (s) {
       const bx = Math.round(player.x) - 6, by = Math.round(player.y) - FH - 8;
       ctx.fillStyle = "#221c28"; ctx.fillRect(bx - 1, by - 1, 14, 12);

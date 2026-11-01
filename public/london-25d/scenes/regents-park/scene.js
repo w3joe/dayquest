@@ -164,7 +164,7 @@
         talk: "A jogger, not stopping: \"Morning! Well, afternoon. Three laps to go!\"" });
       w.npc("npc_dogwalker", { path: [[(LAKE_C + 2) * T, py], [(COLS - 2) * T, py]], speed: 0.5, pause: 60,
         talk: "A dog walker: \"Dogs have to stay on leads in the rose garden. He knows.\"" });
-      w.npc("npc_parent", { path: [[(LAKE_C + 3) * T, py + 14], [(WALK_C0 - 1) * T, py + 14]], speed: 0.4, delay: 200, pause: 90 });
+      w.npc("npc_parent", { path: [[(LAKE_C + 3) * T, py + 26], [(WALK_C0 - 1) * T, py + 26]], speed: 0.4, delay: 200, pause: 90 });
       w.npc("npc_elder", { path: [[midX + 30, 20 * T], [midX + 30, 26 * T]], speed: 0.28, pause: 150,
         talk: "An older gentleman: \"I've walked these roses every summer for forty years.\"" });
       w.npc("npc_tourist", { path: [[midX + 34, PLAZA.r1 * T + 30]], still: true, face: "up" });

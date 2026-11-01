@@ -120,8 +120,9 @@
       w.npc("npc_student", { path: [[W - 140, northY + 18], [180, northY + 18]], speed: 0.5, delay: 90 });
       w.npc("npc_tourist", { path: [[W - 60, southY], [260, southY]], speed: 0.45, pause: 90, talk: "A tourist with a map: \"Is this the way to Denmark Street? The guitar shops?\"" });
       w.npc("npc_busker", { path: [[W - 210, southY + 6]], still: true, face: "down", talk: "A busker tunes a guitar. Denmark Street, round the corner, was London's Tin Pan Alley." });
-      w.traffic("black_cab", { y: (ROW_KERB_TOP + 1) * T + 24, speed: 1.5, gap: 240 });
-      w.traffic("delivery_bike", { y: (ROW_KERB_TOP + 2) * T + 18, speed: -1.1, flip: true, gap: 360, offset: 400 });
+      // far lane runs left; the near lane is the bus's, so the bike follows the bus at the same speed and period
+      w.traffic("black_cab", { y: (ROW_KERB_TOP + 1) * T + 24, speed: -1.5, flip: true, gap: 240 });
+      w.traffic("delivery_bike", { y: (ROW_KERB_TOP + 2) * T + 20, speed: 1.6, gap: 737, offset: -400 });
 
       // buses use the street (route numbers on the shared sprite aren't this street's)
       w.mover("bus", { x: -260, y: (ROW_KERB_TOP + 2) * T + 22, invented: true, update(m) {

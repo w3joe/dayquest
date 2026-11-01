@@ -14,7 +14,7 @@ Tile ending:
 
 > This is a single seamless repeating ground texture tile viewed straight down (orthographic, no perspective), filling the entire square image edge to edge, designed on a 16x16 grid of big pixels so it tiles seamlessly on all four sides. No border, no objects, no text. Square 1024x1024.
 
-## Calls (15)
+## Calls (16)
 
 ### bench (2026-11-01 14-38-32)
 
@@ -104,6 +104,12 @@ Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. 
 
 ```text
 Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. Using the attached sprite sheet as the exact character reference (same chibi proportions, same face, hair, glasses, outfit, colours and pixel style), draw the same character. Front view, full body, standing, big grin. 3 frames of a waving animation with one hand raised above his shoulder: 1) hand tilted left, 2) hand upright, 3) hand tilted right. Put the frames in a single horizontal row, evenly spaced and not touching, each figure the same size as one frame of the reference sheet. Landscape 1536x1024. Flat solid pure magenta (#FF00FF) background, no shadows, no text, no grid lines, no table, no props other than those described.
+```
+
+### terrace_strip (2026-11-01 15-39-14)
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. A continuous row of joined London terraced houses seen from the front and slightly above, filling the full width with no gaps between them: three storeys each, alternating red-brown brick and cream stucco facades, white sash windows, black front doors with fanlights, slate roofs with chimney pots, all standing on one flat horizontal ground line. The row repeats seamlessly left-right, so the left and right edges match. Very wide landscape 1536x1024. Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.
 ```
 
 ## Notes
