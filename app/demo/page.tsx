@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Demo from "../../components/today/Demo";
+import Today from "../../components/today/Today";
 
 export const metadata: Metadata = { title: "Demo · DayQuest" };
 
 export default function DemoPage() {
-  return <Demo />;
+  return <Today demo />;
 }

@@ -7,6 +7,8 @@ import { discardPhotoUpload, startPhotoUpload, type Photo } from "../../lib/phot
 import SpritePreview, { type SpriteVerification } from "./SpritePreview";
 import { browserId } from "../../lib/browser-id";
 import { sfx } from "../../lib/sound";
+import Link from "next/link";
+import { DEMO_FIT, DEMO_PLACES, DEMO_SPRITE, DEMO_UPLOADS, DemoRoute } from "./Demo";
 import { MAX_LOCATION_FILE_BYTES, parseLocationHistory } from "../../lib/location-history";
 import AppShell from "./AppShell";
 import CameraButton from "./CameraButton";
@@ -24,18 +26,18 @@ const galleries = [
   { kind: "extra", name: "More", sprite: "flower", wide: true },
 ] as const;
 
-export default function Today() {
+export default function Today({ demo = false }: { demo?: boolean }) {
   const router = useRouter();
   const [sessionId, setSessionId] = useState("");
-  const [photos, setPhotos] = useState<Partial<Record<Kind, Photo>>>({});
-  const [spriteUrl, setSpriteUrl] = useState<string>();
+  const [photos, setPhotos] = useState<Partial<Record<Kind, Photo>>>(demo ? { fit: { url: DEMO_FIT.url, preview: DEMO_FIT.url } } : {});
+  const [spriteUrl, setSpriteUrl] = useState<string | undefined>(demo ? DEMO_SPRITE : undefined);
   const [spriteVerification, setSpriteVerification] = useState<SpriteVerification>();
   const [spriteBusy, setSpriteBusy] = useState(false);
   const [spriteError, setSpriteError] = useState("");
-  const [notes, setNotes] = useState<Partial<Record<Kind, string>>>({});
+  const [notes, setNotes] = useState<Partial<Record<Kind, string>>>(demo ? { fit: DEMO_FIT.note } : {});
   const [storageError, setStorageError] = useState("");
   const gallery = useGallery(sessionId);
-  const [places, setPlaces] = useState<{ name: string; count: number; range: string }>();
+  const [places, setPlaces] = useState<{ name: string; count: number; range: string } | undefined>(demo ? DEMO_PLACES : undefined);
   const [placesError, setPlacesError] = useState("");
   const [today, setToday] = useState<Date>();
   const files = useRef<Partial<Record<Kind, File>>>({});
@@ -52,6 +54,7 @@ export default function Today() {
   const requests = useRef(new Set<AbortController>());
   useEffect(() => {
     setToday(new Date());
+    if (demo) { gallery.restore(DEMO_UPLOADS); return; }
     try {
       const draft = parseStoredDraft(sessionStorage.getItem(DRAFT_STORAGE_KEY));
       if (draft) {
@@ -227,36 +230,37 @@ export default function Today() {
     }
   }
   const finishHint = spriteBusy ? "Making your character…" : !photos.fit?.url ? "Add your fit to begin" : uploading ? "Saving…" : pendingChanges ? "Retry or remove failed photos" : spriteReady ? "All set!" : spriteUrl ? "Check your character preview" : "Waiting for your character";
-  return <AppShell active="try">
+  return <AppShell active={demo ? "demo" : "try"}>
     <section className="dq-card dq-card-pink" aria-labelledby="photos-title">
       <div className="dq-quest-head">
         <div className="dq-quest-title"><span className="dq-date">{today ? today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }) : "\u00a0"}</span><h1 id="photos-title">{USER_NAME}</h1><p className="dq-subtitle">What did today look like?</p></div>
         <span className="dq-chip dq-chip-pink" aria-label={`${uploaded} photos added`}>{uploaded} {uploaded === 1 ? "photo" : "photos"}</span>
       </div>
       <div className="dq-photo-grid">{quests.map(quest => { const photo = photos[quest.kind]; return <div className={`dq-photo-card dq-photo-${quest.kind} ${photo?.url ? "is-uploaded" : ""}`} key={quest.kind}>
-        <div className="dq-photo-head"><h3>{quest.name}</h3><CameraButton label={`Take a photo for ${quest.name}`} disabled={!sessionId} onFile={file => void upload(quest.kind, file)} /></div>
+        <div className="dq-photo-head"><h3>{quest.name}</h3>{!demo && <CameraButton label={`Take a photo for ${quest.name}`} disabled={!sessionId} onFile={file => void upload(quest.kind, file)} />}</div>
         <label className="dq-upload-zone" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void upload(quest.kind, event.dataTransfer.files[0]); }}>
           <input type="file" accept="image/jpeg,image/png,image/webp" aria-label={`Upload ${quest.name}`} disabled={!sessionId} onChange={event => { void upload(quest.kind, event.target.files?.[0]); event.target.value = ""; }}/>
           {photo?.url && <span className="dq-upload-check" aria-label="Uploaded">✓</span>}
           {photo?.preview ? <img src={photo.preview} alt={`${quest.name} pixel preview`} className="dq-photo-preview"/> : <PixelSprite name={quest.sprite} size={6} className="dq-photo-sprite"/>}
-          <span className="dq-photo-action">{photo?.busy ? "Saving…" : photo?.preview ? "Swap" : "+ Add"}</span>
+          {!demo && <span className="dq-photo-action">{photo?.busy ? "Saving…" : photo?.preview ? "Swap" : "+ Add"}</span>}
         </label>
         {(photo?.preview || photo?.error) && <div className="dq-photo-info">
-          {photo?.preview && <input type="text" className="dq-caption" maxLength={NOTE_MAX_LENGTH} placeholder="Add a note" aria-label={`Note about ${quest.name}`} value={notes[quest.kind] ?? ""} onChange={event => setNotes(current => ({ ...current, [quest.kind]: event.target.value }))}/>}
+          {photo?.preview && <input type="text" className="dq-caption" maxLength={NOTE_MAX_LENGTH} placeholder="Add a note" aria-label={`Note about ${quest.name}`} value={notes[quest.kind] ?? ""} readOnly={demo} onChange={event => setNotes(current => ({ ...current, [quest.kind]: event.target.value }))}/>}
           {photo?.error && <><p className="dq-error" role="alert">{photo.error}</p>{photo.pending && <div className="dq-actions"><button type="button" className="dq-small-button" onClick={() => void upload(quest.kind, pendingFiles.current[quest.kind])}>Retry</button><button type="button" className="dq-small-button" onClick={() => discardReplacement(quest.kind)}>{photo.url ? "Keep old" : "Discard"}</button></div>}</>}
         </div>}
       </div>; })}
-        {galleries.map(g => <GalleryCard key={g.kind} title={g.name} sprite={g.sprite} kind={g.kind} wide={"wide" in g} ready={!!sessionId} items={gallery.items.filter(item => item.kind === g.kind)} onAdd={files => gallery.add(g.kind, files)} onRemove={gallery.remove} onRetry={gallery.retry} onNote={gallery.setNote} />)}
+        {galleries.map(g => <GalleryCard key={g.kind} title={g.name} sprite={g.sprite} kind={g.kind} wide={"wide" in g} readOnly={demo} ready={!!sessionId} items={gallery.items.filter(item => item.kind === g.kind)} onAdd={files => gallery.add(g.kind, files)} onRemove={gallery.remove} onRetry={gallery.retry} onNote={gallery.setNote} />)}
       </div>
       {gallery.notice && <p className="dq-error" role="alert">{gallery.notice}</p>}
       {spriteUrl ? <SpritePreview url={spriteUrl} onStatusChange={setSpriteVerification} onRegenerate={() => void makeSprite()} disabled={spriteBusy || uploading || pendingChanges} retained={pendingChanges} /> : <div className="dq-sprite-status" aria-live="polite"><PixelSprite name="face" size={4} className={spriteBusy ? "dq-hop" : undefined}/><div><strong>{spriteBusy ? "Making your character…" : "Your character"}</strong><span>{spriteError || (spriteBusy ? "Just a minute" : "Add a fit photo to start")}</span></div>{spriteError && <button type="button" className="dq-small-button" disabled={spriteBusy || pendingFitChanges} onClick={() => void makeSprite()}>Retry</button>}</div>}
       <div className="dq-places">
         <PixelSprite name="pin" size={4}/>
         <div><strong>Location history</strong><span className={placesError ? "dq-error" : undefined} role={placesError ? "alert" : undefined}>{placesError || (places ? `${places.count.toLocaleString("en-GB")} places${places.range ? ` · ${places.range}` : ""}` : "Google Timeline JSON or GPX")}</span></div>
-        {places && <button type="button" className="dq-small-button" onClick={() => setPlaces(undefined)}>Remove</button>}
-        <label className={`dq-small-button dq-file-button ${places ? "is-done" : ""}`}>{places ? "Replace" : "+ Add file"}<input type="file" accept=".json,.gpx,application/json,application/gpx+xml,text/xml" aria-label="Upload location history" onChange={event => { void addLocationHistory(event.target.files?.[0]); event.target.value = ""; }}/></label>
+        {places && !demo && <button type="button" className="dq-small-button" onClick={() => setPlaces(undefined)}>Remove</button>}
+        {!demo && <label className={`dq-small-button dq-file-button ${places ? "is-done" : ""}`}>{places ? "Replace" : "+ Add file"}<input type="file" accept=".json,.gpx,application/json,application/gpx+xml,text/xml" aria-label="Upload location history" onChange={event => { void addLocationHistory(event.target.files?.[0]); event.target.value = ""; }}/></label>}
       </div>
+      {demo && <DemoRoute />}
     </section>
-    <div className="dq-cta"><p className="dq-cta-hint" aria-live="polite">{finishHint}</p>{storageError && <p className="dq-error" role="alert">{storageError}</p>}<button type="button" className="dq-big-button" disabled={!canFinish} onClick={finishDay}>Create my world <PixelSprite name="star" size={1.5}/></button></div>
+    {demo ? <div className="dq-cta"><Link href="/" className="dq-big-button">Try it with your photos</Link></div> : <div className="dq-cta"><p className="dq-cta-hint" aria-live="polite">{finishHint}</p>{storageError && <p className="dq-error" role="alert">{storageError}</p>}<button type="button" className="dq-big-button" disabled={!canFinish} onClick={finishDay}>Create my world <PixelSprite name="star" size={1.5}/></button></div>}
   </AppShell>;
 }
