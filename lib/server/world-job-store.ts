@@ -55,13 +55,13 @@ export async function readWorldCheckpoint<T>(id: string): Promise<T | null> {
   } while (cursor);
   if (!newest) return null;
   if (newest.size > MAX_STATE_BYTES) throw new RequestError("Saved world progress is too large.", 503);
-  // Public CDN GETs can keep a 404 after list already sees the object.
-  // `useCache: false` only adds cache=0 for private access, so checkpoints
-  // must be read (and written) as private origin objects.
+  // The Blob store is public: `access: "private"` is rejected, and `cache=0`
+  // is only valid on private stores. Authenticated GETs still beat an anonymous
+  // cached 404; unique pathnames avoid overwrite lag.
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 250));
+    if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 400));
     try {
-      const blob = await get(newest.url, { access: "private", useCache: false, abortSignal: AbortSignal.timeout(15_000) });
+      const blob = await get(newest.url, { access: "public", abortSignal: AbortSignal.timeout(15_000) });
       if (!blob || blob.statusCode !== 200) continue;
       if (blob.blob.size > MAX_STATE_BYTES) {
         await blob.stream.cancel();
@@ -90,10 +90,16 @@ export async function writeWorldCheckpoint<T>(id: string, state: T): Promise<voi
   if (typeof content !== "string" || Buffer.byteLength(content) > MAX_STATE_BYTES) throw new RequestError("World progress could not be saved.", 503);
   if (useBlob) {
     const filename = `${String(Date.now()).padStart(13, "0")}-${randomUUID()}.json`;
-    await put(`${prefixFor(id)}states/${filename}`, content, {
-      access: "private", contentType: "application/json", addRandomSuffix: false, allowOverwrite: false,
-      abortSignal: AbortSignal.timeout(15_000),
-    });
+    try {
+      await put(`${prefixFor(id)}states/${filename}`, content, {
+        access: "public", contentType: "application/json", addRandomSuffix: false, allowOverwrite: false,
+        abortSignal: AbortSignal.timeout(15_000),
+      });
+    } catch (error) {
+      if (error instanceof RequestError) throw error;
+      console.error("World checkpoint write failed", { operation: "blob_put" });
+      throw new RequestError("Could not save world progress. Please retry.", 503);
+    }
     return;
   }
   const paths = localPaths(id);
@@ -114,7 +120,7 @@ export async function acquireWorldLease(id: string, leaseMs: number): Promise<st
     if (current && current.uploadedAt.getTime() + leaseMs > Date.now()) return null;
     try {
       const lease = await put(`${prefixFor(id)}lease.json`, JSON.stringify({ nonce: randomUUID() }), {
-        access: "private", contentType: "application/json", addRandomSuffix: false,
+        access: "public", contentType: "application/json", addRandomSuffix: false,
         ...(current ? { ifMatch: current.etag } : { allowOverwrite: false }),
         abortSignal: AbortSignal.timeout(15_000),
       });
@@ -122,7 +128,9 @@ export async function acquireWorldLease(id: string, leaseMs: number): Promise<st
     } catch (error) {
       // Blob reports an already-existing create as BlobError, and a lost replacement CAS as precondition failure.
       if (error instanceof BlobPreconditionFailedError || (error instanceof Error && /already exists/i.test(error.message))) return null;
-      throw error;
+      if (error instanceof RequestError) throw error;
+      console.error("World lease acquire failed", { operation: "blob_put" });
+      throw new RequestError("Could not save world progress. Please retry.", 503);
     }
   }
   // Serialise local expiry/release checks; wx additionally prevents fresh claims across processes.
