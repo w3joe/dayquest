@@ -1,3 +1,4 @@
+import { ACCEPT_ATTR } from "./photo-tools";
 import { NOTE_MAX_LENGTH, MAX_UPLOADS_PER_KIND } from "../../lib/draft";
 import CameraButton from "./CameraButton";
 import PixelSprite, { type SpriteName } from "./pixel";
@@ -11,7 +12,7 @@ type Props = {
 /** A photo slot that takes any number of photos, each with its own note. */
 export default function GalleryCard({ title, sprite, kind, items, ready, wide, readOnly, onAdd, onRemove, onRetry, onNote, missing }: Props & { missing?: boolean }) {
   const picker = (label: string, className: string, children: React.ReactNode) => <label className={className} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); onAdd(event.dataTransfer.files); }}>
-    <input type="file" multiple accept="image/jpeg,image/png,image/webp" aria-label={label} disabled={!ready} onChange={event => { onAdd(event.target.files); event.target.value = ""; }} />
+    <input type="file" multiple accept={ACCEPT_ATTR} aria-label={label} disabled={!ready} onChange={event => { onAdd(event.target.files); event.target.value = ""; }} />
     {children}
   </label>;
   return <div className={`dq-photo-card dq-gallery dq-photo-${kind} ${wide ? "is-wide" : ""}`} style={missing ? { outline: "3px dashed #f2759b", outlineOffset: 3 } : undefined}>

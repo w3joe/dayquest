@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_UPLOADS, MAX_UPLOADS_PER_KIND } from "../../lib/draft";
 import { sfx } from "../../lib/sound";
-import { ACCEPTED_TYPES, MAX_PHOTO_BYTES, matchPhoto, preparePhoto, preview } from "./photo-tools";
+import { ACCEPTED_TYPES, MAX_PHOTO_BYTES, matchPhoto, preparePhoto, preview, isAcceptedPhoto } from "./photo-tools";
 import { DEMO_MODE } from "../../lib/demo";
 
 export type GalleryKind = "lunch" | "landmark" | "extra";
@@ -75,7 +75,7 @@ export function useGallery(sessionId: string) {
     if (!picked.length || !sessionId || !mounted.current) return;
     // Reserve one of the shared draft's 30 slots for the character photo.
     const room = Math.max(0, Math.min(MAX_UPLOADS_PER_KIND - itemsRef.current.filter(item => item.kind === kind).length, MAX_UPLOADS - 1 - itemsRef.current.length));
-    const usable = picked.filter(file => ACCEPTED_TYPES.includes(file.type));
+    const usable = picked.filter(isAcceptedPhoto);
     setNotice(usable.length < picked.length ? "Photos must be JPEG, PNG or WebP." : usable.length > room ? `Up to ${MAX_UPLOADS_PER_KIND} photos per group and ${MAX_UPLOADS} photos in total.` : "");
     const chosen = usable.slice(0, room);
     if (!chosen.length) return;

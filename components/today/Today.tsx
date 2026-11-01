@@ -14,7 +14,7 @@ import AppShell from "./AppShell";
 import CameraButton from "./CameraButton";
 import GalleryCard from "./GalleryCard";
 import { useGallery } from "./useGallery";
-import { ACCEPTED_TYPES, MAX_PHOTO_BYTES, matchPhoto, preparePhoto, preview } from "./photo-tools";
+import { ACCEPTED_TYPES, MAX_PHOTO_BYTES, matchPhoto, preparePhoto, preview , ACCEPT_ATTR, isAcceptedPhoto } from "./photo-tools";
 import PixelSprite, { type SpriteName } from "./pixel";
 import { DEMO_FIT_DELAY_MS, DEMO_MODE, DEMO_SPRITE_URL } from "../../lib/demo";
 
@@ -140,7 +140,7 @@ export default function Today({ demo = false }: { demo?: boolean }) {
   }
   async function upload(kind: Kind, picked?: File) {
     if (!picked || !sessionId) return;
-    if (!ACCEPTED_TYPES.includes(picked.type)) { update(kind, { error: "Choose a JPEG, PNG, or WebP photo." }); return; }
+    if (!isAcceptedPhoto(picked)) { update(kind, { error: "Choose a photo (JPEG, PNG, WebP or HEIC)." }); return; }
     sfx.pop();
     if (DEMO_MODE) {
       // Hardcoded demo: the photo stays in this browser; only a pixel preview is shown.
@@ -264,7 +264,7 @@ export default function Today({ demo = false }: { demo?: boolean }) {
       <div className="dq-photo-grid">{quests.map(quest => { const photo = photos[quest.kind]; return <div className={`dq-photo-card dq-photo-${quest.kind} ${photo?.url ? "is-uploaded" : ""}`} key={quest.kind} style={!photo?.url && !demo ? { outline: "3px dashed #f2759b", outlineOffset: 3 } : undefined}>
         <div className="dq-photo-head"><h3>{quest.name}</h3>{!demo && <CameraButton label={`Take a photo for ${quest.name}`} disabled={!sessionId} onFile={file => void upload(quest.kind, file)} />}</div>
         <label className="dq-upload-zone" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void upload(quest.kind, event.dataTransfer.files[0]); }}>
-          <input type="file" accept="image/jpeg,image/png,image/webp" aria-label={`Upload ${quest.name}`} disabled={!sessionId} onChange={event => { void upload(quest.kind, event.target.files?.[0]); event.target.value = ""; }}/>
+          <input type="file" accept={ACCEPT_ATTR} aria-label={`Upload ${quest.name}`} disabled={!sessionId} onChange={event => { void upload(quest.kind, event.target.files?.[0]); event.target.value = ""; }}/>
           {photo?.url && <span className="dq-upload-check" aria-label="Uploaded">✓</span>}
           {photo?.preview ? <img src={photo.preview} alt={`${quest.name} pixel preview`} className="dq-photo-preview"/> : <PixelSprite name={quest.sprite} size={6} className="dq-photo-sprite"/>}
           {!demo && <span className="dq-photo-action">{photo?.busy ? "Saving…" : photo?.preview ? "Swap" : "+ Add"}</span>}

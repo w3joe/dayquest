@@ -1,6 +1,23 @@
+const isHeic = (file: File) => /image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
+
+/** iPhone HEIC/HEIF photos can't be decoded by most browsers: convert them to JPEG in the browser first. */
+export async function toDecodable(file: File): Promise<File> {
+  if (!isHeic(file)) return file;
+  const { default: heic2any } = await import("heic2any");
+  const out = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+  const blob = Array.isArray(out) ? out[0] : out;
+  return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg", lastModified: file.lastModified });
+}
+
+/** JPEG, PNG, WebP, HEIC/HEIF, or anything else the browser reports as an image. */
+export const isAcceptedPhoto = (file: File) => ACCEPTED_TYPES.includes(file.type) || isHeic(file) || file.type.startsWith("image/");
+export const ACCEPT_ATTR = "image/*,.heic,.heif";
+
 /** Tiny pixel-style thumbnail (data URL) for a photo. */
 export async function preview(file: File): Promise<string> {
-  const bitmap = await createImageBitmap(file);
+  file = await toDecodable(file);
+  let bitmap: ImageBitmap;
+  try { bitmap = await createImageBitmap(file, { imageOrientation: "from-image" }); } catch { bitmap = await createImageBitmap(file); }
   try {
     const canvas = document.createElement("canvas");
     const scale = Math.min(1, 96 / Math.max(bitmap.width, bitmap.height));
@@ -38,6 +55,7 @@ const COMPRESS_ABOVE = 1024 * 1024;
  */
 export async function preparePhoto(file: File): Promise<File> {
   try {
+    file = await toDecodable(file);
     let bitmap: ImageBitmap;
     try { bitmap = await createImageBitmap(file, { imageOrientation: "from-image" }); } catch { bitmap = await createImageBitmap(file); }
     try {
