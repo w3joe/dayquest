@@ -2,9 +2,9 @@ import * as Phaser from "phaser";
 import { Direction, type GridEngine } from "grid-engine";
 import type { Subscription } from "rxjs";
 import type { DayManifest } from "@/lib/day";
-import { BASE_MAPS, FRAMES, MAP_H, MAP_W, TILE, VIEW_W, groundBlocked, hash, placeLandmark, tileAt } from "../maps";
+import { BASE_MAPS, FRAMES, MAP_H, MAP_W, TILE, VIEW_W, carveRoute, groundBlocked, hash, placeLandmark, tileAt } from "../maps";
 import { FONT, TextBox } from "../ui/TextBox";
-import { foodKey, landmarkKey } from "./BootScene";
+import { foodIconKey, foodKey, landmarkKey } from "./BootScene";
 
 type Interactable = { text: string; icon?: string };
 
@@ -41,13 +41,20 @@ export class HighlightScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(base.sky);
 
     const blocked = new Set<string>();
+    const landmarkBlocked = new Set<string>();
+    const placements = scene.landmarks.map((landmark) => placeLandmark(scene.base, landmark));
+    for (const p of placements) for (let y = p.y0 + p.h - 2; y < p.y0 + p.h; y++) for (let x = p.x0; x < p.x0 + p.w; x++) landmarkBlocked.add(`${x},${y}`);
+    if (scene.food) landmarkBlocked.add(`${scene.food.tile.x},${scene.food.tile.y}`);
+    // day.json decides the exit, so bridge whatever the map has in the way.
+    const carved = carveRoute(scene.base, scene.spawn, scene.exit, landmarkBlocked);
     const data: number[][] = [];
     for (let y = 0; y < MAP_H; y++) {
       const row: number[] = [];
       for (let x = 0; x < MAP_W; x++) {
         const c = tileAt(scene.base, x, y);
-        row.push(c === "_" ? -1 : c === "w" ? FRAMES.water : c === "p" ? (scene.base === "street" ? FRAMES.cobble : FRAMES.path) : hash(x, y) % 9 === 0 ? FRAMES.flowers : FRAMES.grass);
-        if (groundBlocked(scene.base, x, y)) blocked.add(`${x},${y}`);
+        const isCarved = carved.has(`${x},${y}`);
+        row.push(isCarved ? FRAMES.path : c === "_" ? -1 : c === "w" ? FRAMES.water : c === "p" ? (scene.base === "street" ? FRAMES.cobble : FRAMES.path) : hash(x, y) % 9 === 0 ? FRAMES.flowers : FRAMES.grass);
+        if (!isCarved && groundBlocked(scene.base, x, y)) blocked.add(`${x},${y}`);
       }
       data.push(row);
     }
@@ -55,22 +62,21 @@ export class HighlightScene extends Phaser.Scene {
     if (scene.skyline) this.add.image(0, 0, `s${this.index}_skyline`).setOrigin(0).setDepth(-10);
 
     for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
-      if (tileAt(scene.base, x, y) === "t") {
+      if (tileAt(scene.base, x, y) === "t" && !carved.has(`${x},${y}`)) {
         this.add.image(x * TILE, y * TILE, "tiles", FRAMES.grass).setOrigin(0).setDepth(-5);
         this.add.image(x * TILE + 8, (y + 1) * TILE, "tree").setOrigin(0.5, 1).setDepth((y + 1) * TILE);
       }
     }
 
     // Landmarks block their lower two rows so the player can walk behind the upper part (depth sort).
-    for (const landmark of scene.landmarks) {
-      const p = placeLandmark(scene.base, landmark);
+    for (const p of placements) {
       const cx = (p.x0 + p.w / 2) * TILE;
       const bottom = (p.y0 + p.h) * TILE;
       this.add.image(cx, bottom - 2, "shadow").setDepth(bottom - 3).setDisplaySize(p.w * TILE - 6, 8);
-      this.add.image(cx, bottom, landmarkKey(this.index, landmark.slot)).setOrigin(0.5, 1).setDepth(bottom);
+      this.add.image(cx, bottom, landmarkKey(this.index, p.landmark.slot)).setOrigin(0.5, 1).setDepth(bottom);
       for (let y = p.y0 + p.h - 2; y < p.y0 + p.h; y++) for (let x = p.x0; x < p.x0 + p.w; x++) {
         blocked.add(`${x},${y}`);
-        this.interactables.set(`${x},${y}`, { text: landmark.text });
+        this.interactables.set(`${x},${y}`, { text: p.landmark.text });
       }
     }
 
@@ -79,7 +85,7 @@ export class HighlightScene extends Phaser.Scene {
       this.add.rectangle(x * TILE + 8, y * TILE + 12, 14, 6, 0x6b4a2f).setStrokeStyle(1, 0x2b1d12).setDepth(y * TILE + 4);
       this.add.image(x * TILE + 8, y * TILE + 11, foodKey(this.index)).setOrigin(0.5, 1).setDepth(y * TILE + 5);
       blocked.add(`${x},${y}`);
-      this.interactables.set(`${x},${y}`, { text: scene.food.text, icon: foodKey(this.index) });
+      this.interactables.set(`${x},${y}`, { text: scene.food.text, icon: this.textures.exists(foodIconKey(this.index)) ? foodIconKey(this.index) : foodKey(this.index) });
     }
 
     const map = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });

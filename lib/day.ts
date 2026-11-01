@@ -9,7 +9,8 @@ export type DayScene = {
   spawn: Tile;
   exit: Tile;
   landmarks: Landmark[];
-  food?: { sprite: string; tile: Tile; text: string };
+  /** sprite: 16×16 on the table; icon: 32×32 for the textbox (optional, fall back to sprite). */
+  food?: { sprite: string; icon?: string; tile: Tile; text: string };
 };
 export type TransitLeg =
   | { mode: "bus"; route: string; destination: string; from: string; to: string }

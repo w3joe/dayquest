@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import day from "../../data/input.json";
-import { uuidv4 } from "@/lib/uuid";
+import { DRAFT_STORAGE_KEY, isReadyDraft, parseStoredDraft, type UploadKind } from "../../lib/draft";
+import { discardPhotoUpload, startPhotoUpload, type Photo } from "../../lib/photo-upload";
+import SpritePreview, { type SpriteVerification } from "./SpritePreview";
+import { browserId } from "../../lib/browser-id";
 
-type Kind = "fit" | "fit_back" | "lunch" | "landmark" | "park";
-type Photo = { url?: string; preview?: string; matching?: string; error?: string; busy?: boolean; manualMatch?: boolean };
-type Draft = { sessionId: string; uploads: { kind: Kind; url: string }[]; spriteUrl?: string };
-const key = "dayquest:draft";
+type Kind = UploadKind;
 const quests: { kind: Kind; name: string; hint: string; icon: string }[] = [
   { kind: "fit", name: "Today's fit", hint: "Full body · front view · required", icon: "♟" },
   { kind: "fit_back", name: "The other side", hint: "Back view · optional", icon: "♟" },
@@ -76,6 +76,7 @@ export default function Today() {
   const [sessionId, setSessionId] = useState("");
   const [photos, setPhotos] = useState<Partial<Record<Kind, Photo>>>({});
   const [spriteUrl, setSpriteUrl] = useState<string>();
+  const [spriteVerification, setSpriteVerification] = useState<SpriteVerification>();
   const [spriteBusy, setSpriteBusy] = useState(false);
   const [spriteError, setSpriteError] = useState("");
   const [storageError, setStorageError] = useState("");
@@ -88,26 +89,25 @@ export default function Today() {
   const uploadedUrls = useRef<Partial<Record<Kind, string>>>({});
   const generationRunning = useRef(false);
   const generationRequested = useRef(false);
+  const generationController = useRef<AbortController | undefined>(undefined);
+  const uploadControllers = useRef<Partial<Record<Kind, AbortController>>>({});
   const mounted = useRef(true);
   const requests = useRef(new Set<AbortController>());
   const healthTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     try {
-      const saved = sessionStorage.getItem(key);
-      if (saved) {
-        const draft = JSON.parse(saved) as Draft;
-        if (typeof draft.sessionId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(draft.sessionId) && Array.isArray(draft.uploads)) {
-          setSessionId(draft.sessionId);
-          uploadedUrls.current = Object.fromEntries(draft.uploads.filter(p => quests.some(q => q.kind === p.kind) && typeof p.url === "string").map(p => [p.kind, p.url]));
-          setPhotos(Object.fromEntries(draft.uploads.filter(p => quests.some(q => q.kind === p.kind) && typeof p.url === "string").map(p => [p.kind, { url: p.url, preview: p.url, matching: "Saved to today's day" }])));
-          if (typeof draft.spriteUrl === "string") setSpriteUrl(draft.spriteUrl);
-          else if (draft.uploads.some(p => p.kind === "fit")) setSpriteError("Your character was not saved. Retry or add your front photo again.");
-          return;
-        }
+      const draft = parseStoredDraft(sessionStorage.getItem(DRAFT_STORAGE_KEY));
+      if (draft) {
+        setSessionId(draft.sessionId);
+        uploadedUrls.current = Object.fromEntries(draft.uploads.map(p => [p.kind, p.url]));
+        setPhotos(Object.fromEntries(draft.uploads.map(p => [p.kind, { url: p.url, preview: p.url, matching: "Saved to today's day" }])));
+        if (draft.spriteUrl) setSpriteUrl(draft.spriteUrl);
+        else if (draft.uploads.some(p => p.kind === "fit")) setSpriteError("Your character was not saved. Retry or add your front photo again.");
+        return;
       }
     } catch { /* Start a fresh draft if old storage is invalid. */ }
-    setSessionId(uuidv4());
-    }, []);
+    setSessionId(browserId());
+  }, []);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -119,7 +119,7 @@ export default function Today() {
   useEffect(() => {
     if (!sessionId) return;
     try {
-      sessionStorage.setItem(key, JSON.stringify({ sessionId, uploads: Object.entries(photos).filter(([, p]) => p.url).map(([kind, p]) => ({ kind, url: p.url })), spriteUrl }));
+      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ sessionId, uploads: Object.entries(photos).filter(([, p]) => p.url).map(([kind, p]) => ({ kind, url: p.url })), spriteUrl }));
       setStorageError("");
     } catch { setStorageError("Your browser could not save this draft. Enable session storage to continue."); }
   }, [sessionId, photos, spriteUrl]);
@@ -128,11 +128,12 @@ export default function Today() {
     if (mounted.current) setPhotos(current => ({ ...current, [kind]: { ...current[kind], ...value } }));
   }
   async function makeSprite() {
-    if (!mounted.current || pendingFits.current.size || generationRunning.current || !uploadedUrls.current.fit) return;
+    if (!mounted.current || pendingFits.current.size || pendingFiles.current.fit || pendingFiles.current.fit_back || generationRunning.current || !uploadedUrls.current.fit) return;
     generationRequested.current = false;
     generationRunning.current = true;
     const attempt = generation.current;
     const controller = new AbortController();
+    generationController.current = controller;
     requests.current.add(controller);
     let front = files.current.fit;
     const frontUrl = uploadedUrls.current.fit;
@@ -164,6 +165,7 @@ export default function Today() {
       if (mounted.current && attempt === generation.current && !controller.signal.aborted) setSpriteError(error instanceof Error ? error.message : "Character generation failed.");
     } finally {
       requests.current.delete(controller);
+      if (generationController.current === controller) generationController.current = undefined;
       generationRunning.current = false;
       if (mounted.current) {
         setSpriteBusy(false);
@@ -181,17 +183,19 @@ export default function Today() {
       update(kind, { error: "Front and back photos must total less than 4 MB. Choose a smaller photo." }); return;
     }
     const attempt = (operations.current[kind] ?? 0) + 1; operations.current[kind] = attempt;
+    uploadControllers.current[kind]?.abort();
     const controller = new AbortController();
+    uploadControllers.current[kind] = controller;
     requests.current.add(controller);
     let succeeded = false;
-    update(kind, { busy: true, error: undefined, url: undefined });
+    pendingFiles.current[kind] = file;
+    setPhotos(current => ({ ...current, [kind]: startPhotoUpload(current[kind]) }));
     if (isFit) {
+      // Preserve the committed outfit, but invalidate any in-flight generation.
       pendingFits.current.set(kind, attempt);
-      pendingFiles.current[kind] = file;
-      delete files.current[kind];
-      delete uploadedUrls.current[kind];
+      if (generationRunning.current) generationRequested.current = true;
       ++generation.current;
-      setSpriteUrl(undefined);
+      generationController.current?.abort();
     }
     try {
       const [thumbnail, matching] = await Promise.all([preview(file), matchPhoto(file)]);
@@ -200,27 +204,56 @@ export default function Today() {
       const form = new FormData(); form.set("photo", file); form.set("kind", kind); form.set("sessionId", sessionId);
       const response = await fetch("/api/upload", { method: "POST", body: form, signal: controller.signal });
       const result = await response.json();
-      if (!response.ok || typeof result.url !== "string") throw new Error(result.error || "Upload failed. Select the photo to retry.");
+      if (!response.ok || typeof result.url !== "string") throw new Error(result.error || "Upload failed. Please try again.");
       if (!mounted.current || operations.current[kind] !== attempt) return;
       files.current[kind] = file;
       uploadedUrls.current[kind] = result.url;
       succeeded = true;
-      update(kind, { url: result.url, busy: false });
+      delete pendingFiles.current[kind];
+      update(kind, { url: result.url, busy: false, pending: false, previous: undefined });
+      if (isFit) { setSpriteUrl(undefined); setSpriteError(""); }
     } catch (error) {
       if (operations.current[kind] === attempt && !controller.signal.aborted) update(kind, { busy: false, error: error instanceof Error ? error.message : "Upload failed. Please try again." });
     } finally {
       requests.current.delete(controller);
+      if (uploadControllers.current[kind] === controller) delete uploadControllers.current[kind];
       if (isFit && pendingFits.current.get(kind) === attempt) {
         pendingFits.current.delete(kind);
-        delete pendingFiles.current[kind];
         if (succeeded) generationRequested.current = true;
         if (mounted.current && generationRequested.current) void makeSprite();
       }
     }
   }
+  function discardReplacement(kind: Kind) {
+    operations.current[kind] = (operations.current[kind] ?? 0) + 1;
+    uploadControllers.current[kind]?.abort();
+    delete pendingFiles.current[kind];
+    pendingFits.current.delete(kind);
+    setPhotos(current => ({ ...current, [kind]: discardPhotoUpload(current[kind]) }));
+    if (generationRequested.current) void makeSprite();
+  }
   const uploaded = Object.values(photos).filter(p => p.url).length;
   const uploading = Object.values(photos).some(p => p.busy);
-  const canFinish = !!photos.fit?.url && !!spriteUrl && !uploading && !spriteBusy && !storageError;
+  const pendingChanges = Object.values(photos).some(p => p.pending);
+  const pendingFitChanges = !!photos.fit?.pending || !!photos.fit_back?.pending;
+  const spriteReady = !!spriteUrl && spriteVerification?.url === spriteUrl && spriteVerification.status === "ready";
+  const canFinish = !!photos.fit?.url && spriteReady && !pendingChanges && !uploading && !spriteBusy && !storageError;
+  function finishDay() {
+    if (!canFinish || Object.keys(pendingFiles.current).length || generationRunning.current) return;
+    const draft = {
+      sessionId,
+      uploads: Object.entries(uploadedUrls.current).map(([kind, url]) => ({ kind, url })),
+      spriteUrl,
+    };
+    if (!isReadyDraft(draft)) return;
+    try {
+      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+      setStorageError("");
+      router.push("/generating");
+    } catch {
+      setStorageError("Your browser could not save this draft. Enable session storage to continue.");
+    }
+  }
   const workout = day.workouts[0];
   return <main className="dq-shell">
     <header className="dq-header"><a href="/" className="dq-wordmark"><span className="dq-brand-icon">✦</span> dayquest<span className="dq-wordmark-dot">.</span></a><span className="dq-header-note">A DAY WORTH VISITING</span><a href="/day/demo" className="dq-demo-link">Explore a demo <span>↗</span></a></header>
@@ -233,13 +266,13 @@ export default function Today() {
           <span className="dq-upload-check" aria-label={photo?.url ? "Uploaded" : "Not uploaded"}>{photo?.url ? "✓" : ""}</span>
           {photo?.preview ? <img src={photo.preview} alt={`${quest.name} pixel preview`} className="dq-photo-preview"/> : <span className="dq-photo-icon" aria-hidden="true">{quest.icon}</span>}
           <span className="dq-photo-action">{photo?.busy ? "SAVING…" : photo?.preview ? "REPLACE PHOTO +" : "ADD PHOTO +"}</span>
-        </label><div className="dq-photo-info"><h3>{quest.name}</h3><p>{quest.hint}</p>{photo?.matching && <p className="dq-photo-match">{photo.matching}</p>}{photo?.manualMatch && <label className="dq-stop-picker">Choose a stop (optional)<select aria-label={`Match ${quest.name} to a stop`} defaultValue="" onChange={event => update(quest.kind, { matching: event.target.value ? `Matched to ${event.target.value}` : "No photo time found · add to this day" })}><option value="">Leave unmatched</option>{day.locations.map(stop => <option key={`${stop.t}-${stop.label}`} value={`${stop.t} · ${stop.label}`}>{stop.t} · {stop.label}</option>)}</select></label>}{photo?.error && <p className="dq-error" role="alert">{photo.error}</p>}</div>
+        </label><div className="dq-photo-info"><h3>{quest.name}</h3><p>{quest.hint}</p>{photo?.matching && <p className="dq-photo-match">{photo.matching}</p>}{photo?.manualMatch && <label className="dq-stop-picker">Choose a stop (optional)<select aria-label={`Match ${quest.name} to a stop`} defaultValue="" onChange={event => update(quest.kind, { matching: event.target.value ? `Matched to ${event.target.value}` : "No photo time found · add to this day" })}><option value="">Leave unmatched</option>{day.locations.map(stop => <option key={`${stop.t}-${stop.label}`} value={`${stop.t} · ${stop.label}`}>{stop.t} · {stop.label}</option>)}</select></label>}{photo?.error && <><p className="dq-error" role="alert">{photo.error}</p>{photo.pending && <div><button type="button" className="dq-small-button" onClick={() => void upload(quest.kind, pendingFiles.current[quest.kind])}>Retry photo</button>{" "}<button type="button" className="dq-small-button" onClick={() => discardReplacement(quest.kind)}>{photo.url ? "Keep previous photo" : "Discard photo"}</button></div>}</>}</div>
       </div>; })}</div>
-      <div className="dq-sprite-status" aria-live="polite">{spriteUrl ? <><img src={spriteUrl} alt="Your generated back-facing pixel character"/><div><strong>Your little adventurer is ready.</strong><span>Same outfit. A whole new perspective.</span></div><span className="dq-sprite-tick">✓</span></> : <><span className="dq-character-placeholder" aria-hidden="true">♟</span><div><strong>{spriteBusy ? "Stitching your outfit into pixels…" : "Every adventure starts with you."}</strong><span>{spriteError || "Add a front fit photo to create your character. A back view helps too."}</span></div>{spriteError && <button type="button" className="dq-small-button" disabled={spriteBusy} onClick={() => void makeSprite()}>Retry character</button>}</>}</div>
+      {spriteUrl ? <SpritePreview url={spriteUrl} onStatusChange={setSpriteVerification} onRegenerate={() => void makeSprite()} disabled={spriteBusy || uploading || pendingChanges} retained={pendingChanges} /> : <div className="dq-sprite-status" aria-live="polite"><span className="dq-character-placeholder" aria-hidden="true">♟</span><div><strong>{spriteBusy ? "Stitching your outfit into pixels…" : "Every adventure starts with you."}</strong><span>{spriteError || "Add a front fit photo to create your character. A back view helps too."}</span></div>{spriteError && <button type="button" className="dq-small-button" disabled={spriteBusy || pendingFitChanges} onClick={() => void makeSprite()}>Retry character</button>}</div>}
     </section>
     <div className="dq-bottom-grid"><section className="dq-panel dq-health" aria-labelledby="health-title"><span className="dq-eyebrow">03 / A LITTLE MOVEMENT</span><h2 id="health-title">Good for the soul.</h2><p className="dq-section-copy">A walk through the park belongs in your story, too.</p>{health === "done" ? <div className="dq-walk-stats"><span className="dq-walk-icon">♧</span><div><strong>AFTERNOON WALK</strong><p>{workout.distanceKm} KM <span>·</span> {workout.durationMin} MIN <span>·</span> {workout.steps.toLocaleString("en-GB")} STEPS</p></div><span>✓</span></div> : <button type="button" className="dq-health-button" disabled={health === "syncing"} onClick={() => { setHealth("syncing"); healthTimer.current = setTimeout(() => setHealth("done"), 1500); }}><span>♥</span> {health === "syncing" ? "SYNCING YOUR WALK…" : "IMPORT FROM HEALTH"}<span>+</span></button>}<p className="dq-footnote">DEMO IMPORT · SAMPLE WALK DATA</p></section>
     <section className="dq-panel dq-transport" aria-labelledby="transport-title"><span className="dq-eyebrow">04 / BETWEEN THE MOMENTS</span><h2 id="transport-title">How you got there.</h2><div className="dq-transport-list">{day.transport.map((leg, i) => <div className="dq-transport-row" key={i}><span className={`dq-line-chip ${leg.mode === "bus" ? "dq-bus" : leg.line === "Bakerloo" ? "dq-bakerloo" : "dq-central"}`}>{leg.mode === "bus" ? `BUS ${leg.route}` : leg.line}</span><span>{leg.from}<span className="dq-route-arrow"> → </span>{leg.to}</span></div>)}</div><p className="dq-footnote">AUTO-DETECTED FROM DEMO LOCATION HISTORY</p></section></div>
-    <section className="dq-finish"><div><span className="dq-eyebrow">ALL THE LITTLE PIECES, ONE LITTLE WORLD.</span><h2>Ready to call it a day?</h2><p>{spriteBusy ? "Your character is being created. This can take a minute." : !photos.fit?.url ? "Add your fit check above to begin your adventure." : uploading ? "Just saving your latest memories…" : spriteUrl ? "Three places. One adventure. Someone to share it with." : "Your character needs to be ready before you set off."}</p>{storageError && <p className="dq-error" role="alert">{storageError}</p>}</div><button type="button" className="dq-end-button" disabled={!canFinish} onClick={() => router.push("/generating")}>END MY DAY <span>→</span></button></section>
+    <section className="dq-finish"><div><span className="dq-eyebrow">ALL THE LITTLE PIECES, ONE LITTLE WORLD.</span><h2>Ready to call it a day?</h2><p>{spriteBusy ? "Your character is being created. This can take a minute." : !photos.fit?.url ? "Add your fit check above to begin your adventure." : uploading ? "Just saving your latest memories…" : pendingChanges ? "Retry or discard your unsaved photo changes above." : spriteReady ? "Three places. One adventure. Someone to share it with." : spriteUrl ? "Your character image must load successfully before you set off. Check the preview above." : "Your character needs to be ready before you set off."}</p>{storageError && <p className="dq-error" role="alert">{storageError}</p>}</div><button type="button" className="dq-end-button" disabled={!canFinish} onClick={finishDay}>END MY DAY <span>→</span></button></section>
     </div><footer className="dq-footer"><span>MADE OF THE LITTLE THINGS.</span><span>DAYQUEST / LONDON, 2026</span></footer>
   </main>;
 }

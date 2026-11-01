@@ -5,6 +5,7 @@ import { FONT } from "../ui/TextBox";
 
 export const landmarkKey = (scene: number, slot: number) => `s${scene}_l${slot}`;
 export const foodKey = (scene: number) => `s${scene}_food`;
+export const foodIconKey = (scene: number) => `s${scene}_food_icon`;
 
 /** Loads the day's art (relative to day.json), the generated tile atlas and the static transit art. */
 export class BootScene extends Phaser.Scene {
@@ -28,7 +29,10 @@ export class BootScene extends Phaser.Scene {
     manifest.scenes.forEach((scene, i) => {
       if (scene.skyline) this.load.image(`s${i}_skyline`, resolveDayAsset(scene.skyline, manifestUrl));
       for (const landmark of scene.landmarks) this.load.image(landmarkKey(i, landmark.slot), resolveDayAsset(landmark.sprite, manifestUrl));
-      if (scene.food) this.load.image(foodKey(i), resolveDayAsset(scene.food.sprite, manifestUrl));
+      if (scene.food) {
+        this.load.image(foodKey(i), resolveDayAsset(scene.food.sprite, manifestUrl));
+        if (scene.food.icon) this.load.image(foodIconKey(i), resolveDayAsset(scene.food.icon, manifestUrl));
+      }
     });
     for (const name of ["bus", "tube", "city", "nelson"]) this.load.image(`transit_${name}`, `/transit/${name}.png`);
   }

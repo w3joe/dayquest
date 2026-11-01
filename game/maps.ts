@@ -114,3 +114,36 @@ export function groundBlocked(base: DayScene["base"], x: number, y: number): boo
   const c = tileAt(base, x, y);
   return c === "w" || c === "t" || c === "_";
 }
+
+/**
+ * The exit comes from day.json, so a map must never strand the player. Finds the cheapest route from spawn to exit
+ * (landmark footprints are impassable, water/trees/sky can be bridged at a cost) and returns the ground tiles to turn into path.
+ */
+export function carveRoute(base: DayScene["base"], spawn: { x: number; y: number }, exit: { x: number; y: number }, landmarkBlocked: Set<string>): Set<string> {
+  const key = (x: number, y: number) => `${x},${y}`;
+  const cost = (x: number, y: number) => (landmarkBlocked.has(key(x, y)) ? Infinity : groundBlocked(base, x, y) ? 6 : 1);
+  const dist = new Map<string, number>([[key(spawn.x, spawn.y), 0]]);
+  const prev = new Map<string, string>();
+  const open: [number, number, number][] = [[0, spawn.x, spawn.y]];
+  while (open.length) {
+    open.sort((a, b) => a[0] - b[0]);
+    const [d, x, y] = open.shift()!;
+    if (x === exit.x && y === exit.y) break;
+    if (d > (dist.get(key(x, y)) ?? Infinity)) continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+      const c = cost(nx, ny);
+      if (c === Infinity) continue;
+      const nd = d + c;
+      if (nd < (dist.get(key(nx, ny)) ?? Infinity)) { dist.set(key(nx, ny), nd); prev.set(key(nx, ny), key(x, y)); open.push([nd, nx, ny]); }
+    }
+  }
+  const carved = new Set<string>();
+  for (let at: string | undefined = key(exit.x, exit.y); at && prev.has(at); at = prev.get(at)) {
+    const [x, y] = at.split(",").map(Number);
+    if (groundBlocked(base, x, y)) carved.add(at);
+  }
+  if (groundBlocked(base, exit.x, exit.y)) carved.add(key(exit.x, exit.y));
+  return carved;
+}

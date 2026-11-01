@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Shadwell 2.5D</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <button id="toggle-invented" type="button" aria-pressed="false">Invented: off</button>
+</div>
+<div id="legend" hidden><span class="swatch"></span>Blue outline = invented (not in the photos)</div>
+
+<div id="dialogue" hidden>
+  <p id="dialogue-text"></p>
+  <span id="dialogue-next">&#9660;</span>
+</div>
+
+<div id="title">
+  <div class="card">
+    <h1>Shadwell</h1>
+    <p class="sub">from two photos</p>
+    <p class="blink">Press Enter / tap to start</p>
+    <p class="keys">Move: arrows / WASD &middot; Run: Shift &middot; Talk: Space / Enter &middot; Invented: I</p>
+  </div>
+</div>
+
+<div id="touch" hidden>
+  <div id="dpad">
+    <button data-key="up" class="up" aria-label="Up">&#9650;</button>
+    <button data-key="left" class="left" aria-label="Left">&#9664;</button>
+    <button data-key="right" class="right" aria-label="Right">&#9654;</button>
+    <button data-key="down" class="down" aria-label="Down">&#9660;</button>
+  </div>
+  <button id="btn-a" data-key="a" aria-label="A">A</button>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
