@@ -14,7 +14,7 @@
 - _TODO: fill in at feature freeze_
 - Pipeline: day data → LLM picks 3 highlights (tourist spot, meal, park) + nearby landmarks → reference photos → `gpt-image-2.5` → pixel post-process → `day.json`
 - Game: Phaser 3 + Grid Engine scenes with AI-generated landmarks, depth sorting, textboxes
-- Fit check → front-facing player sprite
+- Fit check → back-facing player sprite
 - Transport loading animations (bus / tube line)
 - Shareable `/day/<id>` links
 
