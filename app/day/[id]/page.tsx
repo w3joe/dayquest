@@ -10,13 +10,13 @@ export const dynamic = "force-dynamic";
 
 export default async function DayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!isDayId(id)) notFound();
+  if (id === "demo" || !isDayId(id)) notFound();
 
   let manifest;
   let manifestUrl;
   try {
     // Local dev without Blob: B's pipeline writes generated days to public/days/<id>/ too.
-    if (id === "demo" || (!process.env.BLOB_BASE_URL && process.env.NODE_ENV !== "production")) {
+    if (process.env.NODE_ENV !== "production" && (!process.env.BLOB_BASE_URL || id === "world-preview")) {
       manifestUrl = `/days/${id}/day.json`;
       const raw = await readFile(path.join(process.cwd(), "public", "days", id, "day.json"), "utf8");
       manifest = parseDayManifest(JSON.parse(raw), id);

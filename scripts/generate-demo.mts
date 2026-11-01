@@ -1,5 +1,6 @@
 /**
- * Pre-generate the demo day into public/days/demo/ and record events.ndjson for /generating?replay=demo.
+ * Generate internal fixtures into public/days/demo/ and record events.ndjson.
+ * The demo page and generation replay are retired; these files are for development checks.
  *
  *   npm run demo:generate                                   # mock: placeholder art, no API calls
  *   PIPELINE_TEXT=live PIPELINE_IMAGES=live npm run demo:generate -- --player sprite.png --lunch ramen.jpg
@@ -48,4 +49,4 @@ await runGenerateDay({
   console.log(`${String(Date.now() - started).padStart(6)}ms  ${event.label}`);
 });
 await writeFile(path.join(dir, "events.ndjson"), events.map((e) => JSON.stringify(e)).join("\n") + "\n");
-console.log(`done: ${events.length} events, open /day/demo or /generating?replay=demo`);
+console.log(`done: ${events.length} events, internal fixtures written to ${dir}`);

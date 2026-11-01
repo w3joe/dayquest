@@ -68,8 +68,17 @@ test("multipart reader bounds bodies even when Content-Length is omitted", async
 });
 
 test("character processing produces 32×48 PNG with binary alpha and ≤32 colours", async () => {
+  // A flat-colour fixture cannot expose a palette setting that silently rounds
+  // to 256. Use hundreds of source colours while keeping the same subject bounds.
+  const pixels = Buffer.alloc(20 * 40 * 4);
+  for (let i = 0; i < pixels.length; i += 4) {
+    pixels[i] = (i * 17) % 256;
+    pixels[i + 1] = Math.floor(i / 20) % 256;
+    pixels[i + 2] = Math.floor(i / 4) % 256;
+    pixels[i + 3] = 192;
+  }
   const source = await sharp({ create: { width: 64, height: 64, channels: 4, background: "#00000000" } })
-    .composite([{ input: await sharp({ create: { width: 20, height: 40, channels: 4, background: { r: 220, g: 50, b: 70, alpha: 0.75 } } }).png().toBuffer(), left: 22, top: 12 }])
+    .composite([{ input: await sharp(pixels, { raw: { width: 20, height: 40, channels: 4 } }).png().toBuffer(), left: 22, top: 12 }])
     .png().toBuffer();
   const result = await pixelateCharacter(source);
   const metadata = await sharp(result).metadata();

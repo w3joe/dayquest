@@ -21,19 +21,19 @@ Live modes also need `OPENAI_API_KEY`.
 - `pipeline/publish.ts`: Blob store at `days/<id>/…` when `BLOB_READ_WRITE_TOKEN` and `BLOB_BASE_URL` are set; otherwise `public/days/<id>/` in dev. `loadStoredAsset` only reads `/api/assets/…`, `public/`, or our Blob host.
 - `pipeline/generate.ts`: `runGenerateDay(opts, emit)` runs the whole pipeline and emits §6.1 events.
 - `app/api/generate-day/route.ts`: `POST { uploads, spriteUrl }` → NDJSON stream. The last event is `{ step: "done", id }` or `{ step: "error" }`.
-- `app/generating/page.tsx`: live log from the Today draft, or `?replay=demo` replaying `public/days/demo/events.ndjson`, compressed to about 8 s. Navigates to `/day/<id>` when done.
+- `app/generating/page.tsx`: live log from the Today draft. Navigates to `/day/<id>` when done. Retired replay links return to Today without starting generation.
 
 ## Manifest addition
 
 `scene.food.icon` is the 32×32 textbox icon. `food.sprite` stays the 16×16 table sprite. `icon` is optional in `lib/day.ts`, so A should fall back to `sprite`.
 
-## Demo day
+## Internal demo fixtures
 
 ```bash
 npm run demo:generate                      # placeholder demo (committed now)
 PIPELINE_TEXT=live PIPELINE_IMAGES=live npm run demo:generate -- --player sprite.png --lunch ramen.jpg --landmark eye.jpg --park park.jpg
 ```
 
-This wipes and rewrites `public/days/demo/` (`day.json`, PNGs and `events.ndjson` with real timings). Photos are re-encoded, so EXIF never reaches the repo. To hand-tune art instead, overwrite the PNGs in `public/days/demo/` at the same sizes and keep `day.json`.
+The demo page and replay are retired. This development command wipes and rewrites `public/days/demo/` (`day.json`, PNGs and `events.ndjson` with real timings). Photos are re-encoded, so EXIF never reaches the repo. To hand-tune art instead, overwrite the PNGs in `public/days/demo/` at the same sizes and keep `day.json`.
 
 In dev without Blob, `/day/<id>` reads `public/days/<id>/day.json` (gitignored), so a full Today → Generating → Day run works locally.

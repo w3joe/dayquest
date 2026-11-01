@@ -34,6 +34,7 @@ test("validates IDs and publishes to the exact expected Blob path", () => {
 test("resolves player and scene assets against local and generated manifests", () => {
   assert.equal(resolveDayAsset("player.png", "/days/demo/day.json"), "/days/demo/player.png");
   assert.equal(resolveDayAsset("s0_l0.png", "https://assets.example.com/days/abc/day.json"), "https://assets.example.com/days/abc/s0_l0.png");
+  assert.equal(resolveDayAsset("/tiles/dq/library/tree.png", "https://assets.example.com/days/abc/day.json"), "/tiles/dq/library/tree.png");
   const unsafe = manifest(); unsafe.player.sprite = "javascript:alert(1)";
   assert.throws(() => parseDayManifest(unsafe, "demo"));
   assert.throws(() => resolveDayAsset("data:image/png;base64,abc", "/days/demo/day.json"));

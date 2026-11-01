@@ -1,9 +1,8 @@
 """Asset prompt set. One shared style prefix for everything."""
-STYLE = ("Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. "
-         "Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). "
-         "Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. "
-         "Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. "
-         "Entirely original design, not copied from or imitating any existing game, character or logo. ")
+import json
+from pathlib import Path
+
+STYLE = json.loads((Path(__file__).resolve().parent.parent / "assets" / "style.json").read_text())["prefix"] + " "
 OBJ = (" Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. "
        "No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.")
 TILE = (" This is a single seamless repeating ground texture tile viewed straight down (orthographic, no perspective), filling the entire square image edge to edge, "
