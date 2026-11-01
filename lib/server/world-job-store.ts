@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { BlobNotFoundError, BlobPreconditionFailedError, del, head, list, put } from "@vercel/blob";
+import { BlobNotFoundError, BlobPreconditionFailedError, del, get, head, list, put } from "@vercel/blob";
 import { RequestError } from "./errors";
 
 const LOCAL_ROOT = path.join(process.cwd(), ".data", "world-job-store");
@@ -55,10 +55,27 @@ export async function readWorldCheckpoint<T>(id: string): Promise<T | null> {
   } while (cursor);
   if (!newest) return null;
   if (newest.size > MAX_STATE_BYTES) throw new RequestError("Saved world progress is too large.", 503);
-  // Every URL is new and has already been confirmed by list: no cached 404, overwrite or stale pointer.
-  const response = await fetch(newest.url, { cache: "no-store", redirect: "error", signal: AbortSignal.timeout(15_000) });
-  if (!response.ok) throw new RequestError("Could not read saved world progress. Please retry.", 503);
-  return parseState<T>(await response.text());
+  // Anonymous public GETs can cache a 404 even after list confirms the object.
+  // The SDK sends storage authorization; no-store alone only bypasses Next's
+  // data cache. Never fall back to an older checkpoint and repeat paid work.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 250));
+    try {
+      const blob = await get(newest.url, { access: "public", useCache: false, abortSignal: AbortSignal.timeout(15_000) });
+      if (!blob || blob.statusCode !== 200) continue;
+      if (blob.blob.size > MAX_STATE_BYTES) {
+        await blob.stream.cancel();
+        throw new RequestError("Saved world progress is too large.", 503);
+      }
+      return parseState<T>(await new Response(blob.stream).text());
+    } catch (error) {
+      // Corrupt/oversized state is an explicit error, not a reason to choose an
+      // older state. Transport failures may retry this same immutable object.
+      if (error instanceof RequestError) throw error;
+      if (attempt === 2) console.error("World checkpoint read failed", { operation: "authenticated_blob_get", attempts: 3 });
+    }
+  }
+  throw new RequestError("Could not read saved world progress. Please retry.", 503);
 }
 function parseState<T>(content: string): T {
   if (Buffer.byteLength(content) > MAX_STATE_BYTES) throw new RequestError("Saved world progress is too large.", 503);
