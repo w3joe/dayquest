@@ -19,7 +19,7 @@ open DayQuest.xcodeproj
 
 1. In **Signing & Capabilities**, pick your team. If the bundle ID `app.dayquest.ios` is taken, change it, and change the matching `BGTaskSchedulerPermittedIdentifiers` prefix.
 2. Start the web app **from this branch** so the phone can reach it: `npm run dev` (it listens on all interfaces). A server running `main` rejects the phone's request, because main's route needs a finished fit check. Find the Mac's address with `ipconfig getifaddr en0`.
-3. Run on your phone. Open **Settings** (gear icon) and set the server to `http://<mac-ip>:3000`, or to the deployed URL.
+3. Run on your phone. The app talks to `https://devday-hack-ios.shawn404.top` by default (the `dayquest-ios` container on myserver). To use a local server instead, open **Settings** (gear icon) and set `http://<mac-ip>:3000`.
 
 ## Demo controls
 

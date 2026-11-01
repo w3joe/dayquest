@@ -37,7 +37,7 @@ final class DayEngine {
 
     init() {
         let defaults = UserDefaults.standard
-        serverURL = defaults.string(forKey: "serverURL") ?? "http://localhost:3000"
+        serverURL = defaults.string(forKey: "serverURL") ?? "https://devday-hack-ios.shawn404.top"
         playerName = defaults.string(forKey: "playerName") ?? "LUCAS"
         endMinutes = defaults.object(forKey: "endMinutes") as? Int ?? 21 * 60
         autoGenerate = defaults.object(forKey: "autoGenerate") as? Bool ?? true
