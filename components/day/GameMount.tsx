@@ -35,7 +35,7 @@ export function GameMount({ manifest, manifestUrl, onShare }: GameMountProps) {
 
   if (error) return <section className={styles.game} aria-label="Game"><p className={styles.pending}>The game could not start in this browser. Try reloading the page.</p></section>;
   return <section aria-label="Playable day" style={{ display: "flex", flexDirection: "column", alignItems: "center", background: "#1f1a2e", padding: 12 }}>
-    <p aria-live="polite" style={{ color: "#f6f1df", font: "11px monospace", lineHeight: 1.6, textAlign: "center" }}>{loading ? "Loading your world…" : "Click the world to play · Arrows / WASD: walk · Space / Enter: read or skip · Touch controls below"}</p>
+    <p aria-live="polite" style={{ color: "#f6f1df", font: "11px monospace", lineHeight: 1.6, textAlign: "center" }}>{loading ? "Loading your world…" : "Click the world to play · Arrows / WASD: walk · Space / Enter: actions or travel · Escape: cancel · Touch controls below"}</p>
     <div ref={host} style={{ width: "100%", maxWidth: 960, lineHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", imageRendering: "pixelated" }} />
   </section>;
 }

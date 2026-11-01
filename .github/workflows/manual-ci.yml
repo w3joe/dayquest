@@ -1,0 +1,41 @@
+name: DayQuest checks (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dayquest-checks-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '26'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run existing tests
+        run: npm test
+
+      - name: Verify production build
+        run: npm run build
+
+      - name: Write run summary
+        run: |
+          echo "Typecheck, existing tests and production build passed." >> "$GITHUB_STEP_SUMMARY"
+          echo 'Deploy manually from your signed-in computer with `npm run deploy:vercel`.' >> "$GITHUB_STEP_SUMMARY"
+          echo "This workflow creates no deployments and needs no Vercel token." >> "$GITHUB_STEP_SUMMARY"

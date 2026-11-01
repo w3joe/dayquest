@@ -39,3 +39,18 @@ test("resolves player and scene assets against local and generated manifests", (
   assert.throws(() => parseDayManifest(unsafe, "demo"));
   assert.throws(() => resolveDayAsset("data:image/png;base64,abc", "/days/demo/day.json"));
 });
+
+test("food evidence is optional for legacy manifests and validated separately from personal text", () => {
+  const legacy = manifest();
+  const food = { sprite: "lunch.png", tile: { x: 10, y: 10 }, text: "A quiet break in the day." };
+  Object.assign(legacy.scenes[1], { food });
+  assert.equal(parseDayManifest(legacy, "demo").scenes[1].food?.name, undefined);
+  const enriched = structuredClone(legacy);
+  Object.assign(enriched.scenes[1], { food: { ...food, name: "Tomato sandwich", description: "Seeded bread, tomato and lettuce." } });
+  assert.deepEqual(parseDayManifest(enriched, "demo").scenes[1].food, { ...food, name: "Tomato sandwich", description: "Seeded bread, tomato and lettuce." });
+  for (const evidence of [{ name: 123 }, { name: "" }, { name: "n".repeat(101) }, { description: false }, { description: "" }, { description: "d".repeat(1801) }]) {
+    const invalid = structuredClone(legacy);
+    Object.assign(invalid.scenes[1], { food: { ...food, ...evidence } });
+    assert.throws(() => parseDayManifest(invalid, "demo"), /Invalid food/);
+  }
+});

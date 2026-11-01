@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "id": "steam_v1",
+      "src": "/interactions/library/steam-v1.png",
+      "kind": "effect",
+      "width": 16,
+      "height": 24,
+      "description": "Three small white puffs of steam in a rising column, shown as a single-frame overlay above the character. Use for a supplied meal or drink explicitly described as hot or steaming. Does not animate eating, drinking, cooking or body movement.",
+      "tags": ["steam", "hot-food", "hot-drink", "overlay", "static"]
+    },
+    {
+      "id": "sparkle_v1",
+      "src": "/interactions/library/sparkle-v1.png",
+      "kind": "effect",
+      "width": 16,
+      "height": 16,
+      "description": "A single yellow four-point sparkle overlay above the character for a brief moment of appreciation or noticing a detail. A static visual flourish; does not create rewards, change an object, or represent a personalised character action.",
+      "tags": ["sparkle", "appreciation", "notice", "overlay", "static"]
+    },
+    {
+      "id": "heart_v1",
+      "src": "/interactions/library/heart-v1.png",
+      "kind": "effect",
+      "width": 16,
+      "height": 16,
+      "description": "A small pink heart in a white rounded speech bubble above the character, suitable for a brief expression of liking or appreciation. Single-frame overlay only; does not establish a relationship or animate the character's body.",
+      "tags": ["heart", "like", "appreciation", "speech-bubble", "overlay", "static"]
+    },
+    {
+      "id": "camera_flash_v1",
+      "src": "/interactions/library/camera-flash-v1.png",
+      "kind": "effect",
+      "width": 16,
+      "height": 16,
+      "description": "A single white camera-flash burst with short rays, displayed above the character. Use only when scene evidence or another supplied capability supports a camera moment. Contains no camera, phone, arm motion or personalised photo-taking pose.",
+      "tags": ["camera", "flash", "photo", "overlay", "static"]
+    }
+  ]
+}

@@ -6,11 +6,14 @@ import type { ImageGenerator } from "./imagegen";
 import type { DayStore } from "./publish";
 import type { SceneBlueprint, ScenePlanInput } from "./scene-types";
 import type { GenerateEvent, UploadKind } from "./types";
+import { validateInteractionPack, type InteractionPack } from "../lib/interactions";
 
 export type WorldCheckpoint = {
   blueprint?: SceneBlueprint;
   /** Successfully stored filenames keyed by asset ID. Never mark a failed upload complete. */
   assets: Record<string, string>;
+  /** Planned once, persisted before publication so a retry never repeats planning. */
+  interactionPack?: InteractionPack;
 };
 export type WorldBuildInput = {
   id: string;
@@ -24,6 +27,8 @@ export type WorldBuildDependencies = {
   images: ImageGenerator;
   store: DayStore;
   styleReferences?: Buffer[];
+  /** Explicit production planner; omitted by legacy/offline pipeline consumers. */
+  planInteractions?(scene: import("../lib/day").DayScene): Promise<InteractionPack>;
 };
 
 /** Independent sprites run in a bounded batch. Save each success even if its neighbour fails. */
@@ -72,17 +77,24 @@ export async function advanceWorldBuild(input: WorldBuildInput, checkpoint: Worl
     return { checkpoint: { ...checkpoint, assets: { ...checkpoint.assets, [next.id]: next.file } }, total: jobs.length,
       event: { step: "image", label: `${next.name} saved`, thumb: `data:image/png;base64,${bytes.toString("base64")}` } };
   }
+  const layout = buildWorldLayout(blueprint, checkpoint.assets);
+  const scene = { kind: "tourist" as const, title: blueprint.title, time: blueprint.time,
+    base: blueprint.ground === "park" ? "park" as const : "street" as const, spawn: layout.spawn, exit: layout.exit,
+    landmarks: [], world: layout.world,
+    ...(blueprint.food ? { food: { sprite: checkpoint.assets.food, icon: checkpoint.assets.food,
+      tile: layout.foodTile, text: blueprint.food.text, name: blueprint.food.name, description: blueprint.food.description } } : {}) };
+  if (deps.planInteractions && !checkpoint.interactionPack) {
+    const interactionPack = await deps.planInteractions(scene);
+    validateInteractionPack(scene, interactionPack);
+    return { checkpoint: { ...checkpoint, interactionPack }, total: jobs.length,
+      event: { step: "landmarks", label: `${interactionPack.actions.length} contextual interactions planned and saved.` } };
+  }
   // The accepted fit-check sprite remains the preview/canonical character.
   await deps.store.put("player.png", input.player, "image/png");
-  const layout = buildWorldLayout(blueprint, checkpoint.assets);
   const manifest: DayManifest = {
     id: input.id, date: input.date,
     player: { name: input.name, sprite: "player.png", walkSheet: checkpoint.assets.player_walk },
-    scenes: [{ kind: "tourist", title: blueprint.title, time: blueprint.time,
-      base: blueprint.ground === "park" ? "park" : "street", spawn: layout.spawn, exit: layout.exit,
-      landmarks: [], world: layout.world,
-      ...(blueprint.food ? { food: { sprite: checkpoint.assets.food, icon: checkpoint.assets.food,
-        tile: layout.foodTile, text: blueprint.food.text } } : {}) }],
+    scenes: [{ ...scene, ...(checkpoint.interactionPack ? { interactionPack: checkpoint.interactionPack } : {}) }],
     transit: [],
   };
   parseDayManifest(manifest, input.id);

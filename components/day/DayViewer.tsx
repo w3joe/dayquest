@@ -44,6 +44,9 @@ export function DayViewer({ manifest, manifestUrl }: { manifest: DayManifest; ma
       <ol className={styles.scenes}>{manifest.scenes.map((scene, index) => <li key={`${scene.kind}-${index}`}>
         <span className={styles.sceneNumber}>0{index + 1}</span><p className={styles.kicker}>{scene.time} · {scene.kind.toUpperCase()}</p><h3>{scene.title}</h3>
         <p>{scene.world ? scene.world.objects.filter((object) => object.id.startsWith("building_")).map((object) => object.name).join(" · ") : scene.landmarks.map((landmark) => landmark.name).join(" · ")}</p>
+        {manifest.journeys?.find(journey => journey.fromSceneId === scene.id)?.legs.map((leg, legIndex) => <p className={styles.kicker} key={legIndex}>
+          {leg.mode === "bus" ? `BUS ${leg.route} · ${leg.from} → ${leg.to}` : leg.mode === "tube" ? `${leg.line.toUpperCase()} LINE · ${leg.stations[0]} → ${leg.stations.at(-1)}` : `WALK · ${leg.from} → ${leg.to}`}
+        </p>)}
       </li>)}</ol>
     </section>
     <footer className={styles.footer}><span>Every day becomes a place you can visit.</span><Link href="/">Create your day →</Link></footer>
