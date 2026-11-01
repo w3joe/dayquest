@@ -1,0 +1,227 @@
+{
+  "semanticSegments": [
+    {
+      "startTime": "2026-11-07T10:00:00.000+00:00",
+      "endTime": "2026-11-07T10:25:00.000+00:00",
+      "visit": {
+        "probability": 0.9,
+        "topCandidate": {
+          "placeLocation": {
+            "latLng": "51.5007°, -0.1246°"
+          },
+          "semanticType": "UNKNOWN"
+        }
+      }
+    },
+    {
+      "startTime": "2026-11-07T10:25:00.000+00:00",
+      "endTime": "2026-11-07T10:45:00.000+00:00",
+      "visit": {
+        "probability": 0.9,
+        "topCandidate": {
+          "placeLocation": {
+            "latLng": "51.5009°, -0.122°"
+          },
+          "semanticType": "UNKNOWN"
+        }
+      }
+    },
+    {
+      "startTime": "2026-11-07T10:45:00.000+00:00",
+      "endTime": "2026-11-07T12:05:00.000+00:00",
+      "visit": {
+        "probability": 0.9,
+        "topCandidate": {
+          "placeLocation": {
+            "latLng": "51.5033°, -0.1196°"
+          },
+          "semanticType": "UNKNOWN"
+        }
+      }
+    },
+    {
+      "startTime": "2026-11-07T12:05:00.000+00:00",
+      "endTime": "2026-11-07T12:05:00.000+00:00",
+      "activity": {
+        "start": {
+          "latLng": "51.5033°, -0.1196°"
+        },
+        "end": {
+          "latLng": "51.501°, -0.126°"
+        },
+        "distanceMeters": 700,
+        "topCandidate": {
+          "type": "WALKING",
+          "probability": 0.8
+        }
+      }
+    },
+    {
+      "startTime": "2026-11-07T12:05:00.000+00:00",
+      "endTime": "2026-11-07T12:10:00.000+00:00",
+      "visit": {
+        "probability": 0.9,
+        "topCandidate": {
+          "placeLocation": {
+            "latLng": "51.501°, -0.126°"
+          },
+          "semanticType": "UNKNOWN"
+        }
+      }
+    },
+    {
+      "startTime": "2026-11-07T12:10:00.000+00:00",
+      "endTime": "2026-11-07T12:30:00.000+00:00",
+      "activity": {
+        "start": {
+          "latLng": "51.501°, -0.126°"
+        },
+        "end": {
+          "latLng": "51.5163°, -0.1303°"
+        },
+        "distanceMeters": 2300,
+        "topCandidate": {
+          "type": "IN_BUS",
+          "probability": 0.8
+        }
+      }
+    },
+    {
+      "startTime": "2026-11-07T12:30:00.000+00:00",
+      "endTime": "2026-11-07T12:40:00.000+00:00",
+      "activity": {
+        "start": {
+          "latLng": "51.5163°, -0.1303°"
+        },
+        "end": {
+          "latLng": "51.5157°, -0.1281°"
+        },
+        "distanceMeters": 160,
+        "topCandidate": {
+          "type": "WALKING",
+          "probability": 0.8
+        }
+      }
+    },
+    {
+      "startTime": "2026-11-07T12:40:00.000+00:00",
+      "endTime": "2026-11-07T13:40:00.000+00:00",
+      "visit": {
+        "probability": 0.9,
+        "topCandidate": {
+          "placeLocation": {
+            "latLng": "51.5157°, -0.1281°"
+          },
+          "semanticType": "UNKNOWN"
+        }
+      }
+    },
+    {
+      "startTime": "2026-11-07T13:40:00.000+00:00",
+      "endTime": "2026-11-07T13:40:00.000+00:00",
+      "activity": {
+        "start": {
+          "latLng": "51.5157°, -0.1281°"
+        },
+        "end": {
+          "latLng": "51.5165°, -0.131°"
+        },
+        "distanceMeters": 170,
+        "topCandidate": {
+          "type": "WALKING",
+          "probability": 0.8
+        }
+      }
+    },
+    {
+      "startTime": "2026-11-07T13:40:00.000+00:00",
+      "endTime": "2026-11-07T13:50:00.000+00:00",
+      "activity": {
+        "start": {
+          "latLng": "51.5165°, -0.131°"
+        },
+        "end": {
+          "latLng": "51.5152°, -0.1419°"
+        },
+        "distanceMeters": 800,
+        "topCandidate": {
+          "type": "IN_SUBWAY",
+          "probability": 0.8
+        }
+      }
+    },
+    {
+      "startTime": "2026-11-07T13:50:00.000+00:00",
+      "endTime": "2026-11-07T14:00:00.000+00:00",
+      "activity": {
+        "start": {
+          "latLng": "51.5152°, -0.1419°"
+        },
+        "end": {
+          "latLng": "51.5234°, -0.1466°"
+        },
+        "distanceMeters": 950,
+        "topCandidate": {
+          "type": "IN_SUBWAY",
+          "probability": 0.8
+        }
+      }
+    },
+    {
+      "startTime": "2026-11-07T14:00:00.000+00:00",
+      "endTime": "2026-11-07T14:15:00.000+00:00",
+      "activity": {
+        "start": {
+          "latLng": "51.5234°, -0.1466°"
+        },
+        "end": {
+          "latLng": "51.5268°, -0.153°"
+        },
+        "distanceMeters": 650,
+        "topCandidate": {
+          "type": "WALKING",
+          "probability": 0.8
+        }
+      }
+    },
+    {
+      "startTime": "2026-11-07T14:15:00.000+00:00",
+      "endTime": "2026-11-07T14:50:00.000+00:00",
+      "visit": {
+        "probability": 0.9,
+        "topCandidate": {
+          "placeLocation": {
+            "latLng": "51.5268°, -0.153°"
+          },
+          "semanticType": "UNKNOWN"
+        }
+      }
+    },
+    {
+      "startTime": "2026-11-07T14:50:00.000+00:00",
+      "endTime": "2026-11-07T15:20:00.000+00:00",
+      "visit": {
+        "probability": 0.9,
+        "topCandidate": {
+          "placeLocation": {
+            "latLng": "51.5274°, -0.1555°"
+          },
+          "semanticType": "UNKNOWN"
+        }
+      }
+    },
+    {
+      "startTime": "2026-11-07T15:20:00.000+00:00",
+      "endTime": "2026-11-07T15:50:00.000+00:00",
+      "visit": {
+        "probability": 0.9,
+        "topCandidate": {
+          "placeLocation": {
+            "latLng": "51.5262°, -0.159°"
+          },
+          "semanticType": "UNKNOWN"
+        }
+      }
+    }
+  ]
+}
