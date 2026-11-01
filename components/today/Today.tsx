@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import day from "../../data/input.json";
+import defaultDay from "../../data/input.json";
 import { DRAFT_STORAGE_KEY, isReadyDraft, parseStoredDraft, type UploadKind } from "../../lib/draft";
 import { discardPhotoUpload, startPhotoUpload, type Photo } from "../../lib/photo-upload";
 import SpritePreview, { type SpriteVerification } from "./SpritePreview";
@@ -32,7 +32,9 @@ async function preview(file: File): Promise<string> {
   } finally { bitmap.close(); }
 }
 
-async function matchPhoto(file: File): Promise<string> {
+type DayData = typeof defaultDay;
+
+async function matchPhoto(file: File, day: DayData): Promise<string> {
   try {
     const { parse } = await import("exifr");
     const metadata = await parse(file, ["DateTimeOriginal", "CreateDate"]);
@@ -48,15 +50,17 @@ async function matchPhoto(file: File): Promise<string> {
   } catch { return "No photo time found · add to this day"; }
 }
 
-function LocationSync() {
+function LocationSync({ day, onSample, sampleState, sampleNote }: { day: DayData; onSample: () => void; sampleState: "idle" | "loading" | "done" | "error"; sampleNote: string }) {
   const [count, setCount] = useState(0);
   useEffect(() => {
+    setCount(0);
     const timer = window.setInterval(() => setCount(n => Math.min(n + 1, day.locations.length)), 220);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [day]);
   const points = day.locations.map(stop => ({ x: 32 + ((stop.lng + .163) / .048) * 336, y: 25 + ((51.531 - stop.lat) / .034) * 235 }));
   return <section className="dq-panel dq-location" aria-labelledby="location-title">
     <div className="dq-section-heading"><div><span className="dq-eyebrow">01 / THE PLACES</span><h2 id="location-title">A little further from home.</h2></div><span className="dq-status"><span className="dq-status-dot" />{count === day.locations.length ? "DAY SYNCED" : "SYNCING…"}</span></div>
+    <div className="dq-sample"><button type="button" className="dq-small-button" onClick={onSample} disabled={sampleState === "loading"}>{sampleState === "loading" ? "READING ROUTE…" : sampleState === "done" ? "SAMPLE ROUTE LOADED ✓" : "USE SAMPLE ROUTE"}</button><span className="dq-footnote" role="status">{sampleNote || "No location history of your own? Load a made-up London day to see the whole flow."}</span></div>
     <div className="dq-map-grid"><div className="dq-map">
       <svg viewBox="0 0 400 290" role="img" aria-label="Illustrated London route from Westminster through Soho to Regent’s Park">
         <defs><pattern id="blocks" width="32" height="28" patternUnits="userSpaceOnUse"><rect x="4" y="4" width="20" height="16" fill="#e4dfca"/><path d="M0 25H32M28 0V28" stroke="#f6f1df" strokeWidth="5"/></pattern></defs>
@@ -66,13 +70,32 @@ function LocationSync() {
         <polyline points={points.slice(0, count).map(p => `${p.x},${p.y}`).join(" ")} fill="none" stroke="#bd684b" strokeWidth="3" strokeDasharray="4 5"/>
         {points.slice(0, count).map((p, i) => <g key={i}><rect x={p.x - 5} y={p.y - 5} width="10" height="10" fill="#faf4de" stroke="#38483d" strokeWidth="2"/><rect x={p.x - 2} y={p.y - 2} width="4" height="4" fill="#bd684b"/></g>)}
       </svg><div className="dq-map-caption"><span>⌖ LONDON, UK</span><span>ILLUSTRATED MAP</span></div>
-    </div><div className="dq-timeline"><div className="dq-timeline-top"><span>YOUR DAY, IN LITTLE STOPS</span><span>{String(count).padStart(2, "0")} / 12</span></div><div className="dq-stop-list" aria-label="Location history">{day.locations.map((stop, i) => <div key={`${stop.t}-${stop.label}`} className={`dq-stop ${i < count ? "is-synced" : ""}`}><time>{stop.t}</time><span className="dq-stop-marker" /><span>{stop.label}</span><span aria-hidden="true">{i < count ? "✓" : "·"}</span></div>)}</div></div></div>
-    <div className="dq-sync-footer"><span>Demo location history · {day.locations.length} stops</span><span>{Math.round(count / day.locations.length * 100)}%</span></div><div className="dq-progress" role="progressbar" aria-label="Location sync" aria-valuemin={0} aria-valuemax={12} aria-valuenow={count}><span style={{ width: `${count / 12 * 100}%` }}/></div>
+    </div><div className="dq-timeline"><div className="dq-timeline-top"><span>YOUR DAY, IN LITTLE STOPS</span><span>{String(count).padStart(2, "0")} / {String(day.locations.length).padStart(2, "0")}</span></div><div className="dq-stop-list" aria-label="Location history">{day.locations.map((stop, i) => <div key={`${stop.t}-${stop.label}`} className={`dq-stop ${i < count ? "is-synced" : ""}`}><time>{stop.t}</time><span className="dq-stop-marker" /><span>{stop.label}</span><span aria-hidden="true">{i < count ? "✓" : "·"}</span></div>)}</div></div></div>
+    <div className="dq-sync-footer"><span>{sampleState === "done" ? "Synthetic sample route" : "Demo location history"} · {day.locations.length} stops</span><span>{Math.round(count / day.locations.length * 100)}%</span></div><div className="dq-progress" role="progressbar" aria-label="Location sync" aria-valuemin={0} aria-valuemax={day.locations.length} aria-valuenow={count}><span style={{ width: `${count / day.locations.length * 100}%` }}/></div>
   </section>;
 }
 
 export default function Today() {
   const router = useRouter();
+  const [day, setDay] = useState<DayData>(defaultDay);
+  const [sampleState, setSampleState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [sampleNote, setSampleNote] = useState("");
+  async function useSampleRoute() {
+    setSampleState("loading");
+    setSampleNote("");
+    try {
+      // The real import path: the server parses a Timeline, Health and GPX package with recorded place lookups.
+      const response = await fetch("/api/ingest?demo=1", { method: "POST" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Could not read the sample route.");
+      setDay(body.input as DayData);
+      setSampleState("done");
+      setSampleNote(`Read ${body.input.locations.length} stops, ${body.input.transport.length} transit legs and a ${body.input.workouts[0]?.distanceKm ?? 0} km walk from a made-up Timeline, Health and GPX export.${body.warnings?.length ? ` ${body.warnings.length} note(s).` : ""}`);
+    } catch (error) {
+      setSampleState("error");
+      setSampleNote(error instanceof Error ? error.message : "Could not read the sample route.");
+    }
+  }
   const [sessionId, setSessionId] = useState("");
   const [photos, setPhotos] = useState<Partial<Record<Kind, Photo>>>({});
   const [spriteUrl, setSpriteUrl] = useState<string>();
@@ -198,7 +221,7 @@ export default function Today() {
       generationController.current?.abort();
     }
     try {
-      const [thumbnail, matching] = await Promise.all([preview(file), matchPhoto(file)]);
+      const [thumbnail, matching] = await Promise.all([preview(file), matchPhoto(file, day)]);
       if (!mounted.current || operations.current[kind] !== attempt) return;
       update(kind, { preview: thumbnail, matching, manualMatch: matching.startsWith("No photo time") });
       const form = new FormData(); form.set("photo", file); form.set("kind", kind); form.set("sessionId", sessionId);
@@ -258,7 +281,7 @@ export default function Today() {
   return <main className="dq-shell">
     <header className="dq-header"><a href="/" className="dq-wordmark"><span className="dq-brand-icon">✦</span> dayquest<span className="dq-wordmark-dot">.</span></a><span className="dq-header-note">A DAY WORTH VISITING</span><a href="/day/demo" className="dq-demo-link">Explore a demo <span>↗</span></a></header>
     <div className="dq-hero"><div><p className="dq-eyebrow">{day.user.name}'S DAY / LONDON CHAPTER</p><h1>Ordinary day.<br/><span>Extraordinary little world.</span></h1><p className="dq-intro">The places you went. The things you ate. The outfit you wore.<br className="dq-desktop-break"/> Gather today’s little moments, and give someone a place to visit.</p></div><div className="dq-date-card"><span>SATURDAY</span><strong>07</strong><span>NOVEMBER 2026</span><div>✦ SAVE THE LITTLE THINGS</div></div></div>
-    <div className="dq-content"><LocationSync/>
+    <div className="dq-content"><LocationSync day={day} onSample={useSampleRoute} sampleState={sampleState} sampleNote={sampleNote} />
     <section className="dq-panel" aria-labelledby="photos-title"><div className="dq-section-heading"><div><span className="dq-eyebrow">02 / THE LITTLE MOMENTS</span><h2 id="photos-title">What did today look like?</h2></div><span className="dq-counter">{uploaded} / 5 COLLECTED</span></div><p className="dq-section-copy">Start with your fit. Add a few memories. We’ll turn them into pixels.</p>
       <div className="dq-photo-grid">{quests.map(quest => { const photo = photos[quest.kind]; return <div className={`dq-photo-card ${photo?.url ? "is-uploaded" : ""} ${quest.kind === "fit" ? "dq-photo-required" : ""}`} key={quest.kind}>
         <label className="dq-upload-zone" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void upload(quest.kind, event.dataTransfer.files[0]); }}>

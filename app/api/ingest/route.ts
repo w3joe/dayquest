@@ -1,7 +1,10 @@
 import { ingest } from "@/lib/ingest/build";
 import { readPhotoMeta, type PhotoMeta } from "@/lib/ingest/photos";
 import { liveLookups } from "@/lib/ingest/places";
+import { replayLookups, type RecordedLookups } from "@/lib/ingest/replay";
 import { errorResponse, RequestError } from "@/lib/server/errors";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -17,12 +20,27 @@ async function textField(form: FormData, name: string): Promise<string | undefin
   return v.size ? await v.text() : undefined;
 }
 
+/** The synthetic demo package ships in the repo and is ingested through the real parsers with recorded lookups (no network). */
+async function demoPackage(): Promise<{ files: { timeline: string; health: string; gpx: string }; lookups: ReturnType<typeof replayLookups> }> {
+  const dir = path.join(process.cwd(), "data/demo-package");
+  const read = (f: string) => readFile(path.join(dir, f), "utf8");
+  return {
+    files: { timeline: await read("timeline.json"), health: await read("health-export.xml"), gpx: await read("route.gpx") },
+    lookups: replayLookups(JSON.parse(await read("lookups.recorded.json")) as RecordedLookups),
+  };
+}
+
 /**
  * POST multipart: `timeline` (Google Timeline JSON, required), `health` (Apple export.xml), `gpx`, `photos` (any number of images),
  * optional `date` (YYYY-MM-DD), `name`, `notes`. Photos are only read for EXIF time/GPS here; nothing is stored.
  */
 export async function POST(request: Request) {
   try {
+    if (new URL(request.url).searchParams.get("demo") === "1") {
+      const demo = await demoPackage();
+      const result = await ingest(demo.files, { userName: "Lucas", notes: "Synthetic demo route.", lookups: demo.lookups });
+      return Response.json({ ...result, synthetic: true });
+    }
     if (!request.headers.get("content-type")?.startsWith("multipart/form-data")) throw new RequestError("Send the files as multipart/form-data.", 415);
     const form = await request.formData();
     const date = form.get("date");

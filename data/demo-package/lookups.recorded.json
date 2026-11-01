@@ -1,0 +1,139 @@
+{
+ "note": "Synthetic demo package. Answers below were checked by hand against OpenStreetMap, Wikipedia and TfL, not recorded from a live run.",
+ "labels": {
+  "51.5007,-0.1246": "Elizabeth Tower / Parliament Square",
+  "51.5009,-0.1220": "Westminster Bridge",
+  "51.5033,-0.1196": "London Eye",
+  "51.5010,-0.1260": "Parliament Square bus stop",
+  "51.5163,-0.1303": "Tottenham Court Road Station",
+  "51.5157,-0.1281": "Kanada-Ya, 64 St Giles High St",
+  "51.5165,-0.1310": "Tottenham Court Road Station",
+  "51.5152,-0.1419": "Oxford Circus Station",
+  "51.5234,-0.1466": "Regent's Park Station",
+  "51.5268,-0.1530": "Queen Mary's Gardens",
+  "51.5274,-0.1555": "Triton Fountain",
+  "51.5262,-0.1590": "Regent's Park Boating Lake"
+ },
+ "places": {
+  "51.5033,-0.1196": {
+   "name": "London Eye",
+   "kind": "tourist"
+  },
+  "51.5157,-0.1281": {
+   "name": "Kanada-Ya, 64 St Giles High St",
+   "kind": "meal",
+   "detail": "ramen"
+  },
+  "51.5268,-0.1530": {
+   "name": "Queen Mary's Gardens",
+   "kind": "park"
+  }
+ },
+ "landmarks": {
+  "51.5007,-0.1246": [
+   {
+    "title": "Big Ben",
+    "lat": 51.5007,
+    "lng": -0.1246,
+    "distanceM": 20,
+    "summary": "The Great Bell of the Great Clock of Westminster"
+   },
+   {
+    "title": "Palace of Westminster",
+    "lat": 51.4995,
+    "lng": -0.1248,
+    "distanceM": 120
+   },
+   {
+    "title": "Red telephone box",
+    "lat": 51.5008,
+    "lng": -0.1238,
+    "distanceM": 60
+   }
+  ],
+  "51.5033,-0.1196": [
+   {
+    "title": "London Eye",
+    "lat": 51.5033,
+    "lng": -0.1196,
+    "distanceM": 10
+   },
+   {
+    "title": "The Shard",
+    "lat": 51.5045,
+    "lng": -0.0865,
+    "distanceM": 2300
+   }
+  ],
+  "51.5157,-0.1281": [
+   {
+    "title": "Kanada-Ya",
+    "lat": 51.5157,
+    "lng": -0.1281,
+    "distanceM": 5
+   },
+   {
+    "title": "Centre Point",
+    "lat": 51.516,
+    "lng": -0.1286,
+    "distanceM": 40
+   }
+  ],
+  "51.5268,-0.1530": [
+   {
+    "title": "Queen Mary's Gardens",
+    "lat": 51.5268,
+    "lng": -0.153,
+    "distanceM": 10
+   },
+   {
+    "title": "Triton Fountain",
+    "lat": 51.5274,
+    "lng": -0.1555,
+    "distanceM": 180
+   },
+   {
+    "title": "Regent's Park Boating Lake",
+    "lat": 51.5262,
+    "lng": -0.159,
+    "distanceM": 400
+   }
+  ]
+ },
+ "transit": {
+  "bus:51.5010,-0.1260>51.5163,-0.1303": [
+   {
+    "mode": "bus",
+    "route": "24",
+    "destination": "Hampstead Heath",
+    "from": "Parliament Square",
+    "to": "Tottenham Court Road Station",
+    "routeSource": "hint"
+   }
+  ],
+  "tube:51.5165,-0.1310>51.5152,-0.1419": [
+   {
+    "mode": "tube",
+    "line": "Central",
+    "from": "Tottenham Court Road",
+    "to": "Oxford Circus",
+    "stations": [
+     "Tottenham Court Road",
+     "Oxford Circus"
+    ]
+   }
+  ],
+  "tube:51.5152,-0.1419>51.5234,-0.1466": [
+   {
+    "mode": "tube",
+    "line": "Bakerloo",
+    "from": "Oxford Circus",
+    "to": "Regent's Park",
+    "stations": [
+     "Oxford Circus",
+     "Regent's Park"
+    ]
+   }
+  ]
+ }
+}

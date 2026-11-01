@@ -89,3 +89,16 @@ test("missing sources degrade with warnings instead of failing", async () => {
   assert.ok(r.warnings.some((w) => /bus route/.test(w)));
   assert.equal(r.input.transport[0].mode, "bus");
 });
+
+test("demo package: ingests offline through the real parsers and reproduces the demo day", async () => {
+  const { replayLookups } = await import("../lib/ingest/replay");
+  const read = (f: string) => readFile(`data/demo-package/${f}`, "utf8");
+  const { input, candidates, warnings } = await ingest(
+    { timeline: await read("timeline.json"), health: await read("health-export.xml"), gpx: await read("route.gpx") },
+    { userName: "Lucas", lookups: replayLookups(JSON.parse(await read("lookups.recorded.json"))) });
+  assert.deepEqual(input.locations.map((l) => [l.t, l.label]), demo.locations.map((l) => [l.t, l.label]));
+  assert.deepEqual(input.transport.map((l) => (l.mode === "bus" ? `bus ${l.route}` : `tube ${l.line}`)), ["bus 24", "tube Central", "tube Bakerloo"]);
+  assert.deepEqual([input.workouts[0].durationMin, input.workouts[0].distanceKm, input.workouts[0].steps], [75, 3.8, 5200]);
+  assert.deepEqual(candidates.map((c) => c.kind), ["tourist", "meal", "park"]);
+  assert.deepEqual(warnings, []);
+});

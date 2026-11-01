@@ -30,6 +30,8 @@ Effort: S under 2 h, M half a day, L a day or more. Impact is for the shape abov
 | 23 | Cache landmark art by place | Medium | M | pipeline (B) |
 | A | Weather-aware scenes | High | M | ingest (Open-Meteo) + `HighlightScene` grade/particles |
 | B | Demo location package with recorded lookups | High | M | `data/demo-package`, `Lookups` replay, Today |
+| C | Scripted video clip of the day | Medium | M | scripted input into `HighlightScene`, canvas `MediaRecorder` |
+| D | Three interactables per scene (Agents SDK ideas) | High | L | manifest field, `HighlightScene`, agent + validator |
 
 ## Sketches for the top items
 
@@ -42,6 +44,33 @@ Effort: S under 2 h, M half a day, L a day or more. Impact is for the shape abov
 **5. Note from the sender.** Add an optional `note` string to the manifest (and C's validator), an input on Today, and show it as the first textbox when the game starts and again on the end card.
 
 **9. Review before generating.** After `/api/ingest` returns `candidates`, show each of the three highlights with its top alternatives and a rename field, plus the guessed-route flags. The confirmed choice is what goes to generation. This is also the natural home for the "what was guessed" labels.
+
+## Decisions so far
+
+- **Sound:** background music and sound effects, no narration or speech. Sources are in-code synthesis (Web Audio) and CC0 royalty-free loops. OpenAI has no music or SFX endpoint (its audio API is speech and transcription), so generated sound would need a third party. **No Nintendo music or effects**: they are copyrighted recordings, the spec forbids them, and this repo is public. A git-ignored local folder can hold anyone's personal files without committing them.
+- **Frontend:** polish the existing screens rather than rebuild them, starting with the shared-day page. Warm, cosy, phone-first.
+- **Link preview card:** parked, to revisit later.
+- **Weather-aware scenes** and the **demo location package** (see "Two additions"): wanted.
+
+## More ideas from the team
+
+### C. A short video clip of the day, played by a script
+
+A shared day can also carry a short clip of the character walking through it, so someone can watch without playing.
+
+- **Scripted playback.** Instead of recording a human, a script drives the character: it walks a planned route to each landmark, pauses to show its textbox, takes the exit and plays transit. The same movement code as normal play, fed by a script of directions rather than the keyboard. This also makes the guided first visit (idea 8) almost free.
+- **Turning it into a video.** Capture the Phaser canvas with `MediaRecorder` (browser-side, no server) to a short WebM or MP4, or keep it as a live "auto-play" mode that needs no file at all. Sora is out of scope in the spec, and none is needed here since this is the game running.
+- **Where it shows up.** An "Watch the day" button on the share page and a looping preview, and the clip can double as the link preview animation later.
+- **Care needed.** Keep it short (20 to 40 seconds), skip transit by default, respect the music mute, and make it deterministic so every view looks the same.
+
+### D. Three interactables per environment
+
+Each scene should include three things to *do*, such as a button to press, a lever, a bell, a bench to sit on, a lamp to switch on, in addition to reading landmark text.
+
+- **Idea generation with the Agents SDK.** An agent receives the day (the place, landmarks, weather, time of day, what the person did there) and proposes three interactables suited to that scene, each with a name, a tile position that does not block the route, a sprite description, an action, and a line of text. A validator checks positions, uniqueness and reachability, and a safe set of defaults is used if the agent fails, so the demo never depends on it.
+- **Examples.** Westminster: press a crossing button that makes the lights change; ring a bell on the bridge. Ramen street: pull a noren curtain, press a vending-machine button, pet a street cat. Regent's Park: sit on a bench, feed the swans, switch on a lamp near dusk.
+- **Feel.** Each interaction has a small animation, a sound effect, and a short warm line. Weather and time of day can change them (a lamp only lights at dusk; no swans in a storm).
+- **Contract.** `day.json` gains an `interactables` array per scene (3 items). Sprites come from the same generation and pixelate pipeline as landmarks, or from a small fixed set of icons for reliability.
 
 ## Two additions
 
