@@ -76,7 +76,9 @@ async function processWorldStep(state: JobState, draft: ReadyDraft, lease: strin
   let progress = state;
   try {
     const uploads: Partial<Record<UploadKind, Buffer>> = {};
-    const photoLoads = draft.uploads.filter(upload => ["fit", "lunch", "landmark"].includes(upload.kind)).map(async upload => {
+    // Extra photos are saved with the draft but only the first of each kind feeds generation for now.
+    const firstOfKind = draft.uploads.filter((upload, i) => ["fit", "lunch", "landmark"].includes(upload.kind) && draft.uploads.findIndex(other => other.kind === upload.kind) === i);
+    const photoLoads = firstOfKind.map(async upload => {
       const bytes = await loadStoredAsset(upload.url);
       if (!bytes) throw new RequestError("A saved photo could not be loaded. Return to Today and add it again.", 422);
       uploads[upload.kind] = bytes;

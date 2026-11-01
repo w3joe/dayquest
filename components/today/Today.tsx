@@ -2,77 +2,43 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import day from "../../data/input.json";
-import { DRAFT_STORAGE_KEY, isReadyDraft, parseStoredDraft, type UploadKind } from "../../lib/draft";
+import { DRAFT_STORAGE_KEY, NOTE_MAX_LENGTH, isReadyDraft, parseStoredDraft, type UploadKind } from "../../lib/draft";
 import { discardPhotoUpload, startPhotoUpload, type Photo } from "../../lib/photo-upload";
 import SpritePreview, { type SpriteVerification } from "./SpritePreview";
 import { browserId } from "../../lib/browser-id";
+import { sfx } from "../../lib/sound";
+import Link from "next/link";
+import { DEMO_FIT, DEMO_PLACES, DEMO_SPRITE, DEMO_UPLOADS, DemoRoute } from "./Demo";
+import { MAX_LOCATION_FILE_BYTES, parseLocationHistory } from "../../lib/location-history";
+import AppShell from "./AppShell";
+import CameraButton from "./CameraButton";
+import GalleryCard from "./GalleryCard";
+import { useGallery } from "./useGallery";
+import { ACCEPTED_TYPES, MAX_PHOTO_BYTES, matchPhoto, preparePhoto, preview } from "./photo-tools";
+import PixelSprite, { type SpriteName } from "./pixel";
 
-type Kind = Extract<UploadKind, "fit" | "lunch" | "landmark">;
-const quests: { kind: Kind; name: string; hint: string; icon: string }[] = [
-  { kind: "fit", name: "Today's fit", hint: "Full body · front view · required", icon: "♟" },
-  { kind: "lunch", name: "Lunch break", hint: "Your bowl, plate, or little treat", icon: "♨" },
-  { kind: "landmark", name: "Somewhere special", hint: "Buildings and details for your world · optional", icon: "♜" },
-];
+type Kind = Extract<UploadKind, "fit">;
+const quests: { kind: Kind; name: string; sprite: SpriteName }[] = [{ kind: "fit", name: "Fit", sprite: "shirt" }];
+const USER_NAME = "Lucas";
+const galleries = [
+  { kind: "lunch", name: "Food", sprite: "food" },
+  { kind: "landmark", name: "Place", sprite: "landmark" },
+  { kind: "extra", name: "More", sprite: "flower", wide: true },
+] as const;
 
-async function preview(file: File): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  try {
-    const canvas = document.createElement("canvas");
-    const scale = Math.min(1, 96 / Math.max(bitmap.width, bitmap.height));
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Could not preview this image.");
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/png");
-  } finally { bitmap.close(); }
-}
-
-async function matchPhoto(file: File): Promise<string> {
-  try {
-    const { parse } = await import("exifr");
-    const metadata = await parse(file, ["DateTimeOriginal", "CreateDate"]);
-    const time = metadata?.DateTimeOriginal ?? metadata?.CreateDate;
-    if (!(time instanceof Date) || Number.isNaN(time.getTime())) return "No photo time found · add to this day";
-    return `Photo time · ${time.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
-  } catch { return "No photo time found · add to this day"; }
-}
-
-function LocationSync() {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    const timer = window.setInterval(() => setCount(n => Math.min(n + 1, day.locations.length)), 220);
-    return () => window.clearInterval(timer);
-  }, []);
-  const points = day.locations.map(stop => ({ x: 32 + ((stop.lng + .163) / .048) * 336, y: 25 + ((51.531 - stop.lat) / .034) * 235 }));
-  return <section className="dq-panel dq-location" aria-labelledby="location-title">
-    <div className="dq-section-heading"><div><span className="dq-eyebrow">01 / THE PLACES</span><h2 id="location-title">A little further from home.</h2></div><span className="dq-status"><span className="dq-status-dot" />{count === day.locations.length ? "DAY SYNCED" : "SYNCING…"}</span></div>
-    <div className="dq-map-grid"><div className="dq-map">
-      <svg viewBox="0 0 400 290" role="img" aria-label="Illustrated London route from Westminster through Soho to Regent’s Park">
-        <defs><pattern id="blocks" width="32" height="28" patternUnits="userSpaceOnUse"><rect x="4" y="4" width="20" height="16" fill="#e4dfca"/><path d="M0 25H32M28 0V28" stroke="#f6f1df" strokeWidth="5"/></pattern></defs>
-        <rect width="400" height="290" fill="url(#blocks)"/><path d="M0 226H120V241H187V256H246V273H400V290H219V276H171V260H107V247H0Z" fill="#98c6c8"/>
-        <path d="M16 18H129V91H107V116H16Z" fill="#b1c48d"/><path d="M34 39H106V76H81V95H34Z" fill="#c9d8a4"/><path d="M26 105L111 30M164 0V206M0 165H400M253 0V240" stroke="#faf5e4" strokeWidth="10"/>
-        <text x="21" y="22" className="dq-map-label">REGENT’S PARK</text><text x="222" y="119" className="dq-map-label">SOHO</text><text x="202" y="224" className="dq-map-label">WESTMINSTER</text><text x="302" y="280" className="dq-map-label">THAMES</text>
-        <polyline points={points.slice(0, count).map(p => `${p.x},${p.y}`).join(" ")} fill="none" stroke="#bd684b" strokeWidth="3" strokeDasharray="4 5"/>
-        {points.slice(0, count).map((p, i) => <g key={i}><rect x={p.x - 5} y={p.y - 5} width="10" height="10" fill="#faf4de" stroke="#38483d" strokeWidth="2"/><rect x={p.x - 2} y={p.y - 2} width="4" height="4" fill="#bd684b"/></g>)}
-      </svg><div className="dq-map-caption"><span>⌖ LONDON, UK</span><span>ILLUSTRATED MAP</span></div>
-    </div><div className="dq-timeline"><div className="dq-timeline-top"><span>YOUR DAY, IN LITTLE STOPS</span><span>{String(count).padStart(2, "0")} / 12</span></div><div className="dq-stop-list" aria-label="Location history">{day.locations.map((stop, i) => <div key={`${stop.t}-${stop.label}`} className={`dq-stop ${i < count ? "is-synced" : ""}`}><time>{stop.t}</time><span className="dq-stop-marker" /><span>{stop.label}</span><span aria-hidden="true">{i < count ? "✓" : "·"}</span></div>)}</div></div></div>
-    <div className="dq-sync-footer"><span>Demo location history · {day.locations.length} stops</span><span>{Math.round(count / day.locations.length * 100)}%</span></div><div className="dq-progress" role="progressbar" aria-label="Location sync" aria-valuemin={0} aria-valuemax={12} aria-valuenow={count}><span style={{ width: `${count / 12 * 100}%` }}/></div>
-  </section>;
-}
-
-export default function Today() {
+export default function Today({ demo = false }: { demo?: boolean }) {
   const router = useRouter();
   const [sessionId, setSessionId] = useState("");
-  const [photos, setPhotos] = useState<Partial<Record<Kind, Photo>>>({});
-  const [spriteUrl, setSpriteUrl] = useState<string>();
+  const [photos, setPhotos] = useState<Partial<Record<Kind, Photo>>>(demo ? { fit: { url: DEMO_FIT.url, preview: DEMO_FIT.url } } : {});
+  const [spriteUrl, setSpriteUrl] = useState<string | undefined>(demo ? DEMO_SPRITE : undefined);
   const [spriteVerification, setSpriteVerification] = useState<SpriteVerification>();
   const [spriteBusy, setSpriteBusy] = useState(false);
   const [spriteError, setSpriteError] = useState("");
+  const [notes, setNotes] = useState<Partial<Record<Kind, string>>>(demo ? { fit: DEMO_FIT.note } : {});
   const [storageError, setStorageError] = useState("");
-  const [health, setHealth] = useState<"idle" | "syncing" | "done">("idle");
+  const gallery = useGallery(sessionId);
+  const [places, setPlaces] = useState<{ name: string; count: number; range: string } | undefined>(demo ? DEMO_PLACES : undefined);
+  const [placesError, setPlacesError] = useState("");
   const [today, setToday] = useState<Date>();
   const files = useRef<Partial<Record<Kind, File>>>({});
   const operations = useRef<Partial<Record<Kind, number>>>({});
@@ -86,16 +52,18 @@ export default function Today() {
   const uploadControllers = useRef<Partial<Record<Kind, AbortController>>>({});
   const mounted = useRef(true);
   const requests = useRef(new Set<AbortController>());
-  const healthTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     setToday(new Date());
+    if (demo) { gallery.restore(DEMO_UPLOADS); return; }
     try {
       const draft = parseStoredDraft(sessionStorage.getItem(DRAFT_STORAGE_KEY));
       if (draft) {
         setSessionId(draft.sessionId);
         const uploads = draft.uploads.filter(p => quests.some(quest => quest.kind === p.kind));
         uploadedUrls.current = Object.fromEntries(uploads.map(p => [p.kind, p.url]));
-        setPhotos(Object.fromEntries(uploads.map(p => [p.kind, { url: p.url, preview: p.url, matching: "Saved for your world" }])));
+        setPhotos(Object.fromEntries(uploads.map(p => [p.kind, { url: p.url, preview: p.url, matching: "Saved ✓" }])));
+        setNotes(Object.fromEntries(uploads.filter(p => p.note).map(p => [p.kind, p.note])));
+        gallery.restore(draft.uploads);
         if (draft.spriteUrl) setSpriteUrl(draft.spriteUrl);
         else if (draft.uploads.some(p => p.kind === "fit")) setSpriteError("Your character was not saved. Retry or add your front photo again.");
         return;
@@ -107,17 +75,17 @@ export default function Today() {
     mounted.current = true;
     return () => {
       mounted.current = false;
-      if (healthTimer.current) clearTimeout(healthTimer.current);
       for (const request of requests.current) request.abort();
     };
   }, []);
+  const savedKey = JSON.stringify(gallery.saved);
   useEffect(() => {
     if (!sessionId) return;
     try {
-      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ sessionId, uploads: Object.entries(photos).filter(([, p]) => p.url).map(([kind, p]) => ({ kind, url: p.url })), spriteUrl }));
+      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ sessionId, uploads: [...Object.entries(photos).filter(([, p]) => p.url).map(([kind, p]) => ({ kind, url: p.url, note: notes[kind as Kind] })), ...gallery.saved], spriteUrl }));
       setStorageError("");
     } catch { setStorageError("Your browser could not save this draft. Enable session storage to continue."); }
-  }, [sessionId, photos, spriteUrl]);
+  }, [sessionId, photos, spriteUrl, notes, savedKey]);
 
   function update(kind: Kind, value: Partial<Photo>) {
     if (mounted.current) setPhotos(current => ({ ...current, [kind]: { ...current[kind], ...value } }));
@@ -146,8 +114,9 @@ export default function Today() {
       const response = await fetch("/api/fit-check", { method: "POST", body: form, signal: controller.signal });
       const result = await response.json();
       if (!response.ok || typeof result.spriteUrl !== "string") throw new Error(result.error || "Character generation failed. Please try again.");
-      if (mounted.current && attempt === generation.current) setSpriteUrl(result.spriteUrl);
+      if (mounted.current && attempt === generation.current) { setSpriteUrl(result.spriteUrl); sfx.success(); }
     } catch (error) {
+      if (mounted.current && attempt === generation.current && !controller.signal.aborted) sfx.error();
       if (mounted.current && attempt === generation.current && !controller.signal.aborted) setSpriteError(error instanceof Error ? error.message : "Character generation failed.");
     } finally {
       requests.current.delete(controller);
@@ -159,10 +128,12 @@ export default function Today() {
       }
     }
   }
-  async function upload(kind: Kind, file?: File) {
-    if (!file || !sessionId) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { update(kind, { error: "Choose a JPEG, PNG, or WebP photo." }); return; }
-    if (file.size > 4 * 1024 * 1024) { update(kind, { error: "Choose an image smaller than 4 MB." }); return; }
+  async function upload(kind: Kind, picked?: File) {
+    if (!picked || !sessionId) return;
+    if (!ACCEPTED_TYPES.includes(picked.type)) { update(kind, { error: "Choose a JPEG, PNG, or WebP photo." }); return; }
+    const file = await preparePhoto(picked);
+    if (file.size > MAX_PHOTO_BYTES) { update(kind, { error: "Choose an image smaller than 4 MB." }); return; }
+    sfx.pop();
     const isFit = kind === "fit";
     const attempt = (operations.current[kind] ?? 0) + 1; operations.current[kind] = attempt;
     uploadControllers.current[kind]?.abort();
@@ -180,7 +151,7 @@ export default function Today() {
       generationController.current?.abort();
     }
     try {
-      const [thumbnail, matching] = await Promise.all([preview(file), matchPhoto(file)]);
+      const [thumbnail, matching] = await Promise.all([preview(file), matchPhoto(picked)]);
       if (!mounted.current || operations.current[kind] !== attempt) return;
       update(kind, { preview: thumbnail, matching, manualMatch: false });
       const form = new FormData(); form.set("photo", file); form.set("kind", kind); form.set("sessionId", sessionId);
@@ -193,8 +164,10 @@ export default function Today() {
       succeeded = true;
       delete pendingFiles.current[kind];
       update(kind, { url: result.url, busy: false, pending: false, previous: undefined });
+      sfx.success();
       if (isFit) { setSpriteUrl(undefined); setSpriteError(""); }
     } catch (error) {
+      if (operations.current[kind] === attempt && !controller.signal.aborted) sfx.error();
       if (operations.current[kind] === attempt && !controller.signal.aborted) update(kind, { busy: false, error: error instanceof Error ? error.message : "Upload failed. Please try again." });
     } finally {
       requests.current.delete(controller);
@@ -206,6 +179,25 @@ export default function Today() {
       }
     }
   }
+  async function addLocationHistory(file?: File) {
+    if (!file) return;
+    setPlacesError("");
+    try {
+      if (file.size > MAX_LOCATION_FILE_BYTES) throw new Error("That file is too large. Export a shorter range.");
+      const points = parseLocationHistory(await file.text(), file.name);
+      const times = points.flatMap(p => (p.t === undefined ? [] : [p.t]));
+      const fmt = (t: number) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+      const range = times.length ? (fmt(Math.min(...times)) === fmt(Math.max(...times)) ? fmt(times[0]) : `${fmt(Math.min(...times))} – ${fmt(Math.max(...times))}`) : "";
+      if (!mounted.current) return;
+      setPlaces({ name: file.name, count: points.length, range });
+      sfx.success();
+    } catch (error) {
+      if (!mounted.current) return;
+      setPlaces(undefined);
+      setPlacesError(error instanceof Error ? error.message : "We couldn’t read that file.");
+      sfx.error();
+    }
+  }
   function discardReplacement(kind: Kind) {
     operations.current[kind] = (operations.current[kind] ?? 0) + 1;
     uploadControllers.current[kind]?.abort();
@@ -214,9 +206,9 @@ export default function Today() {
     setPhotos(current => ({ ...current, [kind]: discardPhotoUpload(current[kind]) }));
     if (generationRequested.current) void makeSprite();
   }
-  const uploaded = Object.values(photos).filter(p => p.url).length;
-  const uploading = Object.values(photos).some(p => p.busy);
-  const pendingChanges = Object.values(photos).some(p => p.pending);
+  const uploaded = Object.values(photos).filter(p => p.url).length + gallery.saved.length;
+  const uploading = Object.values(photos).some(p => p.busy) || gallery.busy;
+  const pendingChanges = Object.values(photos).some(p => p.pending) || gallery.failed;
   const pendingFitChanges = !!photos.fit?.pending;
   const spriteReady = !!spriteUrl && spriteVerification?.url === spriteUrl && spriteVerification.status === "ready";
   const canFinish = !!photos.fit?.url && spriteReady && !pendingChanges && !uploading && !spriteBusy && !storageError;
@@ -224,37 +216,51 @@ export default function Today() {
     if (!canFinish || Object.keys(pendingFiles.current).length || generationRunning.current) return;
     const draft = {
       sessionId,
-      uploads: Object.entries(uploadedUrls.current).map(([kind, url]) => ({ kind, url })),
+      uploads: [...Object.entries(uploadedUrls.current).map(([kind, url]) => ({ kind, url, note: notes[kind as Kind] })), ...gallery.saved],
       spriteUrl,
     };
     if (!isReadyDraft(draft)) return;
     try {
       sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
       setStorageError("");
+      sfx.fanfare();
       router.push("/generating");
     } catch {
       setStorageError("Your browser could not save this draft. Enable session storage to continue.");
     }
   }
-  const workout = day.workouts[0];
-  return <main className="dq-shell">
-    <header className="dq-header"><a href="/" className="dq-wordmark"><span className="dq-brand-icon">✦</span> dayquest<span className="dq-wordmark-dot">.</span></a><span className="dq-header-note">A DAY WORTH VISITING</span></header>
-    <div className="dq-hero"><div><p className="dq-eyebrow">YOUR PHOTOS / YOUR LITTLE WORLD</p><h1>Ordinary day.<br/><span>Extraordinary little world.</span></h1><p className="dq-intro">The places you went. The things you ate. The outfit you wore.<br className="dq-desktop-break"/> Gather today’s little moments, and give someone a place to visit.</p></div><div className="dq-date-card"><span>{(today?.toLocaleDateString("en-GB", { weekday: "long" }) ?? "Today").toUpperCase()}</span><strong>{today ? String(today.getDate()).padStart(2, "0") : "—"}</strong><span>{(today?.toLocaleDateString("en-GB", { month: "long", year: "numeric" }) ?? "Your day").toUpperCase()}</span><div>✦ SAVE THE LITTLE THINGS</div></div></div>
-    <div className="dq-content"><LocationSync/>
-    <section className="dq-panel" aria-labelledby="photos-title"><div className="dq-section-heading"><div><span className="dq-eyebrow">02 / THE LITTLE MOMENTS</span><h2 id="photos-title">What did today look like?</h2></div><span className="dq-counter">{uploaded} / {quests.length} COLLECTED</span></div><p className="dq-section-copy">Start with your fit. Add a place and your lunch. We’ll build the buildings, little details, and a walking character for your world.</p>
-      <div className="dq-photo-grid">{quests.map(quest => { const photo = photos[quest.kind]; return <div className={`dq-photo-card ${photo?.url ? "is-uploaded" : ""} ${quest.kind === "fit" ? "dq-photo-required" : ""}`} key={quest.kind}>
+  const finishHint = spriteBusy ? "Making your character…" : !photos.fit?.url ? "Add your fit to begin" : uploading ? "Saving…" : pendingChanges ? "Retry or remove failed photos" : spriteReady ? "All set!" : spriteUrl ? "Check your character preview" : "Waiting for your character";
+  return <AppShell active={demo ? "demo" : "try"}>
+    <section className="dq-card dq-card-pink" aria-labelledby="photos-title">
+      <div className="dq-quest-head">
+        <div className="dq-quest-title"><span className="dq-date">{today ? today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }) : "\u00a0"}</span><h1 id="photos-title">{USER_NAME}</h1><p className="dq-subtitle">What did today look like?</p></div>
+        <span className="dq-chip dq-chip-pink" aria-label={`${uploaded} photos added`}>{uploaded} {uploaded === 1 ? "photo" : "photos"}</span>
+      </div>
+      <div className="dq-photo-grid">{quests.map(quest => { const photo = photos[quest.kind]; return <div className={`dq-photo-card dq-photo-${quest.kind} ${photo?.url ? "is-uploaded" : ""}`} key={quest.kind}>
+        <div className="dq-photo-head"><h3>{quest.name}</h3>{!demo && <CameraButton label={`Take a photo for ${quest.name}`} disabled={!sessionId} onFile={file => void upload(quest.kind, file)} />}</div>
         <label className="dq-upload-zone" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void upload(quest.kind, event.dataTransfer.files[0]); }}>
-          <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" aria-label={`Upload ${quest.name}`} disabled={!sessionId} onChange={event => { void upload(quest.kind, event.target.files?.[0]); event.target.value = ""; }}/>
-          <span className="dq-upload-check" aria-label={photo?.url ? "Uploaded" : "Not uploaded"}>{photo?.url ? "✓" : ""}</span>
-          {photo?.preview ? <img src={photo.preview} alt={`${quest.name} pixel preview`} className="dq-photo-preview"/> : <span className="dq-photo-icon" aria-hidden="true">{quest.icon}</span>}
-          <span className="dq-photo-action">{photo?.busy ? "SAVING…" : photo?.preview ? "REPLACE PHOTO +" : "ADD PHOTO +"}</span>
-        </label><div className="dq-photo-info"><h3>{quest.name}</h3><p>{quest.hint}</p>{photo?.matching && <p className="dq-photo-match">{photo.matching}</p>}{photo?.error && <><p className="dq-error" role="alert">{photo.error}</p>{photo.pending && <div><button type="button" className="dq-small-button" onClick={() => void upload(quest.kind, pendingFiles.current[quest.kind])}>Retry photo</button>{" "}<button type="button" className="dq-small-button" onClick={() => discardReplacement(quest.kind)}>{photo.url ? "Keep previous photo" : "Discard photo"}</button></div>}</>}</div>
-      </div>; })}</div>
-      {spriteUrl ? <SpritePreview url={spriteUrl} onStatusChange={setSpriteVerification} onRegenerate={() => void makeSprite()} disabled={spriteBusy || uploading || pendingChanges} retained={pendingChanges} /> : <div className="dq-sprite-status" aria-live="polite"><span className="dq-character-placeholder" aria-hidden="true">♟</span><div><strong>{spriteBusy ? "Stitching your outfit into pixels…" : "Every adventure starts with you."}</strong><span>{spriteError || "Add a front fit photo to create your character."}</span></div>{spriteError && <button type="button" className="dq-small-button" disabled={spriteBusy || pendingFitChanges} onClick={() => void makeSprite()}>Retry character</button>}</div>}
+          <input type="file" accept="image/jpeg,image/png,image/webp" aria-label={`Upload ${quest.name}`} disabled={!sessionId} onChange={event => { void upload(quest.kind, event.target.files?.[0]); event.target.value = ""; }}/>
+          {photo?.url && <span className="dq-upload-check" aria-label="Uploaded">✓</span>}
+          {photo?.preview ? <img src={photo.preview} alt={`${quest.name} pixel preview`} className="dq-photo-preview"/> : <PixelSprite name={quest.sprite} size={6} className="dq-photo-sprite"/>}
+          {!demo && <span className="dq-photo-action">{photo?.busy ? "Saving…" : photo?.preview ? "Swap" : "+ Add"}</span>}
+        </label>
+        {(photo?.preview || photo?.error) && <div className="dq-photo-info">
+          {photo?.preview && <input type="text" className="dq-caption" maxLength={NOTE_MAX_LENGTH} placeholder="Add a note" aria-label={`Note about ${quest.name}`} value={notes[quest.kind] ?? ""} readOnly={demo} onChange={event => setNotes(current => ({ ...current, [quest.kind]: event.target.value }))}/>}
+          {photo?.error && <><p className="dq-error" role="alert">{photo.error}</p>{photo.pending && <div className="dq-actions"><button type="button" className="dq-small-button" onClick={() => void upload(quest.kind, pendingFiles.current[quest.kind])}>Retry</button><button type="button" className="dq-small-button" onClick={() => discardReplacement(quest.kind)}>{photo.url ? "Keep old" : "Discard"}</button></div>}</>}
+        </div>}
+      </div>; })}
+        {galleries.map(g => <GalleryCard key={g.kind} title={g.name} sprite={g.sprite} kind={g.kind} wide={"wide" in g} readOnly={demo} ready={!!sessionId} items={gallery.items.filter(item => item.kind === g.kind)} onAdd={files => gallery.add(g.kind, files)} onRemove={gallery.remove} onRetry={gallery.retry} onNote={gallery.setNote} />)}
+      </div>
+      {gallery.notice && <p className="dq-error" role="alert">{gallery.notice}</p>}
+      {spriteUrl ? <SpritePreview url={spriteUrl} onStatusChange={setSpriteVerification} onRegenerate={() => void makeSprite()} disabled={spriteBusy || uploading || pendingChanges} retained={pendingChanges} /> : <div className="dq-sprite-status" aria-live="polite"><PixelSprite name="face" size={4} className={spriteBusy ? "dq-hop" : undefined}/><div><strong>{spriteBusy ? "Making your character…" : "Your character"}</strong><span>{spriteError || (spriteBusy ? "Just a minute" : "Add a fit photo to start")}</span></div>{spriteError && <button type="button" className="dq-small-button" disabled={spriteBusy || pendingFitChanges} onClick={() => void makeSprite()}>Retry</button>}</div>}
+      <div className="dq-places">
+        <PixelSprite name="pin" size={4}/>
+        <div><strong>Location history</strong><span className={placesError ? "dq-error" : undefined} role={placesError ? "alert" : undefined}>{placesError || (places ? `${places.count.toLocaleString("en-GB")} places${places.range ? ` · ${places.range}` : ""}` : "Google Timeline JSON or GPX")}</span></div>
+        {places && !demo && <button type="button" className="dq-small-button" onClick={() => setPlaces(undefined)}>Remove</button>}
+        {!demo && <label className={`dq-small-button dq-file-button ${places ? "is-done" : ""}`}>{places ? "Replace" : "+ Add file"}<input type="file" accept=".json,.gpx,application/json,application/gpx+xml,text/xml" aria-label="Upload location history" onChange={event => { void addLocationHistory(event.target.files?.[0]); event.target.value = ""; }}/></label>}
+      </div>
+      {demo && <DemoRoute />}
     </section>
-    <div className="dq-bottom-grid"><section className="dq-panel dq-health" aria-labelledby="health-title"><span className="dq-eyebrow">03 / A LITTLE MOVEMENT</span><h2 id="health-title">Good for the soul.</h2><p className="dq-section-copy">A walk through the park belongs in your story, too.</p>{health === "done" ? <div className="dq-walk-stats"><span className="dq-walk-icon">♧</span><div><strong>AFTERNOON WALK</strong><p>{workout.distanceKm} KM <span>·</span> {workout.durationMin} MIN <span>·</span> {workout.steps.toLocaleString("en-GB")} STEPS</p></div><span>✓</span></div> : <button type="button" className="dq-health-button" disabled={health === "syncing"} onClick={() => { setHealth("syncing"); healthTimer.current = setTimeout(() => setHealth("done"), 1500); }}><span>♥</span> {health === "syncing" ? "SYNCING YOUR WALK…" : "IMPORT FROM HEALTH"}<span>+</span></button>}<p className="dq-footnote">DEMO IMPORT · SAMPLE WALK DATA</p></section>
-    <section className="dq-panel dq-transport" aria-labelledby="transport-title"><span className="dq-eyebrow">04 / BETWEEN THE MOMENTS</span><h2 id="transport-title">How you got there.</h2><div className="dq-transport-list">{day.transport.map((leg, i) => <div className="dq-transport-row" key={i}><span className={`dq-line-chip ${leg.mode === "bus" ? "dq-bus" : leg.line === "Bakerloo" ? "dq-bakerloo" : "dq-central"}`}>{leg.mode === "bus" ? `BUS ${leg.route}` : leg.line}</span><span>{leg.from}<span className="dq-route-arrow"> → </span>{leg.to}</span></div>)}</div><p className="dq-footnote">AUTO-DETECTED FROM DEMO LOCATION HISTORY</p></section></div>
-    <section className="dq-finish"><div><span className="dq-eyebrow">ALL THE LITTLE PIECES, ONE LITTLE WORLD.</span><h2>Ready to call it a day?</h2><p>{spriteBusy ? "Your character is being created. This can take a minute." : !photos.fit?.url ? "Add your fit check above to begin your adventure." : uploading ? "Just saving your latest memories…" : pendingChanges ? "Retry or discard your unsaved photo changes above." : spriteReady ? "Your photos are ready. Next: create an explorable neighbourhood with your walking character." : spriteUrl ? "Your character image must load successfully before you set off. Check the preview above." : "Your character needs to be ready before you set off."}</p>{storageError && <p className="dq-error" role="alert">{storageError}</p>}</div><button type="button" className="dq-end-button" disabled={!canFinish} onClick={finishDay}>CREATE MY WORLD <span>→</span></button></section>
-    </div><footer className="dq-footer"><span>MADE OF THE LITTLE THINGS.</span><span>DAYQUEST / A PLACE OF YOUR OWN</span></footer>
-  </main>;
+    {demo ? <div className="dq-cta"><Link href="/" className="dq-big-button">Try it with your photos</Link></div> : <div className="dq-cta"><p className="dq-cta-hint" aria-live="polite">{finishHint}</p>{storageError && <p className="dq-error" role="alert">{storageError}</p>}<button type="button" className="dq-big-button" disabled={!canFinish} onClick={finishDay}>Create my world <PixelSprite name="star" size={1.5}/></button></div>}
+  </AppShell>;
 }

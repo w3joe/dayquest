@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     }
     const mode = modeFromEnv();
     const uploads: Partial<Record<UploadKind, Buffer>> = {};
-    for (const upload of body.uploads) {
+    for (const upload of body.uploads.filter((upload, i) => body.uploads.findIndex(other => other.kind === upload.kind) === i)) {
       const bytes = await loadStoredAsset(upload.url);
       if (!bytes) throw new RequestError("A saved photo could not be loaded. Return to Today and upload it again.", 422);
       uploads[upload.kind] = bytes;
