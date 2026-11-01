@@ -1,8 +1,12 @@
 // Browser-safe handoff shared by Today and B's generating screen.
 export const DRAFT_STORAGE_KEY = "dayquest:draft";
-export const UPLOAD_KINDS = ["fit", "fit_back", "lunch", "landmark", "park"] as const;
+export const UPLOAD_KINDS = ["fit", "fit_back", "lunch", "landmark", "park", "extra"] as const;
 export type UploadKind = (typeof UPLOAD_KINDS)[number];
-export type Draft = { sessionId: string; uploads: { kind: UploadKind; url: string }[]; spriteUrl?: string };
+export type Draft = { sessionId: string; uploads: { kind: UploadKind; url: string; note?: string }[]; spriteUrl?: string };
+export const NOTE_MAX_LENGTH = 140;
+/** Photos allowed per slot; Fit drives the character so it stays single. */
+export const MAX_UPLOADS_PER_KIND = 12;
+export const MAX_UPLOADS = 30;
 export type ReadyDraft = Draft & { spriteUrl: string };
 
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -32,17 +36,19 @@ function assetUrl(value: unknown, sessionId: string, kind: UploadKind | "player"
 /** Validate untrusted input and return only the fields in the shared contract. */
 export function parseDraft(value: unknown): Draft | null {
   if (!record(value) || typeof value.sessionId !== "string" || !UUID_V4.test(value.sessionId) ||
-      !Array.isArray(value.uploads) || value.uploads.length > UPLOAD_KINDS.length) return null;
+      !Array.isArray(value.uploads) || value.uploads.length > MAX_UPLOADS) return null;
   const uploads: Draft["uploads"] = [];
-  const seen = new Set<UploadKind>();
+  const counts = new Map<UploadKind, number>();
   for (const upload of value.uploads) {
     if (!record(upload) || !UPLOAD_KINDS.includes(upload.kind as UploadKind)) return null;
     const kind = upload.kind as UploadKind;
-    if (seen.has(kind) || !assetUrl(upload.url, value.sessionId, kind)) return null;
-    seen.add(kind);
-    uploads.push({ kind, url: upload.url });
+    const count = (counts.get(kind) ?? 0) + 1;
+    if (count > (kind === "fit" || kind === "fit_back" ? 1 : MAX_UPLOADS_PER_KIND) || !assetUrl(upload.url, value.sessionId, kind)) return null;
+    counts.set(kind, count);
+    const note = typeof upload.note === "string" ? upload.note.trim().slice(0, NOTE_MAX_LENGTH) : "";
+    uploads.push({ kind, url: upload.url, ...(note ? { note } : {}) });
   }
-  if (value.spriteUrl !== undefined && (!seen.has("fit") || !assetUrl(value.spriteUrl, value.sessionId, "player"))) return null;
+  if (value.spriteUrl !== undefined && (!counts.has("fit") || !assetUrl(value.spriteUrl, value.sessionId, "player"))) return null;
   return { sessionId: value.sessionId, uploads, ...(value.spriteUrl === undefined ? {} : { spriteUrl: value.spriteUrl as string }) };
 }
 

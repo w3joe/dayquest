@@ -189,3 +189,27 @@ test("fixed catalogue fingerprints and world identities change with supplied cat
   assert.equal(worldJobId(draft, "catalog-version-a"), worldJobId(draft, "catalog-version-a"));
   assert.notEqual(worldJobId(draft, "catalog-version-a"), worldJobId(draft, "catalog-version-b"));
 });
+
+
+test("supporting NPC dialogue and cosmetic objects keep their authored interactions", async () => {
+  const scene = mixedReachabilityScene();
+  const sign = scene.world!.objects.find(object => object.id === "accessible")!;
+  scene.world!.objects.push(
+    { ...sign, id: "neighbor", name: "Friendly neighbor", role: "npc", lines: ["A lovely day."], roam: 0 },
+    { ...sign, id: "bell", name: "Door bell", role: "interactable", effect: "ring" },
+  );
+  const targets = offlineInteractionPlan(scene).actions.map(action => action.targetId);
+  assert.deepEqual(targets, ["accessible"]);
+  const schema = JSON.stringify(interactionPlanSchema(scene, catalog));
+  assert.doesNotMatch(schema, /neighbor|bell/);
+  let calls = 0;
+  await planSceneInteractions(scene, catalog, { responses: { async create(request) {
+    calls++;
+    assert.doesNotMatch(JSON.stringify(request.input), /neighbor|Door bell/);
+    return { output_text: JSON.stringify({ actions: [] }) };
+  } } });
+  assert.equal(calls, 1);
+  await assert.rejects(planSceneInteractions(scene, catalog, { responses: { async create() {
+    return { output_text: JSON.stringify({ actions: [{ id: "override_neighbor", targetId: "neighbor", label: "Look", repeatable: true, steps: [{ type: "say", text: "Generic inspection." }] }] }) };
+  } } }), /unsupported action or asset/);
+});
