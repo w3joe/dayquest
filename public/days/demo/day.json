@@ -41,7 +41,12 @@
           "slot": 2,
           "text": "Walked past a classic red phone box on Parliament Square."
         }
-      ]
+      ],
+      "weather": {
+        "condition": "rain",
+        "tempC": 7,
+        "daylight": "day"
+      }
     },
     {
       "kind": "meal",
@@ -87,6 +92,11 @@
           "y": 8
         },
         "text": "Had tonkotsu ramen + gyoza at Kanada-Ya."
+      },
+      "weather": {
+        "condition": "drizzle",
+        "tempC": 8,
+        "daylight": "day"
       }
     },
     {
@@ -124,7 +134,12 @@
           "slot": 2,
           "text": "Walked 3.8 km in 75 minutes, 5,200 steps."
         }
-      ]
+      ],
+      "weather": {
+        "condition": "clear",
+        "tempC": 10,
+        "daylight": "dusk"
+      }
     }
   ],
   "transit": [

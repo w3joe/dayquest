@@ -4,6 +4,7 @@ import { dayProgressScope } from "../lib/game-progress";
 import type { InteractionAction, InteractionAsset } from "../lib/interactions";
 import { advanceInteraction, beginInteraction, buildInteractionChoices, commitInteraction, currentInteractionStep, emptyInteractionProgress, findInteractionPath, interactionStorageKey, lookupInteractionAsset, nearbyInteractionActions, restoreInteractionProgress, sceneInteractionId, visibleInteractionScene, type InteractionEvent, type InteractionMenuChoice, type InteractionRun, type WorldPoint } from "./interactions";
 import { drawWaterShimmer, renderGround } from "./ground-render";
+import { drawWeather, sceneCaption, seedWeatherParticles, tickWeatherParticles, type WeatherParticle } from "./weather";
 import { worldCollision } from "./world-layout";
 import { BASE_MAPS, FRAMES, MAP_H, MAP_W, TILE, VIEW_H, VIEW_W, groundBlocked, hash, placeLandmark } from "./maps";
 
@@ -28,6 +29,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     for (const supplied of scene.interactionPack?.catalog.assets ?? []) urls.add(resolveDayAsset(supplied.src, manifestUrl));
     if (scene.world) {
       for (const material of ["grass", "flowers", "pavement", "cobble", "road", "kerb"]) urls.add(`/tiles/dq/library/${material}.png`);
+      urls.add("/tiles/dq/water.png");
       for (const object of scene.world.objects) urls.add(resolveDayAsset(object.sprite, manifestUrl));
     }
     for (const landmark of scene.landmarks) urls.add(resolveDayAsset(landmark.sprite, manifestUrl));
@@ -84,6 +86,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
   const lampsOn = new Set<string>(), spoken = new Map<string, number>();
   let transit: { leg: TransitLeg; change?: string; duration: number }[] = [], transitIndex = 0, transitAt = 0;
   let shareNote = "", destroyed = false;
+  let weatherParticles: WeatherParticle[] = [];
   const keys = new Set<Direction>();
 
   function enterChapter() {
@@ -97,6 +100,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     const entry = incoming?.arrival.approach ?? scene.spawn;
     x = entry.x * TILE + 8; y = entry.y * TILE + 15; facing = scene.world ? "down" : "up";
     mode = "highlight"; chapterAt = elapsed;
+    weatherParticles = seedWeatherParticles(scene.weather, viewWidth, viewHeight);
     if (scene.world) {
       for (const object of scene.world.objects) {
         sprites.push({ image: asset(object.sprite), x: object.x, feet: object.y, width: object.width, height: object.height, objectId: object.id, shadow: Math.min(80, object.width * .65),
@@ -462,7 +466,9 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     text(line, left, top + row * 11);
   }
   function shadow(px: number, py: number, width: number) {
-    ctx.fillStyle = "rgba(20,16,40,.24)"; ctx.beginPath(); ctx.ellipse(px + 1, py - 1, width / 2, 3, 0, 0, Math.PI * 2); ctx.fill();
+    const light = manifest.scenes[index].weather?.daylight;
+    ctx.fillStyle = light === "night" ? "rgba(8,10,24,.45)" : light === "dusk" ? "rgba(40,20,10,.32)" : "rgba(20,16,40,.24)";
+    ctx.beginPath(); ctx.ellipse(px + 1, py - 1, width / 2, light === "dusk" ? 4.5 : 3, 0, 0, Math.PI * 2); ctx.fill();
   }
   function drawHighlight() {
     const scene = manifest.scenes[index];
@@ -474,6 +480,9 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
       const tile = base.rows[row][col]; if (tile === "_") continue;
       const f = tile === "w" ? FRAMES.water : tile === "p" ? (scene.base === "street" ? FRAMES.cobble : FRAMES.path) : hash(col, row) % 9 === 0 ? FRAMES.flowers : FRAMES.grass;
       ctx.drawImage(atlas, f * TILE, 0, TILE, TILE, col * TILE, row * TILE, TILE, TILE);
+      if (tile === "p" && base.rows[row][col - 1] === "w" && base.rows[row][col + 1] === "w") {
+        ctx.fillStyle = "#6b4428"; ctx.fillRect(col * TILE, row * TILE, 2, TILE); ctx.fillRect(col * TILE + TILE - 2, row * TILE, 2, TILE);
+      }
     }
     if (scene.food) { ctx.fillStyle = "#6b4a2f"; ctx.fillRect(scene.food.tile.x * TILE + 1, scene.food.tile.y * TILE + 6, 14, 7); }
     for (const sprite of sprites) if (sprite.shadow) shadow(sprite.x, sprite.feet, sprite.shadow);
@@ -484,9 +493,10 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
       ctx.drawImage(sprite.image, Math.round(sprite.x - sprite.image.width / 2), Math.round(sprite.feet - sprite.image.height + bob));
     }
     text("▶", scene.exit.x * TILE + 4, scene.exit.y * TILE + 4, 10, "#fff6b0");
+    drawWeather(ctx, scene.weather, weatherParticles, VIEW_W, VIEW_H, { x, y });
     if (elapsed - chapterAt < 1900) {
       ctx.fillStyle = INK; ctx.fillRect(6, 6, VIEW_W - 12, 24);
-      text(`${scene.time} · ${scene.title}`, VIEW_W / 2, 14, 8, PAPER, "center");
+      text(sceneCaption(scene.time, scene.title, scene.weather), VIEW_W / 2, 14, 8, PAPER, "center");
     }
     if (dialogue) {
       ctx.fillStyle = INK; ctx.fillRect(8, VIEW_H - 64, VIEW_W - 16, 56);
@@ -601,8 +611,9 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
       text("▶", exitX - 4, exitY - 3, 11, "#fff6b0");
     }
     ctx.restore();
+    drawWeather(ctx, scene.weather, weatherParticles, viewWidth, viewHeight, { x: x - cameraX, y: y - cameraY });
     ctx.fillStyle = "rgba(31,26,46,.88)"; ctx.fillRect(8, 8, viewWidth - 16, 25);
-    text(`${scene.time} · ${scene.title}`, 16, 16, 8);
+    text(sceneCaption(scene.time, scene.title, scene.weather), 16, 16, 7);
     if (mode !== "journey" && !runningInteraction && !menuChoices.length && (departure || elapsed - chapterAt < 6000) && !dialogue && journeyState?.phase !== "prompt") {
       ctx.fillStyle = "rgba(31,26,46,.88)"; ctx.fillRect(8, viewHeight - 28, viewWidth - 16, 20);
       const hint = departure ? nearTravelPoint(departure.departure) ? "SPACE / READ: TRAVEL FROM THIS STOP" : `WALK TO ${departure.departure.label.toUpperCase()} →`
@@ -795,6 +806,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     if (destroyed) return;
     const dt = Math.min(40, now - previous); previous = now; elapsed += dt; moving = false;
     if (mode === "highlight") {
+      tickWeatherParticles(weatherParticles, dt, viewWidth, viewHeight, manifest.scenes[index].weather);
       if (runningInteraction) tickInteraction(dt);
       else if (menuChoices.length) { /* The menu owns input until an action or Cancel is chosen. */ }
       else if (dialogue) dialogue.shown = Math.min(dialogue.text.length, dialogue.shown + dt * .04);

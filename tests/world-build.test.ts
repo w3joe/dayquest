@@ -29,8 +29,10 @@ async function harness() {
   const deps: WorldBuildDependencies = {
     plan: async photoInput => {
       plans++;
-      assert.equal(photoInput.landmark, input.uploads.landmark);
-      assert.deepEqual(photoInput.context, { name: "You", date: input.date });
+      if (photoInput.focus === "meal") assert.equal(photoInput.lunch, input.uploads.lunch ?? photoInput.lunch);
+      else if (input.uploads.landmark) assert.equal(photoInput.landmark, input.uploads.landmark);
+      assert.equal(photoInput.context?.name, "You");
+      assert.equal(photoInput.context?.date, input.date);
       return mockScenePlan(photoInput);
     },
     images: { live: false, async generate(request) {
@@ -124,7 +126,7 @@ test("failed storage is never marked complete and failed final publication can r
 
 test("photographed food and custom props publish only after all of their sprites are stored", async () => {
   const h = await harness();
-  h.input.uploads.lunch = h.input.player;
+  h.input.uploads = { lunch: h.input.player, fit: h.input.player };
   const plan = h.deps.plan;
   h.deps.plan = async input => {
     const blueprint = await plan(input);
@@ -259,4 +261,86 @@ test("a parallel failure retains other successes and resume calls only failed or
   const finished = await advanceWorldBuild(h.input, persisted, h.deps);
   assert.ok(finished.manifest);
   assert.equal(attempted.length, 5, "publication must not issue new image calls");
+});
+
+test("publication attaches weather when the lookup works and stays valid when it fails", async () => {
+  const h = await harness();
+  let checkpoint = (await advanceWorldBuild(h.input, { assets: {} }, h.deps)).checkpoint;
+  for (let n = 0; n < 4; n++) checkpoint = (await advanceWorldBuild(h.input, checkpoint, h.deps)).checkpoint;
+  h.deps.weather = async query => {
+    assert.equal(query.time, "12:00");
+    assert.equal(query.photo, h.input.uploads.landmark);
+    return { condition: "rain", tempC: 7, daylight: "day" };
+  };
+  const withWeather = await advanceWorldBuild(h.input, checkpoint, h.deps);
+  assert.deepEqual(withWeather.manifest?.scenes[0].weather, { condition: "rain", tempC: 7, daylight: "day" });
+  h.deps.weather = async () => { throw new Error("weather offline"); };
+  const without = await advanceWorldBuild(h.input, checkpoint, h.deps);
+  assert.equal(without.manifest?.scenes[0].weather, undefined);
+  assert.ok(without.manifest);
+});
+
+async function finishWorld(input: WorldBuildInput, deps: WorldBuildDependencies, start: WorldCheckpoint = { assets: {} }) {
+  let checkpoint = start, last;
+  for (let step = 0; step < 80; step++) {
+    last = await advanceWorldBuild(input, checkpoint, deps);
+    checkpoint = last.checkpoint;
+    if (last.manifest) return last;
+  }
+  throw new Error("world did not finish");
+}
+
+test("each place and food photo becomes its own scene, with a walk between them", async () => {
+  const h = await harness();
+  const landmark = h.input.uploads.landmark!;
+  const lunch = h.input.player;
+  h.input.uploads.lunch = lunch;
+  h.input.photos = [
+    { kind: "landmark", bytes: landmark, note: "The courtyard" },
+    { kind: "lunch", bytes: lunch, note: "Soup at the cafe" },
+  ];
+  const focuses: string[] = [];
+  const original = h.deps.plan;
+  h.deps.plan = async photoInput => {
+    focuses.push(`${photoInput.focus}:${photoInput.sceneId}:${photoInput.kind}`);
+    if (photoInput.focus === "place") {
+      assert.equal(photoInput.landmark, landmark);
+      assert.equal(photoInput.lunch, undefined);
+      assert.equal(photoInput.context?.notes, "The courtyard");
+    } else {
+      assert.equal(photoInput.lunch, lunch);
+      assert.equal(photoInput.landmark, undefined);
+      assert.equal(photoInput.context?.notes, "Soup at the cafe");
+    }
+    return original(photoInput);
+  };
+  const photos: Buffer[] = [];
+  h.deps.weather = async query => {
+    photos.push(query.photo!);
+    return { condition: "clear", tempC: 18, daylight: "day" };
+  };
+  const result = await finishWorld(h.input, h.deps);
+  assert.deepEqual(focuses, ["place:scene_1:tourist", "meal:scene_2:meal"]);
+  assert.equal(h.plans(), 2);
+  assert.equal(h.calls.filter(name => name === "Your walking character").length, 1);
+  const manifest = result.manifest!;
+  assert.equal(manifest.scenes.length, 2);
+  assert.equal(manifest.scenes[0].id, "scene_1");
+  assert.equal(manifest.scenes[0].kind, "tourist");
+  assert.equal(manifest.scenes[0].food, undefined);
+  assert.equal(manifest.scenes[1].id, "scene_2");
+  assert.equal(manifest.scenes[1].kind, "meal");
+  assert.equal(manifest.scenes[1].food?.sprite, "scene_2_food.png");
+  assert.equal(manifest.scenes[0].world!.objects.find(object => object.id === "building_0")?.sprite, "scene_1_building_0.png");
+  assert.equal(manifest.scenes[1].world!.objects.find(object => object.id === "building_0")?.sprite, "scene_2_building_0.png");
+  assert.equal(manifest.journeys?.length, 1);
+  assert.equal(manifest.journeys![0].fromSceneId, "scene_1");
+  assert.equal(manifest.journeys![0].toSceneId, "scene_2");
+  assert.equal(manifest.journeys![0].legs[0].mode, "walk");
+  assert.equal(manifest.transit.length, 0);
+  assert.deepEqual(photos, [landmark, lunch]);
+  assert.ok(h.saved.has("scene_1_building_0.png"));
+  assert.ok(h.saved.has("scene_2_food.png"));
+  assert.equal(h.saved.has("building_0.png"), false);
+  assert.ok(h.saved.has("player_walk.png"));
 });

@@ -18,7 +18,7 @@ export default function GalleryCard({ title, sprite, kind, items, ready, wide, r
   return <div className={`dq-photo-card dq-gallery dq-photo-${kind} ${wide ? "is-wide" : ""}`} style={missing ? { outline: "3px dashed #f2759b", outlineOffset: 3 } : undefined}>
     <div className="dq-photo-head"><div className="dq-gallery-title"><h3>{title}</h3>{items.length > 0 && <span className="dq-count">{items.length}</span>}</div>{!readOnly && <CameraButton label={`Take a ${title} photo`} disabled={!ready} onFile={file => onAdd(file ? [file] : null)} />}</div>
     {items.length === 0
-      ? picker(`Upload ${title} photos`, "dq-upload-zone", <><PixelSprite name={sprite} size={6} className="dq-photo-sprite" /><span className="dq-photo-action">+ Add</span></>)
+      ? picker(`Upload ${title} photos`, "dq-upload-zone", <><PixelSprite name={sprite} size={6} className="dq-photo-sprite" />{!readOnly && <span className="dq-photo-action">+ Add</span>}</>)
       : <div className="dq-tiles">{items.map(item => <div className="dq-tile" key={item.id}>
         <div className="dq-tile-image">
           {item.preview ? <img src={item.preview} alt={`${title} photo`} /> : <PixelSprite name={sprite} size={3} />}
@@ -26,6 +26,7 @@ export default function GalleryCard({ title, sprite, kind, items, ready, wide, r
           {item.busy && <span className="dq-tile-busy">Saving…</span>}{item.url && !item.busy && <span className="dq-tile-ok" aria-label="Saved">✓</span>}
         </div>
         <input type="text" className="dq-caption" maxLength={NOTE_MAX_LENGTH} placeholder="Add a note" aria-label={`Note about this ${title} photo`} value={item.note} readOnly={readOnly} onChange={event => onNote(item.id, event.target.value)} />
+        {item.matching?.startsWith("Photo time") && <p className="dq-photo-match">{item.matching}</p>}
         {item.error && <p className="dq-error" role="alert">{item.error} <button type="button" className="dq-link-button" onClick={() => onRetry(item.id)}>Retry</button></p>}
       </div>)}
         {!readOnly && items.length < MAX_UPLOADS_PER_KIND && picker(`Add more ${title} photos`, "dq-tile dq-tile-add", <><span className="dq-tile-plus">+</span><span>Add</span></>)}

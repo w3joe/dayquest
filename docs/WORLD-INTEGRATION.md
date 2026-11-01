@@ -11,14 +11,14 @@ an instruction to use `/api/world-jobs`; offline sample tools remain available.
 - One front fit photo drives the accepted character and its walking frames.
 - Food, Place and More accept multiple photos with per-photo notes, up to twelve
   per group and thirty photos in the complete draft including Fit.
-- Every submitted photo and note reaches planning. The first Place and Food
-  photos anchor the single representative location and featured meal. Supporting
-  photos provide context; they do not imply visits, additional stops or routes.
+- Every Place, Food, Park and extra photo becomes its own explorable scene, in
+  upload order. Fit photos stay with the character. A food photo is a meal
+  scene: place research looks up the restaurant and builds that shopfront when
+  a real venue can be verified. Consecutive scenes are joined by a walk.
 - Replacement uploads preserve the committed fit until the new upload succeeds.
   Removed or superseded gallery uploads cannot repopulate the draft.
 - Uploaded location history currently has a local preview only. The main page
-  explicitly says it is not used for world creation yet. The itinerary helpers
-  and multi-scene import/transport contracts remain available for future wiring.
+  explicitly says it is not used for world creation yet.
 
 ## World composition and interactions
 
@@ -34,10 +34,13 @@ street furniture, transport and supporting NPCs may use shared artwork. Shared
 production interaction assets contain effects only; food pickup binds to the
 scene's generated `food.png`.
 
-The normal production path uses deterministic template design. The optional
-multi-agent place research and design pipeline requires the server setting
-`WORLD_DESIGN_AGENTS=live`. Its design mode is included in the world job identity;
-failed research/design falls back without replacing photographed subjects.
+The production path uses the **Cloud Agents API** by default (`WORLD_DESIGN_AGENTS=live`):
+each specialist (place researcher, brief, composer, designer, critic, tuner) gets its
+own OpenAI-hosted sandbox session, writes `/workspace/outputs/result.json`, and the
+session is deleted afterwards. Set `WORLD_DESIGN_AGENTS=sdk` for the older in-process
+Agents SDK (no VM), or `template` / `off` for deterministic template design. Design
+mode is included in the world job identity; failed research/design falls back
+without replacing photographed subjects.
 
 ## Validation
 

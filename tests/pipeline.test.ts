@@ -65,6 +65,23 @@ test("mock pipeline publishes a valid manifest, every referenced sprite, and the
   assert.ok(events.filter((e) => e.step === "image").every((e) => e.thumb?.startsWith("data:image/png;base64,")));
 });
 
+test("weather is recorded on scenes and a failed lookup still publishes the day", async () => {
+  const { files, store } = memoryStore();
+  const withWeather = await runGenerateDay({
+    id: "t", input: await input(), store, livePlan: false, images: mockImageGenerator(),
+    weather: async scene => scene.kind === "tourist" ? { condition: "rain", tempC: 7, daylight: "day" } : undefined,
+  }, () => {});
+  assert.deepEqual(withWeather.scenes[0].weather, { condition: "rain", tempC: 7, daylight: "day" });
+  assert.equal(withWeather.scenes[1].weather, undefined);
+  const { files: other, store: otherStore } = memoryStore();
+  const published = await runGenerateDay({
+    id: "t", input: await input(), store: otherStore, livePlan: false, images: mockImageGenerator(),
+    weather: async () => { throw new Error("offline"); },
+  }, () => {});
+  assert.ok(other.has("day.json"));
+  assert.ok(published.scenes.every(scene => scene.weather === undefined));
+});
+
 test("a failing image model falls back to placeholders instead of failing the day", async () => {
   const { files, store } = memoryStore();
   const broken: ImageGenerator = { live: true, generate: async () => { throw new Error("rate limited"); } };

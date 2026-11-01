@@ -8,8 +8,7 @@ import type { WorldJob } from "../world-job";
 import { RequestError } from "./errors";
 import { safeOpenAIError } from "./openai-errors";
 import { acquireWorldLease, readWorldCheckpoint, releaseWorldLease, writeWorldCheckpoint } from "./world-job-store";
-import { advanceWorldAssetBatch, advanceWorldBuild, type WorldCheckpoint } from "../../pipeline/world-build";
-import { buildSceneAssetJobs } from "../../pipeline/scene-assets";
+import { advanceWorldAssetBatch, advanceWorldBuild, worldAssetJobs, type WorldCheckpoint } from "../../pipeline/world-build";
 import { openAIImageGenerator } from "../../pipeline/imagegen";
 import { loadStoredAsset, storeForDay } from "../../pipeline/publish";
 import { planScene } from "../../pipeline/scene-plan";
@@ -20,6 +19,7 @@ import type { UploadKind } from "../../pipeline/types";
 import { loadInteractionCatalog } from "./interaction-catalog";
 import { planSceneInteractions } from "../../pipeline/interaction-plan";
 import { photoWorldInteractionCatalog } from "../interaction-assets";
+import { lookupSceneWeather } from "../weather";
 
 type JobState = WorldJob & { checkpoint: WorldCheckpoint; date: string };
 // Greater than the route's 300s maximum; a timed-out request cannot overlap the next worker.
@@ -39,16 +39,24 @@ export function publicWorldJob(state: WorldJob): WorldJob {
     total: state.total, updatedAt: state.updatedAt, ...(state.error ? { error: state.error } : {}) };
 }
 
+/** Cloud Agents unless the operator opts into the in-process SDK or plain templates. */
+export function worldDesignMode(): "cloud-agents" | "sdk-agents" | "template" {
+  const value = process.env.WORLD_DESIGN_AGENTS;
+  if (value === "sdk") return "sdk-agents";
+  if (value === "template" || value === "off") return "template";
+  return "cloud-agents";
+}
+
 export function worldJobId(draft: ReadyDraft, catalogFingerprint = loadInteractionCatalog().fingerprint): string {
   const uploads = [...draft.uploads].sort((a, b) => a.kind.localeCompare(b.kind));
-  return createHash("sha256").update(JSON.stringify({ version: 4, catalogFingerprint, session: draft.sessionId, uploads, player: draft.spriteUrl,
-    worldDesign: process.env.WORLD_DESIGN_AGENTS === "live" ? "agents" : "template",
+  return createHash("sha256").update(JSON.stringify({ version: 5, catalogFingerprint, session: draft.sessionId, uploads, player: draft.spriteUrl,
+    worldDesign: worldDesignMode(),
     imageModel: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2.5-flare", textModel: process.env.OPENAI_TEXT_MODEL || "gpt-6-astra" })).digest("hex").slice(0, 32);
 }
 
 function initialState(id: string): JobState {
   return { id, status: "queued", date: new Date().toISOString().slice(0, 10),
-    events: [{ step: "highlights", label: "Reading your photos and planning one explorable neighbourhood…" }],
+    events: [{ step: "highlights", label: "Reading your photos and planning a scene for each one…" }],
     checkpoint: { assets: {} }, completed: 0, total: 0, updatedAt: new Date().toISOString() };
 }
 
@@ -94,23 +102,24 @@ async function processWorldStep(state: JobState, draft: ReadyDraft, lease: strin
     if (!player || info?.format !== "png" || info.width !== 32 || info.height !== 48 || !info.hasAlpha) {
       throw new RequestError("Your saved character could not be loaded. Return to Today and retry your character.", 422);
     }
-    // All place/lunch/extra photos reach scene planning. The first photo in each
-    // slot remains its canonical sprite reference, preserving the user's choice.
+    // Each place, lunch, park and extra photo becomes its own scene. Fit stays with the character.
     for (const photo of photos) uploads[photo.kind] ??= photo.bytes;
     const notes = photos.map((photo, index) => photo.note ? `Photo ${index + 1} (${photo.kind}): ${photo.note}` : "").filter(Boolean).join("\n");
     const input = { id: state.id, date: state.date, name: "You", uploads, player, photos,
       ...(notes ? { environment: { notes } } : {}) };
     const { catalog, fingerprint } = loadInteractionCatalog();
     if (worldJobId(draft, fingerprint) !== state.id) throw new RequestError("World generation settings changed while this world was being created. Return to Today to start the updated world.", 409);
-    const experimental = process.env.WORLD_DESIGN_AGENTS === "live";
+    const experimental = worldDesignMode() !== "template";
     const deps = { plan: (input: Parameters<typeof planScene>[0]) => planScene(input, new OpenAI({ timeout: 60_000, maxRetries: 0 })),
       images: openAIImageGenerator(new OpenAI({ timeout: 110_000, maxRetries: 0 })), store: storeForDay(state.id), styleReferences,
       planInteractions: (scene: Parameters<typeof planSceneInteractions>[0]) => planSceneInteractions(scene, photoWorldInteractionCatalog(scene, catalog)),
+      weather: (query: { time: string; photo?: Buffer }) => lookupSceneWeather({ date: input.date, ...query }),
       ...(experimental ? {
         locator: (blueprint: Parameters<typeof locateWorld>[0]) => locateWorld(blueprint, agentsRunner()),
-        director: (context: Parameters<typeof directWorld>[0], blueprint: Parameters<typeof simulateWorld>[0]) => directWorld(context, agentsRunner(), { simulate: (design, composition) => simulateWorld(blueprint, design, composition) }),
+        director: (context: Parameters<typeof directWorld>[0], blueprint: Parameters<typeof simulateWorld>[0]) =>
+          directWorld(context, agentsRunner(), { simulate: (design, composition) => simulateWorld(blueprint, design, composition), deadlineMs: 240_000 }),
       } : {}) };
-    if (state.checkpoint.blueprint && buildSceneAssetJobs(state.checkpoint.blueprint, input).some(job => !state.checkpoint.assets[job.id])) {
+    if (state.checkpoint.blueprint && worldAssetJobs(input, state.checkpoint, deps).some(job => !state.checkpoint.assets[job.id])) {
       await advanceWorldAssetBatch(input, state.checkpoint, deps, async (checkpoint, event, total) => {
         const next: JobState = { ...progress, checkpoint, total, completed: Object.keys(checkpoint.assets).length,
           updatedAt: new Date().toISOString(), events: [...progress.events, event] };

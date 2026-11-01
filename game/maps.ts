@@ -21,7 +21,7 @@ export const hash = (x: number, y: number) => ((x * 73856093) ^ (y * 19349663)) 
 
 /**
  * Ground legend: `.` grass, `p` path, `w` water, `t` tree (blocks), `_` sky (not drawn, blocks).
- * `p` over water rows is a bridge.
+ * `p` with water on both flanks is a bridge, and both ends must meet walkable land.
  */
 type BaseMap = {
   rows: string[];
@@ -40,7 +40,7 @@ export const BASE_MAPS: Record<DayScene["base"], BaseMap> = {
       "____________________",
       "____________________",
       "____________________",
-      "____________________",
+      "..........pp........",
       "wwwwwwwwwwppwwwwwwww",
       "wwwwwwwwwwppwwwwwwww",
       "..........pp........",
