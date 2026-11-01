@@ -86,7 +86,7 @@ export function DemoDayViewer() {
         Click the world to play · Arrows / WASD: walk · Shift: run · Space / Enter: read · Walk onto the yellow signs to travel
       </p>
       <iframe ref={frame} src={DEMO_DAY.game} title={`${DEMO_DAY.name}'s day in London`} onLoad={() => frame.current?.focus()}
-        style={{ width: "100%", maxWidth: 960, aspectRatio: "3 / 2", border: "4px solid #f6f1df", background: "#14121a" }} />
+        style={{ width: "100%", maxWidth: 960, height: "clamp(440px, 66.6vw, 640px)", border: "4px solid #f6f1df", background: "#14121a" }} />
     </section>
     <section className={styles.itinerary} aria-labelledby="itinerary-title">
       <div className={styles.sectionHeading}><h2 id="itinerary-title">Today&apos;s places</h2><span>{DEMO_DAY.scenes.length} CHAPTERS</span></div>

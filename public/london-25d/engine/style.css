@@ -133,3 +133,16 @@ button { font: inherit; }
 #clip button.link { border: 0; box-shadow: none; text-decoration: underline; margin-top: 10px; background: none; }
 #end-clip { background: var(--red) !important; color: #fff !important; }
 #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 13; background: var(--ink); color: #ffd23f; border: 3px solid #ffd23f; padding: 8px 16px; font-weight: bold; }
+
+/* small screens: compact touch controls so the scene stays visible */
+@media (max-width: 520px), (max-height: 480px) {
+  #touch button { width: 42px; height: 42px; font-size: 16px; }
+  #dpad { left: 10px; bottom: 10px; width: 126px; height: 126px; }
+  #dpad .up { left: 42px; top: 0; }
+  #dpad .left { left: 0; top: 42px; }
+  #dpad .right { left: 84px; top: 42px; }
+  #dpad .down { left: 42px; top: 84px; }
+  #btn-a { right: 14px; bottom: 34px; width: 54px !important; height: 54px !important; font-size: 20px !important; }
+  #hud { top: 6px; right: 6px; gap: 4px; }
+  #hud button { padding: 3px 6px; font-size: 11px; }
+}
