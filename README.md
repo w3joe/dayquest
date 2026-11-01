@@ -6,7 +6,7 @@
 
 ## Try it
 
-- **Live app:** _TODO: Vercel link_ → open `/day/demo`
+- **Live app:** _TODO: Vercel link_ → start at `/` or open a shared `/day/<id>` link
 - Arrow keys to walk · Space to read / advance · walk onto the path at the edge of the map to travel to the next highlight
 
 ## What we built today
@@ -40,7 +40,7 @@ This branch implements the Today screen, photo uploads, fit-check character API 
 - The Today screen animates the template location history, pixelates photo previews, matches EXIF times to stops, and displays the fixture health/transport data. Health import and location sync are demo animations, not integrations with a device.
 - JPEG, PNG and WebP uploads are limited to 4 MB each. Uploads are decoded, oriented and stripped of metadata on the server. Without Blob credentials, development uploads are stored in ignored `.data/` and served by `/api/assets/`; production requires Blob.
 - Fit-check generation needs `OPENAI_API_KEY`. `OPENAI_IMAGE_MODEL` defaults to `gpt-image-2.5-flare`. Missing credentials return an error; a preview thumbnail is never presented as a generated character.
-- `BLOB_BASE_URL` is the public Blob store base URL for generated `days/<id>/day.json` manifests. `/day/demo` reads `public/days/demo/day.json` once A/B supply the demo; unavailable days show a readable recovery page.
+- `BLOB_BASE_URL` is the public Blob store base URL for generated `days/<id>/day.json` manifests. The demo page and generation replay have been removed; unavailable generated days show a readable recovery page. Internal demo assets remain development fixtures.
 - A's Phaser scenes and B's generation endpoint/log/demo assets are not included in C's work. `/generating` is an explicit integration boundary, not a simulated successful generation. See [C integration notes](docs/C-INTEGRATION.md) for handoff contracts.
 
 The branch does not include a hosted deployment or a generated demo day. To deploy after A/B integration, import the repository into Vercel, set the server environment variables from `.env.example`, connect a public Blob store, and check uploads, character generation and a shared day in a fresh browser. Do not commit uploaded personal photos or `.env.local`.

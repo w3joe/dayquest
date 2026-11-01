@@ -9,8 +9,6 @@ import styles from "./generating.module.css";
 
 type Status = "running" | "done" | "error" | "no-draft";
 
-const REPLAY_SECONDS = 8;
-
 function readDraft(): ReadyDraft | null {
   try {
     const draft = parseStoredDraft(sessionStorage.getItem(DRAFT_STORAGE_KEY));
@@ -36,7 +34,7 @@ async function* ndjson(body: ReadableStream<Uint8Array>): AsyncGenerator<Generat
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** §6.1 generating screen: live NDJSON from /api/generate-day, or ?replay=demo from the recorded run. */
+/** §6.1 generating screen: live NDJSON from /api/generate-day. */
 export default function GeneratingPage() {
   const router = useRouter();
   const [events, setEvents] = useState<GenerateEvent[]>([]);
@@ -48,27 +46,6 @@ export default function GeneratingPage() {
     let cancelled = false;
     setEvents([]);
     setStatus("running");
-    const replay = new URLSearchParams(window.location.search).get("replay");
-
-    // Replays: the recorded run, with its timing compressed to ~REPLAY_SECONDS so the log stays genuine but snappy.
-    async function runReplay() {
-      const response = await fetch("/days/demo/events.ndjson", { cache: "no-store" });
-      if (!response.ok || !response.body) throw new Error("No recorded demo run");
-      const all: GenerateEvent[] = [];
-      for await (const event of ndjson(response.body)) all.push(event);
-      const total = Math.max(1, all.at(-1)?.at ?? 1);
-      let previous = 0;
-      for (const event of all) {
-        await sleep(Math.min(1500, Math.max(120, (((event.at ?? previous) - previous) / total) * REPLAY_SECONDS * 1000)));
-        previous = event.at ?? previous;
-        if (cancelled) return;
-        setEvents((list) => [...list, event]);
-      }
-      if (cancelled) return;
-      setStatus("done");
-      await sleep(1200);
-      if (!cancelled) router.push("/day/demo");
-    }
     // Live runs render events as they stream in.
     async function runLive() {
       const draft = readDraft();
@@ -94,7 +71,12 @@ export default function GeneratingPage() {
       if (!finished && !cancelled) setStatus("error");
     }
 
-    (replay === "demo" ? runReplay() : runLive()).catch(() => !cancelled && setStatus("error"));
+    // Old replay links must never start generation from an existing draft.
+    if (new URLSearchParams(window.location.search).has("replay")) {
+      router.replace("/");
+      return;
+    }
+    runLive().catch(() => !cancelled && setStatus("error"));
     return () => { cancelled = true; };
   }, [attempt, router]);
 
@@ -107,7 +89,7 @@ export default function GeneratingPage() {
       <p className="eyebrow">DAYQUEST · GENERATING</p>
       <h1>Nothing to build yet.</h1>
       <p>Your photos and character live in the Today tab. Head back, add your fit check, then press End My Day.</p>
-      <Link href="/">Back to Today</Link> · <Link href="/generating?replay=demo">Watch the demo day being built</Link>
+      <Link href="/">Back to Today</Link>
     </main>;
   }
 
