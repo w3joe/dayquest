@@ -289,6 +289,6 @@ export default function Today({ demo = false }: { demo?: boolean }) {
       {places && !demo && <p className="dq-cta-hint">Location history is previewed here. It is not used to build your world yet.</p>}
       {demo && <DemoRoute />}
     </section>
-    {demo ? <div className="dq-cta">{DEMO_MODE && <button type="button" className="dq-big-button" onClick={() => { sfx.fanfare(); router.push("/generating"); }}>Create my world <PixelSprite name="star" size={1.5}/></button>}<Link href="/" className={DEMO_MODE ? "dq-small-button" : "dq-big-button"}>Try it with your photos</Link></div> : <div className="dq-cta"><p className="dq-cta-hint" aria-live="polite">{finishHint}</p>{storageError && <p className="dq-error" role="alert">{storageError}</p>}<button type="button" className="dq-big-button" disabled={!canFinish} onClick={finishDay}>Create my world <PixelSprite name="star" size={1.5}/></button></div>}
+    {demo ? <div className="dq-cta"><button type="button" className="dq-big-button" onClick={() => { sfx.fanfare(); router.push("/generating?demo=1"); }}>Create my world <PixelSprite name="star" size={1.5}/></button><Link href="/" className="dq-small-button">Try it with your photos</Link></div> : <div className="dq-cta"><p className="dq-cta-hint" aria-live="polite">{finishHint}</p>{storageError && <p className="dq-error" role="alert">{storageError}</p>}<button type="button" className="dq-big-button" disabled={!canFinish} onClick={finishDay}>Create my world <PixelSprite name="star" size={1.5}/></button></div>}
   </AppShell>;
 }

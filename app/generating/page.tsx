@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { GenerateEvent } from "@/pipeline/types";
 import type { WorldJob } from "@/lib/world-job";
 import { DRAFT_STORAGE_KEY, isReadyDraft, parseStoredDraft } from "@/lib/draft";
-import { DEMO_DAY, DEMO_EVENTS, DEMO_MODE } from "@/lib/demo";
+import { DEMO_DAY, DEMO_EVENTS, isDemoRun } from "@/lib/demo";
 import AppShell from "@/components/today/AppShell";
 import PixelSprite from "@/components/today/pixel";
 import styles from "./generating.module.css";
@@ -22,13 +22,15 @@ export default function GeneratingPage() {
   const [error, setError] = useState("");
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
   const logRef = useRef<HTMLOListElement>(null);
+  const [demoRun, setDemoRun] = useState(false);
+  useEffect(() => setDemoRun(isDemoRun()), []);
 
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const controller = new AbortController();
     setError(""); setStatus("running");
-    if (DEMO_MODE) {
+    if (isDemoRun()) {
       // Demo: replay a fixed log over the prebuilt sprites; nothing is generated or fetched.
       const sprites = DEMO_EVENTS.filter((e) => e.thumb).length;
       let i = 0, saved = 0;
@@ -89,7 +91,7 @@ export default function GeneratingPage() {
 
   const done = status === "done";
   const pct = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
-  return <AppShell active={DEMO_MODE ? "demo" : "try"}><section className={`dq-card dq-card-pink ${styles.card}`} aria-live="polite">
+  return <AppShell active={demoRun ? "demo" : "try"}><section className={`dq-card dq-card-pink ${styles.card}`} aria-live="polite">
     <div className={styles.head}>
       <PixelSprite name={done ? "heart" : "star"} size={3} className={done ? styles.headSprite : `${styles.headSprite} dq-hop`} />
       <div className={styles.headText}><span className={styles.eyebrow}>{done ? "All done" : "Building your world"}</span>

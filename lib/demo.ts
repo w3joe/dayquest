@@ -2,8 +2,11 @@
 // (public/london-25d, generated offline with Codex image_gen in the Shadwell style).
 import type { GenerateEvent } from "../pipeline/types";
 
-/** On for the demo branch. Off restores the live upload / fit-check / world-job flow. */
-export const DEMO_MODE = true;
+/** Global switch: true mocks every path (uploads, fit check, world jobs). Off on main: only the Demo
+ * section's run (/generating?demo=1 → /day/demo) is scripted, so the live Try me path stays real. */
+export const DEMO_MODE = false;
+/** True when this page load is the Demo section's scripted run. */
+export const isDemoRun = () => DEMO_MODE || (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("demo"));
 
 const ART = "/london-25d";
 const asset = (scene: string, name: string) => `${ART}/scenes/${scene}/assets/${name}.png`;
