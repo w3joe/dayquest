@@ -32,6 +32,8 @@ Effort: S under 2 h, M half a day, L a day or more. Impact is for the shape abov
 | B | Demo location package with recorded lookups | High | M | `data/demo-package`, `Lookups` replay, Today |
 | C | Scripted video clip of the day | Medium | M | scripted input into `HighlightScene`, canvas `MediaRecorder` |
 | D | Three interactables per scene (Agents SDK ideas) | High | L | manifest field, `HighlightScene`, agent + validator |
+| E | Seasonal scenes (grade and particles first) | High | M | season from date, `HighlightScene` overlay; tile variants later |
+| F | Diary voice, NPC lines, soundtrack from mood, souvenirs, postcard | Medium to High | M to L each | pipeline + game; see section F |
 
 ## Sketches for the top items
 
@@ -71,6 +73,30 @@ Each scene should include three things to *do*, such as a button to press, a lev
 - **Examples.** Westminster: press a crossing button that makes the lights change; ring a bell on the bridge. Ramen street: pull a noren curtain, press a vending-machine button, pet a street cat. Regent's Park: sit on a bench, feed the swans, switch on a lamp near dusk.
 - **Feel.** Each interaction has a small animation, a sound effect, and a short warm line. Weather and time of day can change them (a lamp only lights at dusk; no swans in a storm).
 - **Contract.** `day.json` gains an `interactables` array per scene (3 items). Sprites come from the same generation and pixelate pipeline as landmarks, or from a small fixed set of icons for reliability.
+
+### E. Seasonal scenes
+
+The same map should feel different in different seasons. The date and place already tell us the season (the demo, 7 Nov in London, is deep autumn).
+
+- **Season from the data.** Month plus hemisphere gives `spring | summer | autumn | winter`; a holiday layer sits on top (Bonfire Night around 5 Nov, Christmas lights in December, blossom in April).
+- **Cheap first step: grade and particles.** Palette shift (orange and gold in autumn, cool and bright in winter, fresh green in spring), plus falling leaves, snowflakes, petals or fireflies. This needs no new art and combines with the weather grade (rain on an autumn day).
+- **Richer step: seasonal tilesets.** Generate a variant of each ground tile and the tree per season with the same image pipeline (autumn leaf litter and orange trees, snow-dusted grass and bare trees, spring blossom). Cache them, since they are shared by every day.
+- **Seasonal interactables.** A pile of leaves to jump in, a snowman to build, a blossom branch to shake, a conker to pick up. These plug straight into idea D.
+- **Hemisphere and place.** Do not assume London: a December day in Sydney is summer. A tropical place may have a wet and a dry season instead.
+
+### F. More ambitious, more AI-powered ideas
+
+- **Diary voice.** A vision-and-text model looks at the day's photos and notes and writes each textbox line in the sender's own voice ("The rain stopped just as we reached the river"), warmer and more specific than data-derived text. The sender can edit every line.
+- **Photos become places.** Beyond the food sprite, hang the sender's own park photo as a framed picture, or put their lunch photo on the shop window. Real moments appear inside the world.
+- **Tiny NPCs with a line each.** An agent invents a small local character per scene from place data (the ramen chef, a busker, a swan keeper) with a short, kind line. Cosy and cheap.
+- **A soundtrack that fits the day.** Tempo from walking pace, key and instrument set from mood and weather (rainy street is slow and soft, sunny park is brighter). Procedural, so every day sounds different but always gentle.
+- **Mood of the day.** Infer a mood from steps, weather, time, photos and the sender's note, and let it drive palette, music and the end-card message.
+- **Ask the day.** Viewers type or tap a question ("what did you eat?", "was it cold?") and a small character answers, grounded only in that day's data, never invented.
+- **Souvenirs.** Each landmark yields a keepsake the viewer can collect into a shelf (a pixel ticket stub, a leaf, a postcard). Gives a reason to explore and a sentimental object to keep.
+- **Animated route map.** A 10-second map flyover of the whole day's path, drawn from the real GPS trace, as an opening or a shareable clip.
+- **Postcard ending.** The end card becomes a generated postcard (a scene crop, the sender's note, a stamp with the date and place) that can be saved or sent.
+- **A village of days.** Over time, days join into a small world: a map of every place someone has been, shared with a partner so two people's days sit in the same village.
+- **Companion.** A small pet that follows the player and reacts to weather and landmarks.
 
 ## Two additions
 
