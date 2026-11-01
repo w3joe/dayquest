@@ -25,6 +25,8 @@ _TODO: one concrete example — prompt, what Codex produced, screenshot of the d
 
 ## Setup
 
+Run checks in GitHub manually, then deploy using your existing Vercel login with `npm run deploy:vercel`. See [deployment instructions](docs/DEPLOYMENT.md). Pushes do not trigger deployments. The assigned production address is `https://dayquest-pi.vercel.app`.
+
 ```bash
 git clone https://github.com/w3joe/dayquest.git
 cd dayquest
@@ -84,3 +86,17 @@ npx tsx scripts/preview-world.mts
 ```
 
 Then visit `http://localhost:3000/day/world-preview` with the development server running. The preview uses existing Shadwell buildings and character frames plus a demo lunch icon, labels them as sample artwork, and writes only ignored `public/days/world-preview/` files. It makes no paid API calls and does not demonstrate photo analysis or live generation.
+
+### Connected locations and transport
+
+The transport layer accepts completed location scenes and explicit journeys independently of the location-entry implementation. [Transport integration](docs/TRANSPORT-INTEGRATION.md) defines scene IDs, departure/arrival points, route legs and the `composeWorldItinerary` handoff. Existing single-location worlds remain supported.
+
+Run `npm run preview:transport`, then open `http://localhost:3000/day/transport-preview` while the development server is running. This offline fixture has four sample locations linked by bus, a Tube journey with a line change, and a walk. Walk to the departure point and use Space/Enter or the touch action button to confirm boarding. Travel can be skipped to arrival, and refreshing resumes at a safe scene checkpoint. Only the last location has a finish/share exit.
+
+Bus-stop and station sprites are pre-generated and shared across journeys. Builds validate the committed PNGs locally; runtime travel never calls an image service. Exact ImageGen prompts are recorded in `scripts/transport-art-prompts.json`.
+
+### Generated item interactions
+
+World scenes can carry contextual action sequences composed from shared generic effects and their own dynamically generated assets. Characters, buildings, meals and distinctive photo objects retain their generated artwork; fixed food and character poses are confined to offline samples. Live pickup uses the scene's generated meal sprite. [Interaction integration](docs/INTERACTION-INTEGRATION.md) describes asset delivery, scene handoff, sequence instructions and saved outcomes. Run `npm run assets:check` when adding artwork.
+
+Run `npm run preview:interactions` and visit `http://localhost:3000/day/interaction-preview` with the development server running. This offline fixture uses supplied artwork to demonstrate choosing actions, approaching an item, temporary effects, Lucas's photo/wave/point poses, carrying a prop, cancellation and progress across travel. It makes no API calls.

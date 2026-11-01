@@ -87,13 +87,13 @@ export default function GeneratingPage() {
 
   return <main className={styles.screen}><section className={styles.box} aria-live="polite">
     <p className={styles.title}>{status === "done" ? "YOUR WORLD IS READY" : "TURNING YOUR PHOTOS INTO A PLACE"}</p>
-    <p className={styles.summary}>Buildings, little details, lunch, and your walking character. Completed sprites are saved as we go.</p>
+    <p className={styles.summary}>Buildings, little details, lunch, your walking character, and item interactions. Completed work is saved as we go.</p>
     {progress.total > 0 && <div className={styles.progress}><span>{progress.completed} / {progress.total} sprites saved</span><progress aria-label="Sprites saved" max={progress.total} value={progress.completed} /></div>}
     <ol className={styles.log} ref={logRef}>{events.map((event, i) => <li key={i} className={event.step === "error" ? styles.error : undefined}>
       <span className={styles.prompt}>&gt;</span><span className={styles.label}>{event.label}</span>
       {event.thumb && <img className={styles.thumb} src={event.thumb} alt="Completed sprite" />}
       {event.step === "done" && <span className={styles.arrow}>→</span>}
-    </li>)}{status === "running" && <li><span className={styles.prompt}>&gt;</span><span className={styles.cursor}>▌</span><span>Creating the next piece…</span></li>}</ol>
+    </li>)}{status === "running" && <li><span className={styles.prompt}>&gt;</span><span className={styles.cursor}>▌</span><span>{progress.total > 0 && progress.completed === progress.total ? "Preparing interactions and finishing your world…" : "Creating the next piece…"}</span></li>}</ol>
     {status === "error" && error && <p role="alert" className={styles.error}>{error}</p>}
     {status === "error" && <p className={styles.actions}><button type="button" onClick={() => setAttempt(n => n + 1)}>CONTINUE BUILDING</button><Link href="/">BACK TO TODAY</Link></p>}
   </section></main>;
