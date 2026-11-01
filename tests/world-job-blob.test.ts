@@ -30,6 +30,7 @@ test("checkpoint reads authenticate, retry only the newest state, and retain val
     // The public CDN has a stale negative cache entry even though origin has data.
     if (!request.headers.authorization) { response.writeHead(404); response.end(); return; }
     assert.equal(request.headers.authorization, `Bearer ${token}`);
+    assert.equal(url.searchParams.get("cache"), "0", "private origin reads must bypass the CDN");
     attempts++; paths.push(url.pathname.slice(1));
     if (temporaryMisses-- > 0) { response.writeHead(404); response.end(); return; }
     response.setHeader("content-type", "application/json");

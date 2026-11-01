@@ -55,13 +55,13 @@ export async function readWorldCheckpoint<T>(id: string): Promise<T | null> {
   } while (cursor);
   if (!newest) return null;
   if (newest.size > MAX_STATE_BYTES) throw new RequestError("Saved world progress is too large.", 503);
-  // Anonymous public GETs can cache a 404 even after list confirms the object.
-  // The SDK sends storage authorization; no-store alone only bypasses Next's
-  // data cache. Never fall back to an older checkpoint and repeat paid work.
+  // Public CDN GETs can keep a 404 after list already sees the object.
+  // `useCache: false` only adds cache=0 for private access, so checkpoints
+  // must be read (and written) as private origin objects.
   for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 250));
     try {
-      const blob = await get(newest.url, { access: "public", useCache: false, abortSignal: AbortSignal.timeout(15_000) });
+      const blob = await get(newest.url, { access: "private", useCache: false, abortSignal: AbortSignal.timeout(15_000) });
       if (!blob || blob.statusCode !== 200) continue;
       if (blob.blob.size > MAX_STATE_BYTES) {
         await blob.stream.cancel();
@@ -91,7 +91,7 @@ export async function writeWorldCheckpoint<T>(id: string, state: T): Promise<voi
   if (useBlob) {
     const filename = `${String(Date.now()).padStart(13, "0")}-${randomUUID()}.json`;
     await put(`${prefixFor(id)}states/${filename}`, content, {
-      access: "public", contentType: "application/json", addRandomSuffix: false, allowOverwrite: false,
+      access: "private", contentType: "application/json", addRandomSuffix: false, allowOverwrite: false,
       abortSignal: AbortSignal.timeout(15_000),
     });
     return;
@@ -114,7 +114,7 @@ export async function acquireWorldLease(id: string, leaseMs: number): Promise<st
     if (current && current.uploadedAt.getTime() + leaseMs > Date.now()) return null;
     try {
       const lease = await put(`${prefixFor(id)}lease.json`, JSON.stringify({ nonce: randomUUID() }), {
-        access: "public", contentType: "application/json", addRandomSuffix: false,
+        access: "private", contentType: "application/json", addRandomSuffix: false,
         ...(current ? { ifMatch: current.etag } : { allowOverwrite: false }),
         abortSignal: AbortSignal.timeout(15_000),
       });
