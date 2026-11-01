@@ -1,0 +1,165 @@
+{
+  "id": "demo",
+  "date": "2026-11-07",
+  "player": {
+    "name": "LUCAS",
+    "sprite": "player.png"
+  },
+  "scenes": [
+    {
+      "kind": "tourist",
+      "title": "Touring Westminster",
+      "time": "10:00",
+      "base": "city",
+      "spawn": {
+        "x": 10,
+        "y": 13
+      },
+      "exit": {
+        "x": 19,
+        "y": 7
+      },
+      "landmarks": [
+        {
+          "name": "Big Ben",
+          "sprite": "s0_l0.png",
+          "footprint": "L",
+          "slot": 0,
+          "text": "Took a photo of Big Ben from Westminster Bridge."
+        },
+        {
+          "name": "London Eye",
+          "sprite": "s0_l1.png",
+          "footprint": "L",
+          "slot": 1,
+          "text": "Rode the London Eye. Clear view all the way to St Paul's."
+        },
+        {
+          "name": "Red phone box",
+          "sprite": "s0_l2.png",
+          "footprint": "S",
+          "slot": 2,
+          "text": "Walked past a classic red phone box on Parliament Square."
+        }
+      ]
+    },
+    {
+      "kind": "meal",
+      "title": "Ramen lunch",
+      "time": "12:40",
+      "base": "street",
+      "spawn": {
+        "x": 10,
+        "y": 13
+      },
+      "exit": {
+        "x": 19,
+        "y": 7
+      },
+      "landmarks": [
+        {
+          "name": "Kanada-Ya",
+          "sprite": "s1_l0.png",
+          "footprint": "M",
+          "slot": 0,
+          "text": "Queued for lunch at Kanada-Ya on St Giles High Street."
+        },
+        {
+          "name": "Centre Point",
+          "sprite": "s1_l1.png",
+          "footprint": "L",
+          "slot": 1,
+          "text": "Centre Point towered over the end of the street."
+        },
+        {
+          "name": "Red phone box",
+          "sprite": "s1_l2.png",
+          "footprint": "S",
+          "slot": 2,
+          "text": "Passed another red phone box on the way in."
+        }
+      ],
+      "food": {
+        "sprite": "s1_food.png",
+        "icon": "s1_food_icon.png",
+        "tile": {
+          "x": 9,
+          "y": 8
+        },
+        "text": "Had tonkotsu ramen + gyoza at Kanada-Ya."
+      }
+    },
+    {
+      "kind": "park",
+      "title": "Walk in Regent's Park",
+      "time": "14:15",
+      "base": "park",
+      "spawn": {
+        "x": 10,
+        "y": 13
+      },
+      "exit": {
+        "x": 19,
+        "y": 7
+      },
+      "landmarks": [
+        {
+          "name": "Queen Mary's Rose Garden",
+          "sprite": "s2_l0.png",
+          "footprint": "M",
+          "slot": 0,
+          "text": "Walked through Queen Mary's Rose Garden."
+        },
+        {
+          "name": "Triton Fountain",
+          "sprite": "s2_l1.png",
+          "footprint": "M",
+          "slot": 1,
+          "text": "Stopped by the Triton Fountain."
+        },
+        {
+          "name": "Boating lake",
+          "sprite": "s2_l2.png",
+          "footprint": "L",
+          "slot": 2,
+          "text": "Walked 3.8 km in 75 minutes, 5,200 steps."
+        }
+      ]
+    }
+  ],
+  "transit": [
+    {
+      "legs": [
+        {
+          "mode": "bus",
+          "route": "24",
+          "destination": "Hampstead Heath",
+          "from": "Parliament Square",
+          "to": "Tottenham Court Road Station"
+        }
+      ]
+    },
+    {
+      "legs": [
+        {
+          "mode": "tube",
+          "line": "Central",
+          "color": "#E32017",
+          "stations": [
+            "Tottenham Court Road",
+            "Oxford Circus"
+          ]
+        },
+        {
+          "mode": "tube",
+          "line": "Bakerloo",
+          "color": "#B36305",
+          "stations": [
+            "Oxford Circus",
+            "Regent's Park"
+          ]
+        }
+      ]
+    }
+  ]
+}
