@@ -146,3 +146,8 @@ button { font: inherit; }
   #hud { top: 6px; right: 6px; gap: 4px; }
   #hud button { padding: 3px 6px; font-size: 11px; }
 }
+
+/* match the app's pastel pink UI around the embedded game */
+#hud button { background: #fff6f9; color: #6b3a55; border: 3px solid #f2759b; border-radius: 999px; box-shadow: 0 3px 0 #e56a92; }
+#toggle-invented[aria-pressed="true"] { background: #f2759b; color: #fff; }
+#legend { border-radius: 999px; background: rgba(107, 58, 85, .85); }

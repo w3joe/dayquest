@@ -9,12 +9,12 @@ type Props = {
 };
 
 /** A photo slot that takes any number of photos, each with its own note. */
-export default function GalleryCard({ title, sprite, kind, items, ready, wide, readOnly, onAdd, onRemove, onRetry, onNote }: Props) {
+export default function GalleryCard({ title, sprite, kind, items, ready, wide, readOnly, onAdd, onRemove, onRetry, onNote, missing }: Props & { missing?: boolean }) {
   const picker = (label: string, className: string, children: React.ReactNode) => <label className={className} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); onAdd(event.dataTransfer.files); }}>
     <input type="file" multiple accept="image/jpeg,image/png,image/webp" aria-label={label} disabled={!ready} onChange={event => { onAdd(event.target.files); event.target.value = ""; }} />
     {children}
   </label>;
-  return <div className={`dq-photo-card dq-gallery dq-photo-${kind} ${wide ? "is-wide" : ""}`}>
+  return <div className={`dq-photo-card dq-gallery dq-photo-${kind} ${wide ? "is-wide" : ""}`} style={missing ? { outline: "3px dashed #f2759b", outlineOffset: 3 } : undefined}>
     <div className="dq-photo-head"><div className="dq-gallery-title"><h3>{title}</h3>{items.length > 0 && <span className="dq-count">{items.length}</span>}</div>{!readOnly && <CameraButton label={`Take a ${title} photo`} disabled={!ready} onFile={file => onAdd(file ? [file] : null)} />}</div>
     {items.length === 0
       ? picker(`Upload ${title} photos`, "dq-upload-zone", <><PixelSprite name={sprite} size={6} className="dq-photo-sprite" /><span className="dq-photo-action">+ Add</span></>)

@@ -1,25 +1,31 @@
-.screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; background: #1f2b24; }
-.box {
-  width: min(760px, 100%); background: #fbf8ec; color: #24352b; padding: 24px 26px;
-  border: 4px solid #24352b; box-shadow: inset 0 0 0 3px #fbf8ec, inset 0 0 0 6px #7e9567, 6px 6px 0 #0d1510;
-  font-family: "Pixelify Sans", var(--mono), monospace;
+.card { gap: 16px; }
+.head { display: flex; align-items: center; gap: 14px; }
+.headSprite { flex: none; image-rendering: pixelated; }
+.headText { flex: 1; min-width: 0; }
+.eyebrow { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--hot); margin-bottom: 2px; }
+.title { margin: 0; font-family: var(--pixel); font-weight: 500; font-size: 30px; line-height: 1.1; }
+.summary { margin: 0; font-size: 14px; line-height: 1.6; color: var(--muted); }
+.progress { display: grid; gap: 8px; }
+.progressLabel { display: flex; justify-content: space-between; font-family: var(--pixel); font-size: 16px; }
+.bar { height: 18px; border: 3px solid #f5c2d2; border-radius: 999px; background: #fff5f8; overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--hot); border-radius: 999px; transition: width .4s steps(6); background-image: repeating-linear-gradient(90deg, transparent 0 10px, #ffffff40 10px 14px); }
+.log {
+  list-style: none; margin: 0; padding: 14px 16px; max-height: 52vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+  background: #fff5f8; border: 3px dashed #f5c2d2; border-radius: 22px;
+  font-family: var(--pixel); font-size: 17px; line-height: 1.35;
 }
-.title { margin: 0 0 16px; font-size: 13px; letter-spacing: 2px; color: var(--orange); }
-.summary { font-family: var(--sans); font-size: 13px; line-height: 1.6; margin: 0 0 18px; color: #586a55; }
-.progress { display: grid; gap: 8px; margin-bottom: 20px; font-size: 12px; }
-.progress progress { width: 100%; height: 10px; accent-color: #7e9567; }
-.log { list-style: none; margin: 0; padding: 0; max-height: 60vh; overflow-y: auto; display: grid; gap: 10px; font-size: 15px; line-height: 1.4; }
-.log li { display: flex; align-items: center; gap: 10px; min-height: 28px; animation: pop .18s steps(3) both; }
-.prompt { color: #7e9567; flex-shrink: 0; }
+.log li { flex-shrink: 0; display: flex; align-items: center; gap: 10px; min-height: 30px; animation: pop .18s steps(3) both; }
+.prompt { color: var(--hot); flex-shrink: 0; }
 .label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.thumb { height: 48px; width: auto; max-width: 80px; image-rendering: pixelated; flex-shrink: 0; }
-.arrow { color: var(--orange); }
-.error { color: #a14235; }
-.cursor { animation: blink 1s steps(2) infinite; }
-.actions { display: flex; gap: 16px; align-items: center; margin: 20px 0 0; font-size: 13px; }
-.actions button { border: 3px solid #24352b; background: #7e9567; color: #fbf8ec; padding: 8px 14px; font: inherit; letter-spacing: 1px; }
-.actions a { color: #24352b; }
+.thumb { flex-shrink: 0; display: block; overflow: hidden; box-sizing: border-box; width: 52px; height: 52px; padding: 4px; background: #fff; border: 2px solid var(--edge); border-radius: 14px; box-shadow: 2px 2px 0 var(--shadow); }
+.thumb img { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; image-rendering: pixelated; }
+.arrow { color: var(--hot); }
+.error { color: #d2566f; }
+.alert { margin: 0; font-size: 13px; line-height: 1.5; }
+.cursor { margin-left: 4px; color: var(--hot); animation: blink 1s steps(2) infinite; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0; }
+.actions :global(.dq-small-button) { margin-left: 0; text-decoration: none; color: var(--ink); }
 @keyframes blink { 50% { opacity: 0; } }
 @keyframes pop { from { opacity: 0; transform: translateY(4px); } }
-@media (max-width: 620px) { .box { padding: 18px 16px; } .log { font-size: 13px; } .thumb { height: 36px; } }
-@media (prefers-reduced-motion: reduce) { .log li, .cursor { animation: none; } }
+@media (max-width: 640px) { .title { font-size: 22px; } .log { font-size: 15px; padding: 12px; } .thumb { width: 42px; height: 42px; } .head :global(.dq-chip) { display: none; } }
+@media (prefers-reduced-motion: reduce) { .log li, .cursor, .bar span { animation: none; transition: none; } }

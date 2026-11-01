@@ -7,6 +7,8 @@ import type { GenerateEvent } from "@/pipeline/types";
 import type { WorldJob } from "@/lib/world-job";
 import { DRAFT_STORAGE_KEY, isReadyDraft, parseStoredDraft } from "@/lib/draft";
 import { DEMO_DAY, DEMO_EVENTS, DEMO_MODE } from "@/lib/demo";
+import AppShell from "@/components/today/AppShell";
+import PixelSprite from "@/components/today/pixel";
 import styles from "./generating.module.css";
 
 type Status = "running" | "done" | "error" | "no-draft";
@@ -79,22 +81,32 @@ export default function GeneratingPage() {
 
   useEffect(() => { logRef.current?.lastElementChild?.scrollIntoView({ block: "nearest" }); }, [events]);
 
-  if (status === "no-draft") return <main className="page-shell">
-    <p className="eyebrow">DAYQUEST · YOUR WORLD</p><h1>Start with your photos.</h1>
-    <p>Add your outfit on Today, finish your character, then create a world from your place and lunch photos.</p>
-    <Link href="/">Back to Today</Link>
-  </main>;
+  if (status === "no-draft") return <AppShell active="try"><section className={`dq-card dq-card-butter ${styles.card}`}>
+    <span className={styles.eyebrow}>DayQuest · your world</span><h1 className={styles.title}>Start with your photos.</h1>
+    <p className={styles.summary}>Add your outfit on Today, finish your character, then create a world from your place and lunch photos.</p>
+    <p className={styles.actions}><Link href="/" className="dq-small-button">Back to Today</Link></p>
+  </section></AppShell>;
 
-  return <main className={styles.screen}><section className={styles.box} aria-live="polite">
-    <p className={styles.title}>{status === "done" ? "YOUR WORLD IS READY" : "TURNING YOUR PHOTOS INTO A PLACE"}</p>
+  const done = status === "done";
+  const pct = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
+  return <AppShell active={DEMO_MODE ? "demo" : "try"}><section className={`dq-card dq-card-pink ${styles.card}`} aria-live="polite">
+    <div className={styles.head}>
+      <PixelSprite name={done ? "heart" : "star"} size={3} className={done ? styles.headSprite : `${styles.headSprite} dq-hop`} />
+      <div className={styles.headText}><span className={styles.eyebrow}>{done ? "All done" : "Building your world"}</span>
+        <h1 className={styles.title}>{done ? "Your world is ready!" : "Turning your photos into a place"}</h1></div>
+      {progress.total > 0 && <span className={`dq-chip ${done ? "dq-chip-mint" : "dq-chip-pink"}`}>{progress.completed} / {progress.total}</span>}
+    </div>
     <p className={styles.summary}>Buildings, little details, lunch, your walking character, and item interactions. Completed work is saved as we go.</p>
-    {progress.total > 0 && <div className={styles.progress}><span>{progress.completed} / {progress.total} sprites saved</span><progress aria-label="Sprites saved" max={progress.total} value={progress.completed} /></div>}
+    {progress.total > 0 && <div className={styles.progress}>
+      <div className={styles.progressLabel}><span>{progress.completed} / {progress.total} sprites saved</span><span>{pct}%</span></div>
+      <div className={styles.bar} role="progressbar" aria-label="Sprites saved" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.completed}><span style={{ width: `${pct}%` }} /></div>
+    </div>}
     <ol className={styles.log} ref={logRef}>{events.map((event, i) => <li key={i} className={event.step === "error" ? styles.error : undefined}>
       <span className={styles.prompt}>&gt;</span><span className={styles.label}>{event.label}</span>
-      {event.thumb && <img className={styles.thumb} src={event.thumb} alt="Completed sprite" />}
+      {event.thumb && <span className={styles.thumb}><img src={event.thumb} alt="Completed sprite" /></span>}
       {event.step === "done" && <span className={styles.arrow}>→</span>}
-    </li>)}{status === "running" && <li><span className={styles.prompt}>&gt;</span><span className={styles.cursor}>▌</span><span>{progress.total > 0 && progress.completed === progress.total ? "Preparing interactions and finishing your world…" : "Creating the next piece…"}</span></li>}</ol>
-    {status === "error" && error && <p role="alert" className={styles.error}>{error}</p>}
-    {status === "error" && <p className={styles.actions}><button type="button" onClick={() => setAttempt(n => n + 1)}>CONTINUE BUILDING</button><Link href="/">BACK TO TODAY</Link></p>}
-  </section></main>;
+    </li>)}{status === "running" && <li><span className={styles.prompt}>&gt;</span><span className={styles.label}>{progress.total > 0 && progress.completed === progress.total ? "Preparing interactions and finishing your world…" : "Creating the next piece…"}<span className={styles.cursor}>▌</span></span></li>}</ol>
+    {status === "error" && error && <p role="alert" className={`${styles.error} ${styles.alert}`}>{error}</p>}
+    {status === "error" && <p className={styles.actions}><button type="button" className="dq-big-button" onClick={() => setAttempt(n => n + 1)}>Continue building</button><Link href="/" className="dq-small-button">Back to Today</Link></p>}
+  </section></AppShell>;
 }

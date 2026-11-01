@@ -231,7 +231,11 @@ export default function Today({ demo = false }: { demo?: boolean }) {
   const pendingChanges = Object.values(photos).some(p => p.pending) || gallery.failed;
   const pendingFitChanges = !!photos.fit?.pending;
   const spriteReady = !!spriteUrl && spriteVerification?.url === spriteUrl && spriteVerification.status === "ready";
-  const canFinish = !!photos.fit?.url && spriteReady && !pendingChanges && !uploading && !spriteBusy && !storageError;
+  // all three asked-for photos (fit, food, place) must be in before the world can be made
+  const have = { fit: !!photos.fit?.url, lunch: gallery.items.some(item => item.kind === "lunch" && item.url), landmark: gallery.items.some(item => item.kind === "landmark" && item.url) };
+  const added = Object.values(have).filter(Boolean).length, allThree = added === 3;
+  const missingNames = [!have.fit && "Fit", !have.lunch && "Food", !have.landmark && "Place"].filter(Boolean).join(" and ");
+  const canFinish = allThree && spriteReady && !pendingChanges && !uploading && !spriteBusy && !storageError;
   function finishDay() {
     if (!canFinish || Object.keys(pendingFiles.current).length || generationRunning.current) return;
     if (DEMO_MODE) { sfx.fanfare(); router.push("/generating"); return; }
@@ -250,14 +254,14 @@ export default function Today({ demo = false }: { demo?: boolean }) {
       setStorageError("Your browser could not save this draft. Enable session storage to continue.");
     }
   }
-  const finishHint = spriteBusy ? "Making your character…" : !photos.fit?.url ? "Add your fit to begin" : uploading ? "Saving…" : pendingChanges ? "Retry or remove failed photos" : spriteReady ? "All set!" : spriteUrl ? "Check your character preview" : "Waiting for your character";
+  const finishHint = !allThree && !spriteBusy ? `${added} of 3 photos added · add your ${missingNames} photo` : spriteBusy ? "Making your character…" : !photos.fit?.url ? "Add your fit to begin" : uploading ? "Saving…" : pendingChanges ? "Retry or remove failed photos" : spriteReady ? "All set!" : spriteUrl ? "Check your character preview" : "Waiting for your character";
   return <AppShell active={demo ? "demo" : "try"}>
     <section className="dq-card dq-card-pink" aria-labelledby="photos-title">
       <div className="dq-quest-head">
         <div className="dq-quest-title"><span className="dq-date">{today ? today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }) : "\u00a0"}</span><h1 id="photos-title">{demo ? "Lucas · sample day" : "Your day"}</h1><p className="dq-subtitle">{demo ? "A sample made with demo photos." : "What did today look like?"}</p></div>
         <span className="dq-chip dq-chip-pink" aria-label={`${uploaded} photos added`}>{uploaded} {uploaded === 1 ? "photo" : "photos"}</span>
       </div>
-      <div className="dq-photo-grid">{quests.map(quest => { const photo = photos[quest.kind]; return <div className={`dq-photo-card dq-photo-${quest.kind} ${photo?.url ? "is-uploaded" : ""}`} key={quest.kind}>
+      <div className="dq-photo-grid">{quests.map(quest => { const photo = photos[quest.kind]; return <div className={`dq-photo-card dq-photo-${quest.kind} ${photo?.url ? "is-uploaded" : ""}`} key={quest.kind} style={!photo?.url && !demo ? { outline: "3px dashed #f2759b", outlineOffset: 3 } : undefined}>
         <div className="dq-photo-head"><h3>{quest.name}</h3>{!demo && <CameraButton label={`Take a photo for ${quest.name}`} disabled={!sessionId} onFile={file => void upload(quest.kind, file)} />}</div>
         <label className="dq-upload-zone" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void upload(quest.kind, event.dataTransfer.files[0]); }}>
           <input type="file" accept="image/jpeg,image/png,image/webp" aria-label={`Upload ${quest.name}`} disabled={!sessionId} onChange={event => { void upload(quest.kind, event.target.files?.[0]); event.target.value = ""; }}/>
@@ -270,11 +274,12 @@ export default function Today({ demo = false }: { demo?: boolean }) {
           {photo?.error && <><p className="dq-error" role="alert">{photo.error}</p>{photo.pending && <div className="dq-actions"><button type="button" className="dq-small-button" onClick={() => void upload(quest.kind, pendingFiles.current[quest.kind])}>Retry</button><button type="button" className="dq-small-button" onClick={() => discardReplacement(quest.kind)}>{photo.url ? "Keep old" : "Discard"}</button></div>}</>}
         </div>}
       </div>; })}
-        {galleries.map(g => <GalleryCard key={g.kind} title={g.name} sprite={g.sprite} kind={g.kind} wide={"wide" in g} readOnly={demo} ready={!!sessionId} items={gallery.items.filter(item => item.kind === g.kind)} onAdd={files => gallery.add(g.kind, files)} onRemove={gallery.remove} onRetry={gallery.retry} onNote={gallery.setNote} />)}
+        {galleries.map(g => <GalleryCard key={g.kind} missing={g.kind !== "extra" && !have[g.kind] && !demo} title={g.name} sprite={g.sprite} kind={g.kind} wide={"wide" in g} readOnly={demo} ready={!!sessionId} items={gallery.items.filter(item => item.kind === g.kind)} onAdd={files => gallery.add(g.kind, files)} onRemove={gallery.remove} onRetry={gallery.retry} onNote={gallery.setNote} />)}
       </div>
       {!demo && <p className="dq-cta-hint">The first Place and Food photos anchor your world. Other photos and notes add context.</p>}
       {gallery.notice && <p className="dq-error" role="alert">{gallery.notice}</p>}
-      {spriteUrl ? <SpritePreview url={spriteUrl} onStatusChange={setSpriteVerification} onRegenerate={() => void makeSprite()} disabled={demo || spriteBusy || uploading || pendingChanges} retained={pendingChanges} /> : <div className="dq-sprite-status" aria-live="polite"><PixelSprite name="face" size={4} className={spriteBusy ? "dq-hop" : undefined}/><div><strong>{spriteBusy ? "Making your character…" : "Your character"}</strong><span>{spriteError || (spriteBusy ? "Just a minute" : "Add a fit photo to start")}</span></div>{spriteError && <button type="button" className="dq-small-button" disabled={spriteBusy || pendingFitChanges} onClick={() => void makeSprite()}>Retry</button>}</div>}
+      {!allThree && <div className="dq-sprite-status" aria-live="polite"><PixelSprite name="face" size={4}/><div><strong>{added} of 3 photos added</strong><span>Add your {missingNames} photo to get your adventure ready.</span></div></div>}
+      <div hidden={!allThree}>{spriteUrl ? <SpritePreview url={spriteUrl} onStatusChange={setSpriteVerification} onRegenerate={() => void makeSprite()} disabled={demo || spriteBusy || uploading || pendingChanges} retained={pendingChanges} /> : <div className="dq-sprite-status" aria-live="polite"><PixelSprite name="face" size={4} className={spriteBusy ? "dq-hop" : undefined}/><div><strong>{spriteBusy ? "Making your character…" : "Your character"}</strong><span>{spriteError || (spriteBusy ? "Just a minute" : "Add a fit photo to start")}</span></div>{spriteError && <button type="button" className="dq-small-button" disabled={spriteBusy || pendingFitChanges} onClick={() => void makeSprite()}>Retry</button>}</div>}</div>
       <div className="dq-places">
         <PixelSprite name="pin" size={4}/>
         <div><strong>Location history</strong><span className={placesError ? "dq-error" : undefined} role={placesError ? "alert" : undefined}>{placesError || (places ? `${places.count.toLocaleString("en-GB")} places${places.range ? ` · ${places.range}` : ""}` : "Google Timeline JSON or GPX")}</span></div>

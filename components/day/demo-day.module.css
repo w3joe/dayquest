@@ -1,0 +1,45 @@
+.head{display:flex;align-items:center;gap:16px}
+.title{flex:1;min-width:0}
+.title h1{font-family:var(--pixel);font-weight:500;font-size:34px;line-height:1.1}
+.kicker{display:block;font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.sub{font-size:14px;color:var(--muted);margin-top:4px}
+.player{flex:none;display:grid;place-items:center;width:88px;height:112px;border-radius:22px;background:#f6f1fd;border:3px dashed #d3c6f0}
+.player img{image-rendering:pixelated;animation:dq-bob 2.4s steps(2) infinite}
+.shareRow{display:flex;flex-wrap:wrap;gap:12px}
+.shareRow .pill{flex:1 1 240px;width:auto;font-size:18px;padding:14px 22px}
+.status{font-size:13px;color:#3f8a62;margin-top:-6px}
+.copy{display:grid;gap:6px;font-size:13px;color:var(--muted)}
+.copy input{border:2px solid var(--edge);border-radius:12px;background:#fff;padding:8px 10px;font-size:13px}
+.gameWrap{position:relative;z-index:1;box-sizing:border-box;width:min(1040px,100%);margin:0 auto;padding:0 20px}
+.game{box-sizing:border-box;max-width:1000px;margin:0 auto;background:var(--panel);border:3px solid #bfe0d0;border-radius:30px;box-shadow:6px 6px 0 #dcf1e6;padding:14px 17px;display:grid;gap:12px;justify-items:center}
+.hint{font-family:var(--pixel);font-size:15px;color:var(--muted);text-align:center;line-height:1.4}
+.frame{display:block;width:100%;max-width:960px;min-width:0;height:clamp(440px,66.6vw,640px);border:3px solid var(--edge);border-radius:20px;background:#14121a}
+.sectionHead{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.sectionHead h2{font-family:var(--pixel);font-weight:500;font-size:28px}
+.count{font-family:var(--pixel);font-size:14px;background:#fff;border:2px solid var(--edge);border-radius:999px;padding:2px 10px}
+.scenes{list-style:none;margin:0;padding:0;display:grid;gap:18px}
+.scene{gap:10px}
+.sceneTop{display:flex;align-items:center;gap:14px}
+.thumb{flex:none;width:64px;height:64px;border-radius:16px;background:#fff;border:2px solid var(--edge);display:grid;place-items:center;overflow:hidden}
+.thumb img{max-width:80%;max-height:80%;image-rendering:pixelated}
+.scene h3{font-family:var(--pixel);font-weight:500;font-size:24px;line-height:1.15}
+.landmarks{font-size:13px;color:var(--muted)}
+.text{font-size:14px;line-height:1.6}
+.leg{justify-self:start;font-size:14px!important;padding:3px 12px!important;background:var(--butter);border-color:#f6d9a8;color:#8a6a2a}
+.legMint{background:var(--mint);border-color:#a9dcc0;color:#3f8a62}
+.cta{display:grid;justify-items:center;gap:8px;text-align:center}
+.cta p{font-size:13px;color:var(--muted)}
+/* clip modal */
+.overlay{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:rgba(91,74,95,.45);padding:16px}
+.modal{width:min(440px,100%);text-align:center;font-size:14px}
+.modal p{font-family:var(--pixel);font-size:18px}
+.bar{height:16px;border:2px solid var(--edge);border-radius:999px;background:#fff;overflow:hidden}
+.bar span{display:block;height:100%;background:var(--hot);border-radius:999px}
+.preview{aspect-ratio:3/2;border:3px solid var(--edge);border-radius:20px;background:var(--sky);display:grid;place-items:center;position:relative;overflow:hidden}
+.preview img{max-height:78%;max-width:78%;image-rendering:pixelated}
+.preview span{position:absolute;left:10px;bottom:8px;font-family:var(--pixel);font-size:13px;background:#fffdf8;border:2px solid var(--edge);border-radius:999px;padding:1px 10px}
+.modalActions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.modalActions :global(.dq-small-button){margin-left:0}
+.close{border:0;background:none;text-decoration:underline;color:var(--muted);font-size:13px;cursor:pointer}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);font-family:var(--pixel);font-size:16px;background:var(--hot);color:#fff;border:3px solid #f2759b;border-radius:999px;padding:6px 18px;box-shadow:0 4px 0 #e56a92}
+@media(max-width:640px){.gameWrap{padding:0 14px}.game{padding:10px;border-radius:26px}.title h1{font-size:26px}.player{width:72px;height:96px}.player img{width:48px;height:72px}.scene h3{font-size:20px}}
