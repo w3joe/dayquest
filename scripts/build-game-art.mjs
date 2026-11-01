@@ -17,3 +17,4 @@ await Promise.all(Object.entries(ground).map(([name, input]) => sharp(`${source}
 const props = { tree: 60, lamp: 58, bollard: 20, cycle_stand: 28, aboard: 28, hedge: 20, bin_grey: 26, bin_purple: 26, car_red: 34, car_blue: 34 };
 await Promise.all(Object.entries(props).map(([name, height]) => sharp(`${source}/${name}.png`).resize({ height, kernel: "nearest" }).png().toFile(`${target}/${name}.png`)));
 console.log("Game textures and street furniture built from Shadwell's processed artwork.");
+await import("./build-transport-art.mjs");

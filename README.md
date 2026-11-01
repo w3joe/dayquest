@@ -84,3 +84,11 @@ npx tsx scripts/preview-world.mts
 ```
 
 Then visit `http://localhost:3000/day/world-preview` with the development server running. The preview uses existing Shadwell buildings and character frames plus a demo lunch icon, labels them as sample artwork, and writes only ignored `public/days/world-preview/` files. It makes no paid API calls and does not demonstrate photo analysis or live generation.
+
+### Connected locations and transport
+
+The transport layer accepts completed location scenes and explicit journeys independently of the location-entry implementation. [Transport integration](docs/TRANSPORT-INTEGRATION.md) defines scene IDs, departure/arrival points, route legs and the `composeWorldItinerary` handoff. Existing single-location worlds remain supported.
+
+Run `npm run preview:transport`, then open `http://localhost:3000/day/transport-preview` while the development server is running. This offline fixture has four sample locations linked by bus, a Tube journey with a line change, and a walk. Walk to the departure point and use Space/Enter or the touch action button to confirm boarding. Travel can be skipped to arrival, and refreshing resumes at a safe scene checkpoint. Only the last location has a finish/share exit.
+
+Bus-stop and station sprites are pre-generated and shared across journeys. Builds validate the committed PNGs locally; runtime travel never calls an image service. Exact ImageGen prompts are recorded in `scripts/transport-art-prompts.json`.

@@ -1,4 +1,5 @@
-import { resolveDayAsset, type DayManifest, type DayScene, type InteractEffect, type TransitLeg, type WorldObject } from "@/lib/day";
+import { resolveDayAsset, type DayManifest, type DayScene, type InteractEffect, type TransitLeg, type TravelPoint, type JourneyLeg, type WorldObject } from "@/lib/day";
+import { activeJourney, advanceJourney, checkpointJourney, departureJourney, journeyPhaseDuration, journeyStorageKey, restoreJourney, type JourneyEvent, type JourneyState } from "./journey";
 import { worldCollision } from "./world-layout";
 import { BASE_MAPS, FRAMES, MAP_H, MAP_W, TILE, VIEW_H, VIEW_W, groundBlocked, hash, placeLandmark } from "./maps";
 
@@ -15,6 +16,9 @@ const PAPER = "#f6f1df", INK = "#1f1a2e";
 export async function createGame(parent: HTMLElement, manifest: DayManifest, manifestUrl: string, onShare?: () => Promise<void> | undefined): Promise<GameHandle> {
   const images = new Map<string, HTMLImageElement>();
   const urls = new Set(["/tiles/dq-atlas.png", "/tiles/dq/tree.png", "/transit/bus.png", "/transit/tube.png", "/transit/city.png", "/transit/nelson.png", resolveDayAsset(manifest.player.sprite, manifestUrl)]);
+  if (manifest.journeys?.length) {
+    urls.add("/transit/library/bus_stop.png"); urls.add("/transit/library/station.png");
+  }
   if (manifest.player.walkSheet) urls.add(resolveDayAsset(manifest.player.walkSheet, manifestUrl));
   for (const scene of manifest.scenes) {
     if (scene.world) {
@@ -50,7 +54,12 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
   const walkSheet = manifest.player.walkSheet ? asset(manifest.player.walkSheet) : undefined;
   if (walkSheet && (walkSheet.width !== 96 || walkSheet.height !== 192)) throw new Error("Character walking artwork has an invalid frame layout");
   let viewWidth = VIEW_W, viewHeight = VIEW_H;
-  let index = 0, mode: "highlight" | "transit" | "end" = "highlight";
+  let storedJourney: string | null = null;
+  if (manifest.journeys?.length) { try { storedJourney = localStorage.getItem(journeyStorageKey(manifest.id)); } catch { /* Browsing still works without persistent storage. */ } }
+  let journeyState: JourneyState | undefined = manifest.journeys?.length ? restoreJourney(manifest, storedJourney) : undefined;
+  let index = journeyState ? Math.max(0, manifest.scenes.findIndex(scene => scene.id === journeyState?.sceneId)) : 0;
+  let mode: "highlight" | "transit" | "journey" | "end" = "highlight";
+  let boardingOrigin = { x: 0, y: 0 };
   let x = 0, y = 0, facing: Direction = "up", moving = false, elapsed = 0, chapterAt = 0;
   let dialogue: (Talk & { shown: number; remaining: string[] }) | undefined;
   let blocked = new Set<string>(), talks = new Map<string, Talk>(), sprites: Sprite[] = [];
@@ -66,7 +75,9 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     viewWidth = scene.world ? 480 : VIEW_W; viewHeight = scene.world ? 320 : VIEW_H;
     canvas.width = viewWidth; canvas.height = viewHeight;
     resize();
-    x = scene.spawn.x * TILE + 8; y = scene.spawn.y * TILE + 15; facing = scene.world ? "down" : "up";
+    const incoming = journeyState?.phase === "exploring" ? manifest.journeys?.find(item => item.toSceneId === scene.id && journeyState?.completed.includes(item.id)) : undefined;
+    const entry = incoming?.arrival.approach ?? scene.spawn;
+    x = entry.x * TILE + 8; y = entry.y * TILE + 15; facing = scene.world ? "down" : "up";
     mode = "highlight"; chapterAt = elapsed;
     if (scene.world) {
       for (const object of scene.world.objects) {
@@ -107,6 +118,11 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
   }
   function nextChapter() { index++; keys.clear(); enterChapter(); }
   function confirm() {
+    if (journeyState) {
+      if (journeyState.phase === "prompt") { changeJourney({ type: "confirm" }); return; }
+      if (["boarding", "riding", "transfer"].includes(journeyState.phase)) { changeJourney({ type: "skip" }); return; }
+      if (journeyState.phase === "arriving") return;
+    }
     if (mode === "transit") { nextChapter(); return; }
     if (mode === "end") { void share(); return; }
     if (dialogue) {
@@ -114,6 +130,10 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
       else if (dialogue.remaining.length) { dialogue.text = dialogue.remaining.shift()!; dialogue.shown = 0; }
       else dialogue = undefined;
       return;
+    }
+    const departure = journeyState && departureJourney(manifest, journeyState);
+    if (departure && nearTravelPoint(departure.departure)) {
+      changeJourney({ type: "prompt", journeyId: departure.id, nearby: true }); return;
     }
     const [dx, dy] = DIR[facing], col = Math.floor(x / TILE), row = Math.floor(y / TILE);
     const target = talks.get(`${col + dx},${row + dy}`);
@@ -144,6 +164,41 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     }
     if (object.text) startTalk({ text: object.text });
   }
+  function nearTravelPoint(point: TravelPoint) {
+    return Math.hypot(x - (point.approach.x * TILE + 8), y - (point.approach.y * TILE + 15)) < 34;
+  }
+  function saveJourney() {
+    if (!journeyState) return;
+    try { localStorage.setItem(journeyStorageKey(manifest.id), JSON.stringify(checkpointJourney(manifest, journeyState))); } catch { /* Optional browser persistence. */ }
+  }
+  function changeJourney(event: JourneyEvent) {
+    if (!journeyState) return;
+    const before = journeyState;
+    journeyState = advanceJourney(manifest, before, event);
+    if (journeyState === before) return;
+    const journey = activeJourney(manifest, journeyState);
+    if (journeyState.sceneId !== before.sceneId) {
+      index = manifest.scenes.findIndex(scene => scene.id === journeyState!.sceneId);
+      enterChapter();
+      if (journey) { x = journey.arrival.tile.x * TILE + 8; y = journey.arrival.tile.y * TILE + 15; }
+    }
+    if (journeyState.phase !== before.phase) {
+      if (!(before.phase === "prompt" && journeyState.phase === "exploring")) keys.clear();
+      dialogue = undefined;
+      if (journeyState.phase === "boarding") boardingOrigin = { x, y };
+      mode = ["boarding", "riding", "transfer", "arriving"].includes(journeyState.phase) ? "journey" : "highlight";
+      if (journeyState.phase === "exploring") {
+        const arrived = activeJourney(manifest, before);
+        if (before.phase === "arriving" && arrived) { x = arrived.arrival.approach.x * TILE + 8; y = arrived.arrival.approach.y * TILE + 15; }
+        moving = false; chapterAt = elapsed;
+      }
+      saveJourney();
+      const description = journey ? journeyState.phase === "prompt" ? `Ready to travel from ${journey.departure.label}. Press Read again to ${journey.legs[0].mode === "walk" ? "set off" : "board"}; walk away to cancel.`
+        : journeyState.phase === "exploring" ? `Arrived at ${journey.arrival.label}. Walk to explore.`
+        : `${journeyState.phase === "arriving" ? "Arriving at" : "Travelling to"} ${journey.arrival.label}.` : "Walk to explore.";
+      journeyStatus.textContent = description;
+    }
+  }
   function startTalk(talk: Talk) {
     const isWorld = Boolean(manifest.scenes[index].world);
     const left = talk.icon ? (isWorld ? 58 : 56) : 18;
@@ -169,6 +224,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
   }
   const keydown = (event: KeyboardEvent) => {
     if (KEY[event.code]) { event.preventDefault(); keys.add(KEY[event.code]); }
+    if (event.code === "Escape" && journeyState?.phase === "prompt") { event.preventDefault(); changeJourney({ type: "cancel" }); }
     if (event.code === "Space" || event.code === "Enter") { event.preventDefault(); if (!event.repeat) confirm(); }
   };
   const keyup = (event: KeyboardEvent) => { if (KEY[event.code]) keys.delete(KEY[event.code]); };
@@ -179,10 +235,14 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
   window.addEventListener("blur", clearKeys);
   const controls = document.createElement("div");
   controls.style.cssText = "display:flex;justify-content:center;flex-wrap:wrap;gap:8px;padding:10px;line-height:1.5;color:#f6f1df;font:12px monospace;width:100%";
+  const journeyStatus = document.createElement("p");
+  journeyStatus.setAttribute("aria-live", "polite");
+  journeyStatus.style.cssText = "color:#f6f1df;font:11px monospace;line-height:1.5;text-align:center;margin:5px 8px";
+  if (journeyState) { journeyStatus.textContent = departureJourney(manifest, journeyState) ? "Walk to the marked stop, then press Read to travel." : "Explore this final scene, then follow the Finish sign."; parent.append(journeyStatus); }
   const disposers: (() => void)[] = [];
-  for (const [label, direction] of [["←", "left"], ["↑", "up"], ["↓", "down"], ["→", "right"], ["Read / Skip / Share", "confirm"]] as const) {
+  for (const [label, direction] of [["←", "left"], ["↑", "up"], ["↓", "down"], ["→", "right"], [journeyState ? "Read / Travel / Skip / Share" : "Read / Skip / Share", "confirm"]] as const) {
     const button = document.createElement("button"); button.type = "button"; button.textContent = label;
-    button.setAttribute("aria-label", direction === "confirm" ? "Read, skip transport or share" : `Walk ${direction}`);
+    button.setAttribute("aria-label", direction === "confirm" ? "Read, travel, skip transport or share" : `Walk ${direction}`);
     button.style.cssText = "min-width:40px;min-height:40px;border:2px solid #f6f1df;background:#342e46;color:#f6f1df;padding:6px 10px;touch-action:none";
     if (direction === "confirm") button.addEventListener("click", confirm);
     else {
@@ -193,6 +253,16 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
       disposers.push(() => { button.removeEventListener("pointerdown", down); button.removeEventListener("pointerup", up); button.removeEventListener("pointercancel", up); button.removeEventListener("lostpointercapture", up); });
     }
     disposers.push(() => button.removeEventListener("click", confirm)); controls.append(button);
+  }
+  if (journeyState) {
+    const restart = document.createElement("button"); restart.type = "button"; restart.textContent = "Restart journey";
+    restart.style.cssText = "min-height:40px;border:1px solid #a6b79a;background:transparent;color:#f6f1df;padding:6px 10px;touch-action:manipulation";
+    const reset = () => {
+      journeyState = restoreJourney(manifest); index = 0; keys.clear(); shareNote = "";
+      enterChapter(); saveJourney();
+      journeyStatus.textContent = "Journey restarted. Walk to the marked stop, then press Read to travel.";
+    };
+    restart.addEventListener("click", reset); disposers.push(() => restart.removeEventListener("click", reset)); controls.append(restart);
   }
   parent.append(controls);
   const resize = () => {
@@ -303,26 +373,50 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
       ctx.fillStyle = "#48372b"; ctx.fillRect(tile.x * TILE + 1, tile.y * TILE + 10, 14, 9);
       ctx.fillStyle = "#9b7350"; ctx.fillRect(tile.x * TILE - 3, tile.y * TILE + 5, 22, 7);
     }
+    const departure = journeyState && departureJourney(manifest, journeyState);
+    const active = journeyState && activeJourney(manifest, journeyState);
+    const incoming = manifest.journeys?.find(item => item.toSceneId === scene.id);
+    if (incoming) drawTravelPoint(incoming.arrival, false);
+    if (departure) drawTravelPoint(departure.departure, true);
+    const travel = journeyState?.phase === "boarding" ? active?.departure : journeyState?.phase === "arriving" ? active?.arrival : undefined;
+    if (travel && active?.legs[journeyState?.phase === "arriving" ? active.legs.length - 1 : 0]?.mode === "bus") {
+      const bus = picture("/transit/bus.png");
+      ctx.drawImage(bus, travel.tile.x * TILE - 94, travel.tile.y * TILE - 4, 144, 72);
+    }
     for (const sprite of sprites) if (sprite.shadow) shadow(sprite.x, sprite.feet, sprite.shadow);
-    shadow(x, y, 15);
+    const hidePlayer = journeyState?.phase === "boarding" && journeyState.phaseMs > 1050;
+    if (!hidePlayer) shadow(x, y, 15);
     for (const sprite of sprites) if (sprite.roam) sprite.x = Math.round((sprite.home ?? sprite.x) + Math.sin(elapsed / 1400 + (sprite.phase ?? 0)) * sprite.roam);
-    const entities: Sprite[] = [...sprites, { image: playerImage, x, feet: y, player: true }];
+    const entities: Sprite[] = hidePlayer ? [...sprites] : [...sprites, { image: playerImage, x, feet: y, player: true }];
     for (const sprite of entities.sort((a, b) => a.feet - b.feet)) {
       if (sprite.player) { drawPlayer(sprite.x, sprite.feet); continue; }
       const width = sprite.width ?? sprite.image.width, height = sprite.height ?? sprite.image.height;
       ctx.drawImage(sprite.image, Math.round(sprite.x - width / 2), Math.round(sprite.feet - height), width, height);
     }
     drawEffects(world);
-    const exitX = scene.exit.x * TILE + 8, exitY = scene.exit.y * TILE + 8;
-    ctx.fillStyle = "#274c3b"; ctx.fillRect(exitX - 31, exitY - 27, 36, 18);
-    text("FINISH →", exitX - 13, exitY - 22, 6, PAPER, "center");
-    text("▶", exitX - 4, exitY - 3, 11, "#fff6b0");
+    if (incoming) drawTravelPoint(incoming.arrival, false, true);
+    if (departure) drawTravelPoint(departure.departure, true, true);
+    if (!journeyState || index === manifest.scenes.length - 1) {
+      const exitX = scene.exit.x * TILE + 8, exitY = scene.exit.y * TILE + 8;
+      ctx.fillStyle = "#274c3b"; ctx.fillRect(exitX - 31, exitY - 27, 36, 18);
+      text("FINISH →", exitX - 13, exitY - 22, 6, PAPER, "center");
+      text("▶", exitX - 4, exitY - 3, 11, "#fff6b0");
+    }
     ctx.restore();
     ctx.fillStyle = "rgba(31,26,46,.88)"; ctx.fillRect(8, 8, viewWidth - 16, 25);
     text(`${scene.time} · ${scene.title}`, 16, 16, 8);
-    if (elapsed - chapterAt < 6000 && !dialogue) {
+    if (mode !== "journey" && (departure || elapsed - chapterAt < 6000) && !dialogue && journeyState?.phase !== "prompt") {
       ctx.fillStyle = "rgba(31,26,46,.88)"; ctx.fillRect(8, viewHeight - 28, viewWidth - 16, 20);
-      text("WALK · SPACE TO READ · FOLLOW THE FINISH SIGN →", viewWidth / 2, viewHeight - 22, 7, PAPER, "center");
+      const hint = departure ? nearTravelPoint(departure.departure) ? "SPACE / READ: TRAVEL FROM THIS STOP" : `WALK TO ${departure.departure.label.toUpperCase()} →`
+        : "WALK · SPACE TO READ · FOLLOW THE FINISH SIGN →";
+      text(hint.slice(0, 75), viewWidth / 2, viewHeight - 22, 7, PAPER, "center");
+    }
+    if (journeyState?.phase === "prompt" && active) {
+      ctx.fillStyle = INK; ctx.fillRect(8, viewHeight - 76, viewWidth - 16, 68);
+      ctx.strokeStyle = "#d9c782"; ctx.strokeRect(10, viewHeight - 74, viewWidth - 20, 64);
+      text(`TRAVEL TO ${active.arrival.label.toUpperCase()}`.slice(0, 75), 20, viewHeight - 64, 8);
+      text(active.legs.map(leg => leg.mode === "bus" ? `Bus ${leg.route}` : leg.mode === "tube" ? `${leg.line} line` : "Walk").join(" → ").slice(0, 80), 20, viewHeight - 48, 7);
+      text(`PRESS SPACE / READ AGAIN TO ${active.legs[0].mode === "walk" ? "SET OFF" : "BOARD"} · WALK AWAY TO CANCEL`, 20, viewHeight - 27, 6, "#fff0a8");
     }
     if (dialogue) {
       ctx.fillStyle = INK; ctx.fillRect(8, viewHeight - 81, viewWidth - 16, 73);
@@ -332,6 +426,113 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
       wrap(dialogue.text.slice(0, Math.floor(dialogue.shown)), left, viewHeight - 70, viewWidth - left - 24);
       if (dialogue.shown >= dialogue.text.length) text(dialogue.remaining.length ? "SPACE FOR MORE ▼" : "SPACE TO CLOSE ▼", viewWidth - 18, viewHeight - 22, 6, PAPER, "right");
     }
+  }
+  function drawTravelPoint(point: TravelPoint, outgoing: boolean, labelOnly = false) {
+    const px = point.tile.x * TILE + 8, py = point.tile.y * TILE + 15;
+    if (!labelOnly) {
+    if (point.kind === "path") {
+      ctx.fillStyle = outgoing ? "#dfba64" : "#a4bb94";
+      ctx.beginPath(); ctx.moveTo(px - 8, py - 6); ctx.lineTo(px + 7, py - 6); ctx.lineTo(px + 7, py - 11);
+      ctx.lineTo(px + 16, py - 3); ctx.lineTo(px + 7, py + 5); ctx.lineTo(px + 7, py); ctx.lineTo(px - 8, py); ctx.fill();
+    } else {
+      const station = point.kind === "station", width = station ? 64 : 48, height = station ? 58 : 48;
+      ctx.drawImage(picture(`/transit/library/${station ? "station" : "bus_stop"}.png`), px - width / 2, py - height, width, height);
+    }
+    return;
+    }
+    const label = `${outgoing ? "→ " : ""}${point.label}`.slice(0, 28), width = Math.min(150, label.length * 4 + 12);
+    ctx.fillStyle = outgoing ? "#263f35" : "#373543"; ctx.fillRect(px - width / 2, py - 67, width, 14);
+    text(label, px, py - 63, 6, PAPER, "center");
+  }
+  function animateJourneyFeet() {
+    if (!journeyState) return;
+    const journey = activeJourney(manifest, journeyState);
+    if (!journey) return;
+    if (journeyState.phase === "boarding") {
+      const progress = Math.min(1, journeyState.phaseMs / 1000), bus = journey.legs[0].mode === "bus";
+      const target = { x: journey.departure.tile.x * TILE + 8, y: journey.departure.tile.y * TILE + 15 + (bus ? 52 : 0) };
+      x = boardingOrigin.x + (target.x - boardingOrigin.x) * progress; y = boardingOrigin.y + (target.y - boardingOrigin.y) * progress;
+      const dx = target.x - boardingOrigin.x, dy = target.y - boardingOrigin.y;
+      facing = Math.abs(dx) > Math.abs(dy) ? dx > 0 ? "right" : "left" : dy > 0 ? "down" : "up";
+      moving = progress < 1;
+    } else if (journeyState.phase === "arriving") {
+      const progress = Math.min(1, journeyState.phaseMs / journeyPhaseDuration(manifest, journeyState));
+      const point = journey.arrival, bus = journey.legs.at(-1)?.mode === "bus";
+      const from = { x: point.tile.x * TILE + 8, y: point.tile.y * TILE + 15 + (bus ? 52 : 0) };
+      const to = { x: point.approach.x * TILE + 8, y: point.approach.y * TILE + 15 };
+      x = from.x + (to.x - from.x) * progress; y = from.y + (to.y - from.y) * progress;
+      facing = Math.abs(to.x - from.x) >= Math.abs(to.y - from.y) ? to.x >= from.x ? "right" : "left" : to.y >= from.y ? "down" : "up";
+      moving = true;
+    }
+  }
+  function legName(leg: JourneyLeg) { return leg.mode === "bus" ? `BUS ${leg.route}` : leg.mode === "tube" ? `${leg.line.toUpperCase()} LINE` : "ON FOOT"; }
+  function legStart(leg: JourneyLeg) { return leg.mode === "tube" ? leg.stations[0] : leg.from; }
+  function legEnd(leg: JourneyLeg) { return leg.mode === "tube" ? leg.stations.at(-1)! : leg.to; }
+  function drawJourney() {
+    if (!journeyState) return;
+    const journey = activeJourney(manifest, journeyState);
+    if (!journey) { drawWorld(); return; }
+    const leg = journey.legs[journeyState.legIndex], progress = Math.min(1, journeyState.phaseMs / journeyPhaseDuration(manifest, journeyState));
+    if (journeyState.phase === "boarding" || journeyState.phase === "arriving") {
+      drawWorld();
+      ctx.fillStyle = INK; ctx.fillRect(8, viewHeight - 30, viewWidth - 16, 22);
+      const label = journeyState.phase === "boarding" ? `${journey.legs[0].mode === "walk" ? "STARTING WALK" : "BOARDING"} · ${legName(journey.legs[0])} · SPACE TO SKIP JOURNEY`
+        : `ARRIVING AT ${journey.arrival.label.toUpperCase()}`;
+      text(label.slice(0, 80), viewWidth / 2, viewHeight - 23, 7, PAPER, "center");
+      return;
+    }
+    ctx.fillStyle = leg.mode === "tube" ? "#292636" : "#a6c9d6"; ctx.fillRect(0, 0, viewWidth, viewHeight);
+    if (journeyState.phase === "transfer") {
+      ctx.fillStyle = "#c8bda1"; ctx.fillRect(0, 175, viewWidth, viewHeight - 175);
+      const station = leg.mode === "tube", image = picture(`/transit/library/${station ? "station" : "bus_stop"}.png`);
+      ctx.drawImage(image, viewWidth / 2 + 35, 220 - image.height * 1.4, image.width * 1.4, image.height * 1.4);
+      facing = "right"; moving = true; shadow(105 + progress * 165, 238, 18); drawPlayer(105 + progress * 165, 238);
+      ctx.fillStyle = INK; ctx.fillRect(12, 12, viewWidth - 24, 72);
+      text(`CHANGE AT ${legStart(leg).toUpperCase()}`.slice(0, 70), viewWidth / 2, 29, 9, PAPER, "center");
+      text(`NEXT: ${legName(leg)}`, viewWidth / 2, 53, 9, "#ffcf84", "center");
+    } else if (leg.mode === "walk") {
+      const city = picture("/transit/city.png"), offset = (journeyState.phaseMs * .055) % city.width;
+      for (let px = -offset; px < viewWidth; px += city.width) ctx.drawImage(city, Math.round(px), 150 - city.height);
+      ctx.fillStyle = "#bcb193"; ctx.fillRect(0, 150, viewWidth, viewHeight - 150);
+      ctx.fillStyle = "#a3b482"; ctx.fillRect(0, 168, viewWidth, 29);
+      for (let tx = -((journeyState.phaseMs * .08) % 180); tx < viewWidth; tx += 180) ctx.drawImage(picture("/tiles/dq/tree.png"), Math.round(tx), 151);
+      for (let col = -1; col < viewWidth / TILE + 1; col++) { ctx.strokeStyle = "#a79c80"; ctx.strokeRect(col * TILE - ((journeyState.phaseMs * .08) % TILE), 222, TILE, 32); }
+      facing = "right"; moving = true; shadow(viewWidth / 2, 245, 16); drawPlayer(viewWidth / 2, 245);
+    } else {
+      if (leg.mode === "bus") {
+        const city = picture("/transit/city.png"), offset = (journeyState.phaseMs * .11) % city.width;
+        for (let px = -offset; px < viewWidth; px += city.width) ctx.drawImage(city, Math.round(px), 185 - city.height);
+        ctx.fillStyle = "#777789"; ctx.fillRect(0, 185, viewWidth, 16);
+        ctx.fillStyle = "#4a4a55"; ctx.fillRect(0, 201, viewWidth, 70);
+        ctx.fillStyle = "#eee5bd";
+        for (let px = -((journeyState.phaseMs * .19) % 80); px < viewWidth; px += 80) ctx.fillRect(Math.round(px), 254, 40, 3);
+      } else {
+        ctx.fillStyle = "#393443";
+        for (let px = -((journeyState.phaseMs * .21) % 64); px < viewWidth; px += 64) ctx.fillRect(Math.round(px), 79, 9, 157);
+        ctx.fillStyle = leg.color; ctx.fillRect(0, 85, viewWidth, 8);
+        ctx.fillStyle = "#14121c"; ctx.fillRect(0, 239, viewWidth, 23);
+        ctx.strokeStyle = "#a6a1a5"; ctx.beginPath(); ctx.moveTo(0, 245); ctx.lineTo(viewWidth, 245); ctx.moveTo(0, 254); ctx.lineTo(viewWidth, 254); ctx.stroke();
+      }
+      const bus = leg.mode === "bus", vehicle = picture(bus ? "/transit/bus.png" : "/transit/tube.png");
+      const width = bus ? 192 : 246, height = bus ? 96 : 88, left = viewWidth / 2 - width / 2, top = 244 - height;
+      ctx.drawImage(vehicle, left, top, width, height);
+      // The canonical avatar is visibly seated behind the vehicle window, clipped at its sill.
+      ctx.save(); ctx.beginPath(); ctx.rect(left + 22, top + 14, width - 48, bus ? 28 : 29); ctx.clip();
+      facing = "right"; moving = false; drawPlayer(viewWidth / 2 + 15, top + 54); ctx.restore();
+      if (leg.mode === "tube") {
+        const station = leg.stations[Math.min(leg.stations.length - 1, Math.floor(progress * leg.stations.length))];
+        text(station.toUpperCase().slice(0, 60), viewWidth / 2, 264, 8, "#ffcf84", "center");
+      }
+    }
+    if (journeyState.phase !== "transfer") {
+      ctx.fillStyle = INK; ctx.fillRect(12, 12, viewWidth - 24, 67);
+      text(legName(leg), viewWidth / 2, 24, 12, "#ffcf84", "center");
+      text(`${legStart(leg)} → ${legEnd(leg)}`.slice(0, 75), viewWidth / 2, 49, 8, PAPER, "center");
+      text(`LEG ${journeyState.legIndex + 1} OF ${journey.legs.length}`, viewWidth / 2, 65, 6, PAPER, "center");
+    }
+    ctx.fillStyle = "#f6f1df"; ctx.fillRect(24, viewHeight - 30, viewWidth - 48, 3);
+    ctx.fillStyle = "#70a87f"; ctx.fillRect(24, viewHeight - 30, (viewWidth - 48) * progress, 3);
+    text("SPACE / READ: SKIP TO ARRIVAL", viewWidth / 2, viewHeight - 17, 6, PAPER, "center");
   }
   function drawTransit() {
     const step = transit[transitIndex], leg = step.leg, progress = Math.min(1, (elapsed - transitAt) / step.duration);
@@ -393,6 +594,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
       if (dialogue) dialogue.shown = Math.min(dialogue.text.length, dialogue.shown + dt * .04);
       else {
         const direction = [...keys].at(-1);
+        if (direction && journeyState?.phase === "prompt") changeJourney({ type: "cancel" });
         if (direction) {
           facing = direction; const [dx, dy] = DIR[direction], speed = dt * (manifest.scenes[index].world ? .092 : .064), nx = x + dx * speed, ny = y + dy * speed;
           if (!collision(nx, y)) { moving ||= nx !== x; x = nx; }
@@ -401,19 +603,23 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
           const atExit = manifest.scenes[index].world
             ? Math.abs(x - (exit.x * TILE + 8)) < 12 && Math.abs(y - (exit.y * TILE + 8)) < 22
             : Math.floor(x / TILE) === exit.x && Math.floor(y / TILE) === exit.y;
-          if (atExit) leaveChapter();
+          if (atExit && (!journeyState || index === manifest.scenes.length - 1)) leaveChapter();
         }
       }
+    } else if (mode === "journey") {
+      changeJourney({ type: "tick", deltaMs: dt });
+      animateJourneyFeet();
     } else if (mode === "transit" && elapsed - transitAt >= transit[transitIndex].duration) {
       if (++transitIndex >= transit.length) nextChapter(); else transitAt = elapsed;
     }
     ctx.imageSmoothingEnabled = false;
-    if (mode === "highlight") drawHighlight(); else if (mode === "transit") drawTransit(); else drawEnd();
+    if (mode === "highlight") drawHighlight(); else if (mode === "journey") drawJourney(); else if (mode === "transit") drawTransit(); else drawEnd();
     frameId = requestAnimationFrame(frame);
   }
   enterChapter(); frameId = requestAnimationFrame(frame);
   return { destroy() {
     destroyed = true; cancelAnimationFrame(frameId); observer.disconnect(); keys.clear();
+    journeyStatus.remove();
     canvas.removeEventListener("keydown", keydown); canvas.removeEventListener("keyup", keyup); canvas.removeEventListener("blur", clearKeys); canvas.removeEventListener("pointerdown", click);
     window.removeEventListener("blur", clearKeys); disposers.forEach(dispose => dispose()); canvas.remove(); controls.remove();
   } };

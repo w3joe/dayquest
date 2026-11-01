@@ -34,6 +34,8 @@ export type SceneWorld = {
   objects: WorldObject[];
 };
 export type DayScene = {
+  /** Stable external-provider key, required when a day contains multiple world scenes. */
+  id?: string;
   kind: "tourist" | "meal" | "park";
   title: string;
   time: string;
@@ -49,6 +51,21 @@ export type DayScene = {
 export type TransitLeg =
   | { mode: "bus"; route: string; destination: string; from: string; to: string }
   | { mode: "tube"; line: string; color: string; stations: string[] };
+export type TravelPoint = {
+  kind: "bus_stop" | "station" | "path";
+  label: string;
+  tile: Tile;
+  approach: Tile;
+};
+export type JourneyLeg = (TransitLeg | { mode: "walk"; from: string; to: string }) & { durationMs?: number };
+export type Journey = {
+  id: string;
+  fromSceneId: string;
+  toSceneId: string;
+  departure: TravelPoint;
+  arrival: TravelPoint;
+  legs: JourneyLeg[];
+};
 export type DayManifest = {
   id: string;
   date: string;
@@ -60,6 +77,7 @@ export type DayManifest = {
   };
   scenes: DayScene[];
   transit: { legs: TransitLeg[] }[];
+  journeys?: Journey[];
 };
 
 export function isDayId(id: string): boolean {
@@ -134,40 +152,117 @@ function validWorld(value: unknown): value is SceneWorld {
   }
   return true;
 }
-function clearTile(point: Tile, world: SceneWorld): boolean {
-  // Match the renderer's bottom-anchored player feet and small collision body.
+function overlaps(left: number, top: number, right: number, bottom: number, box: { x: number; y: number; width: number; height: number }): boolean {
+  return right > box.x && left < box.x + box.width && bottom > box.y && top < box.y + box.height;
+}
+function clearFootprint(scene: DayScene, left: number, top: number, right: number, bottom: number): boolean {
+  const world = scene.world;
+  if (!world || left < 0 || top < 0 || right >= world.width * 16 || bottom >= world.height * 16) return false;
+  for (let y = Math.floor(top / 16); y <= Math.floor(bottom / 16); y++) {
+    for (let x = Math.floor(left / 16); x <= Math.floor(right / 16); x++) if (world.ground[y]?.[x] === "w") return false;
+  }
+  if (world.objects.some(item => item.collision && overlaps(left, top, right, bottom, item.collision))) return false;
+  const food = scene.food?.tile;
+  return !food || !overlaps(left, top, right, bottom, { x: food.x * 16, y: food.y * 16 + 6, width: 16, height: 10 });
+}
+
+/** Uses the same feet/body, water and lunch-table collisions as the world renderer. */
+export function isSceneTileWalkable(scene: DayScene, point: Tile): boolean {
+  if (!scene.world || !tile(point, scene.world.width, scene.world.height)) return false;
   const x = point.x * 16 + 8, y = point.y * 16 + 15;
-  const left = x - 4, right = x + 4, top = y - 5;
-  const dry = [[left, top], [right, top], [left, y], [right, y]].every(([px, py]) =>
-    world.ground[Math.floor(py / 16)]?.[Math.floor(px / 16)] !== "w");
-  return dry && world.objects.every(item => {
-    const box = item.collision;
-    return !box || right <= box.x || left >= box.x + box.width || y <= box.y || top >= box.y + box.height;
-  });
+  return clearFootprint(scene, x - 4, y - 5, x + 4, y);
+}
+
+/** Cardinal neighbour movement with a swept body: narrow fences between tile centres still block a route. */
+export function sceneCanStep(scene: DayScene, from: Tile, to: Tile): boolean {
+  if (Math.abs(from.x - to.x) + Math.abs(from.y - to.y) !== 1 || !isSceneTileWalkable(scene, from) || !isSceneTileWalkable(scene, to)) return false;
+  return clearFootprint(scene, Math.min(from.x, to.x) * 16 + 4, Math.min(from.y, to.y) * 16 + 10,
+    Math.max(from.x, to.x) * 16 + 12, Math.max(from.y, to.y) * 16 + 15);
+}
+
+/** Reachable tile keys ("x,y") for a collision-safe external transport adapter. */
+export function sceneReachableTiles(scene: DayScene, from: Tile = scene.spawn): Set<string> {
+  const reached = new Set<string>();
+  if (!isSceneTileWalkable(scene, from)) return reached;
+  const queue = [from]; reached.add(`${from.x},${from.y}`);
+  for (let i = 0; i < queue.length; i++) {
+    const point = queue[i];
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const next = { x: point.x + dx, y: point.y + dy }, key = `${next.x},${next.y}`;
+      if (!reached.has(key) && sceneCanStep(scene, point, next)) { reached.add(key); queue.push(next); }
+    }
+  }
+  return reached;
+}
+
+const endpoint = (leg: JourneyLeg, end: boolean): string => leg.mode === "tube" ? leg.stations[end ? leg.stations.length - 1 : 0] : end ? leg.to : leg.from;
+export const journeyPointKind = (leg: JourneyLeg): TravelPoint["kind"] => leg.mode === "bus" ? "bus_stop" : leg.mode === "tube" ? "station" : "path";
+const placeKey = (value: string) => value.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-GB");
+function validLeg(leg: unknown, allowWalk: boolean): leg is JourneyLeg {
+  if (!object(leg) || (leg.durationMs !== undefined && !integer(leg.durationMs, 1000, 15000))) return false;
+  if (leg.mode === "bus") return [leg.route, leg.destination, leg.from, leg.to].every(text);
+  if (leg.mode === "tube") return text(leg.line) && typeof leg.color === "string" && /^#[0-9a-f]{6}$/i.test(leg.color) &&
+    Array.isArray(leg.stations) && leg.stations.length >= 2 && leg.stations.length <= 32 && leg.stations.every(text);
+  return allowWalk && leg.mode === "walk" && text(leg.from) && text(leg.to);
+}
+
+/** Exactly one ordered keyed journey between each adjacent pair of world scenes. */
+export function validateJourneys(scenes: DayScene[], value: unknown): asserts value is Journey[] {
+  if (!Array.isArray(value) || value.length !== scenes.length - 1) throw new Error("Journeys must connect every adjacent scene");
+  const sceneIds = new Set<string>();
+  for (const scene of scenes) {
+    if (!scene.world || ((scenes.length > 1 || scene.id !== undefined) && (!scene.id || !isDayId(scene.id) || sceneIds.has(scene.id)))) throw new Error("World scenes need unique stable IDs");
+    if (scene.id) sceneIds.add(scene.id);
+  }
+  const journeyIds = new Set<string>();
+  const reachable = new Map<DayScene, Set<string>>();
+  const checkPoint = (point: unknown, scene: DayScene, leg: JourneyLeg, end: boolean) => {
+    if (!object(point) || point.kind !== journeyPointKind(leg) || !text(point.label) || placeKey(point.label) !== placeKey(endpoint(leg, end)) ||
+      !tile(point.tile, scene.world!.width, scene.world!.height) || !tile(point.approach, scene.world!.width, scene.world!.height)) {
+      throw new Error("Invalid journey travel point");
+    }
+    const tiles = reachable.get(scene) ?? sceneReachableTiles(scene); reachable.set(scene, tiles);
+    if (!tiles.has(`${point.tile.x},${point.tile.y}`) || !tiles.has(`${point.approach.x},${point.approach.y}`) ||
+      !sceneCanStep(scene, point.tile, point.approach)) throw new Error("Journey travel point is blocked or unreachable");
+  };
+  for (let i = 0; i < value.length; i++) {
+    const journey = value[i];
+    if (!object(journey) || !text(journey.id) || !isDayId(journey.id) || journeyIds.has(journey.id) ||
+      journey.fromSceneId !== scenes[i].id || journey.toSceneId !== scenes[i + 1].id ||
+      !Array.isArray(journey.legs) || journey.legs.length === 0 || journey.legs.length > 24 || !journey.legs.every(leg => validLeg(leg, true))) {
+      throw new Error("Invalid adjacent-scene journey");
+    }
+    journeyIds.add(journey.id);
+    for (let leg = 1; leg < journey.legs.length; leg++) {
+      if (placeKey(endpoint(journey.legs[leg - 1], true)) !== placeKey(endpoint(journey.legs[leg], false))) throw new Error("Journey legs must share transfer stops");
+    }
+    checkPoint(journey.departure, scenes[i], journey.legs[0], false);
+    checkPoint(journey.arrival, scenes[i + 1], journey.legs[journey.legs.length - 1], true);
+  }
 }
 
 /** Reject partial pipeline output before a game attempts to load it. */
 export function parseDayManifest(value: unknown, expectedId: string): DayManifest {
   if (!object(value) || value.id !== expectedId || !isDayId(expectedId) || !text(value.date) ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(value.date) || !object(value.player) ||
-    !text(value.player.name) || !asset(value.player.sprite) ||
-    (value.player.walkSheet !== undefined && !asset(value.player.walkSheet)) || !Array.isArray(value.scenes) ||
-    !Array.isArray(value.transit) || !(
-      (value.scenes.length === 3 && value.transit.length === 2) ||
-      (value.scenes.length === 1 && value.transit.length === 0 && object(value.scenes[0]) && value.scenes[0].world !== undefined)
-    )) throw new Error("Invalid day manifest");
+    !/^\d{4}-\d{2}-\d{2}$/.test(value.date) || !object(value.player) || !text(value.player.name) || !asset(value.player.sprite) ||
+    (value.player.walkSheet !== undefined && !asset(value.player.walkSheet)) || !Array.isArray(value.scenes) || !Array.isArray(value.transit)) throw new Error("Invalid day manifest");
+  const worlds = value.scenes.length >= 1 && value.scenes.length <= 12 && value.scenes.every(scene => object(scene) && scene.world !== undefined);
+  const legacy = value.scenes.length === 3 && value.transit.length === 2 && value.journeys === undefined && value.scenes.every(scene => object(scene) && scene.world === undefined);
+  if (!legacy && !(worlds && value.transit.length === 0)) throw new Error("Invalid day scene sequence");
+  if (worlds && value.scenes.length > 1 && value.journeys === undefined) throw new Error("Multi-scene worlds require keyed journeys");
   const kinds = ["tourist", "meal", "park"];
   for (const [index, scene] of value.scenes.entries()) {
     if (!object(scene)) throw new Error("Invalid scene in day manifest");
     const world = scene.world;
     if (world !== undefined && !validWorld(world)) throw new Error("Invalid scene world");
     const width = world ? world.width : 20, height = world ? world.height : 15;
-    if (!(value.scenes.length === 1 ? kinds.includes(String(scene.kind)) : scene.kind === kinds[index]) || !["city", "street", "park"].includes(String(scene.base)) ||
+    if (!(worlds ? kinds.includes(String(scene.kind)) : scene.kind === kinds[index]) || !["city", "street", "park"].includes(String(scene.base)) ||
       !text(scene.title) || !text(scene.time) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(scene.time) || !tile(scene.spawn, width, height) || !tile(scene.exit, width, height) ||
       (scene.skyline !== undefined && !asset(scene.skyline)) || !Array.isArray(scene.landmarks) || (world ? scene.landmarks.length > 3 : scene.landmarks.length !== 3)) {
       throw new Error("Invalid scene in day manifest");
     }
-    if (world && (!clearTile(scene.spawn as Tile, world) || !clearTile(scene.exit as Tile, world))) {
+    if (scene.id !== undefined && (typeof scene.id !== "string" || !isDayId(scene.id))) throw new Error("Invalid scene ID");
+    if (world && (!isSceneTileWalkable(scene as DayScene, scene.spawn as Tile) || !isSceneTileWalkable(scene as DayScene, scene.exit as Tile))) {
       throw new Error("Scene spawn or exit is blocked");
     }
     const slots = new Set<number>();
@@ -184,14 +279,9 @@ export function parseDayManifest(value: unknown, expectedId: string): DayManifes
       throw new Error("Invalid food in day manifest");
     }
   }
+  if (worlds && value.journeys !== undefined) validateJourneys(value.scenes as DayScene[], value.journeys);
   for (const transition of value.transit) {
-    if (!object(transition) || !Array.isArray(transition.legs) || transition.legs.length === 0) throw new Error("Invalid transit");
-    for (const leg of transition.legs) {
-      if (!object(leg) || (leg.mode !== "bus" && leg.mode !== "tube")) throw new Error("Invalid transit leg");
-      if (leg.mode === "bus" && ![leg.route, leg.destination, leg.from, leg.to].every(text)) throw new Error("Invalid bus leg");
-      if (leg.mode === "tube" && (!text(leg.line) || typeof leg.color !== "string" || !/^#[0-9a-f]{6}$/i.test(leg.color) ||
-        !Array.isArray(leg.stations) || leg.stations.length < 2 || !leg.stations.every(text))) throw new Error("Invalid tube leg");
-    }
+    if (!object(transition) || !Array.isArray(transition.legs) || transition.legs.length === 0 || !transition.legs.every(leg => validLeg(leg, false))) throw new Error("Invalid transit");
   }
   return value as DayManifest;
 }

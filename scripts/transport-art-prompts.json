@@ -1,0 +1,26 @@
+{
+  "generator": "built-in image_gen",
+  "purpose": "Reusable generic transport library sprites; no app OpenAI API calls at runtime.",
+  "assets": {
+    "bus_stop": {
+      "output": "public/transit/library/bus_stop.png",
+      "width": 64,
+      "height": 64,
+      "entry": {
+        "x": 32,
+        "y": 60
+      },
+      "prompt": "Use case: stylized-concept. Asset type: reusable transparent pixel-art game sprite. Create exactly one isolated London-style bus stop object: a compact slim dark-green metal and glass shelter with muted teal shallow roof, a simple bench inside, and a slender red-topped bus-stop pole standing immediately beside the shelter. Treat shelter and pole as one assembled asset. Original DS-era top-down RPG artwork, high camera steep three-quarter view about60degrees, front face and roof visible; clean crisp chunky square pixels, flat2to3tone shading, dark1pixel outlines, warm muted greens, cream, brickred, grey; soft top-left lighting. Composition: whole object centred, shelter opening faces viewer and clear pavement-entry space at bottom centre; leave transparent margin all sides including beneath feet. Intended final64x64pixel game object, so readable simple silhouette with carefully placed pixel clusters. Actual fully transparent PNG background. No ground plane, scenery, road, humans, vehicles, shadow, text, lettering, numbers, logos, checkerboard, grids, watermarks, border or extra objects. The sign may have a simple red disc with a plain light centre, no words."
+    },
+    "station": {
+      "output": "public/transit/library/station.png",
+      "width": 80,
+      "height": 72,
+      "entry": {
+        "x": 40,
+        "y": 68
+      },
+      "prompt": "Use case: stylized-concept. Asset type: reusable transparent pixel-art game sprite. Create exactly one isolated small underground railway station entrance: a descending dark stairwell between two short creamstone walls, blackgreen metal railings on both sides, and a simple round red circular transit-style sign with a blank navy horizontal bar above one side. Original design with no wording or copied logo details. Original DS-era top-down RPG artwork, high camera steep three-quarter view about60degrees showing stair treads receding up into a dark central opening and wall tops; clean crisp chunky square pixels, flat2to3tone shading, dark1pixel outlines, warmcream stone, charcoal railings, muted brickred and navy accents; soft top-left lighting. Composition: whole compact entrance centred, approach and opening at bottom centre, complete railings visible with transparent margin all sides. Intended final80x72pixel game object, so simple readable stairs and strong silhouette. Actual fully transparent PNG background. No ground plane, scenery, large building, humans, trains, vehicles, shadow, meaningful text, lettering, station names, numbers, checkerboard, grids, watermark or border."
+    }
+  }
+}
