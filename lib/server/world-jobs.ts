@@ -13,6 +13,9 @@ import { buildSceneAssetJobs } from "../../pipeline/scene-assets";
 import { openAIImageGenerator } from "../../pipeline/imagegen";
 import { loadStoredAsset, storeForDay } from "../../pipeline/publish";
 import { planScene } from "../../pipeline/scene-plan";
+import { agentsRunner, directWorld } from "../../pipeline/world-director";
+import { locateWorld } from "../../pipeline/locator";
+import { simulateWorld } from "../../pipeline/world-sim";
 import type { UploadKind } from "../../pipeline/types";
 import { loadInteractionCatalog } from "./interaction-catalog";
 import { planSceneInteractions } from "../../pipeline/interaction-plan";
@@ -38,7 +41,8 @@ export function publicWorldJob(state: WorldJob): WorldJob {
 
 export function worldJobId(draft: ReadyDraft, catalogFingerprint = loadInteractionCatalog().fingerprint): string {
   const uploads = [...draft.uploads].sort((a, b) => a.kind.localeCompare(b.kind));
-  return createHash("sha256").update(JSON.stringify({ version: 2, catalogFingerprint, session: draft.sessionId, uploads, player: draft.spriteUrl,
+  return createHash("sha256").update(JSON.stringify({ version: 3, catalogFingerprint, session: draft.sessionId, uploads, player: draft.spriteUrl,
+    worldDesign: process.env.WORLD_DESIGN_AGENTS === "live" ? "agents" : "template",
     imageModel: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2.5-flare", textModel: process.env.OPENAI_TEXT_MODEL || "gpt-5.4-mini" })).digest("hex").slice(0, 32);
 }
 
@@ -76,28 +80,36 @@ async function processWorldStep(state: JobState, draft: ReadyDraft, lease: strin
   let progress = state;
   try {
     const uploads: Partial<Record<UploadKind, Buffer>> = {};
-    // Extra photos are saved with the draft but only the first of each kind feeds generation for now.
-    const firstOfKind = draft.uploads.filter((upload, i) => ["fit", "lunch", "landmark"].includes(upload.kind) && draft.uploads.findIndex(other => other.kind === upload.kind) === i);
-    const photoLoads = firstOfKind.map(async upload => {
+    const photoLoads = draft.uploads.map(async upload => {
       const bytes = await loadStoredAsset(upload.url);
       if (!bytes) throw new RequestError("A saved photo could not be loaded. Return to Today and add it again.", 422);
-      uploads[upload.kind] = bytes;
+      return { kind: upload.kind, bytes, ...(upload.note ? { note: upload.note } : {}) };
     });
-    const [player, styleReferences] = await Promise.all([
+    const [player, styleReferences, photos] = await Promise.all([
       loadStoredAsset(draft.spriteUrl),
       Promise.all(["shop_cafe.png", "station.png"].map(file => readFile(path.join(process.cwd(), "shadwell-25d", "assets", file)))),
-      ...photoLoads,
+      Promise.all(photoLoads),
     ]);
     const info = player ? await sharp(player).metadata().catch(() => null) : null;
     if (!player || info?.format !== "png" || info.width !== 32 || info.height !== 48 || !info.hasAlpha) {
       throw new RequestError("Your saved character could not be loaded. Return to Today and retry your character.", 422);
     }
-    const input = { id: state.id, date: state.date, name: "You", uploads, player };
+    // All place/lunch/extra photos reach scene planning. The first photo in each
+    // slot remains its canonical sprite reference, preserving the user's choice.
+    for (const photo of photos) uploads[photo.kind] ??= photo.bytes;
+    const notes = photos.map((photo, index) => photo.note ? `Photo ${index + 1} (${photo.kind}): ${photo.note}` : "").filter(Boolean).join("\n");
+    const input = { id: state.id, date: state.date, name: "You", uploads, player, photos,
+      ...(notes ? { environment: { notes } } : {}) };
     const { catalog, fingerprint } = loadInteractionCatalog();
     if (worldJobId(draft, fingerprint) !== state.id) throw new RequestError("The interaction catalogue changed while this world was being created. Return to Today to start the updated world.", 409);
+    const experimental = process.env.WORLD_DESIGN_AGENTS === "live";
     const deps = { plan: (input: Parameters<typeof planScene>[0]) => planScene(input, new OpenAI({ timeout: 60_000, maxRetries: 0 })),
       images: openAIImageGenerator(new OpenAI({ timeout: 110_000, maxRetries: 0 })), store: storeForDay(state.id), styleReferences,
-      planInteractions: (scene: Parameters<typeof planSceneInteractions>[0]) => planSceneInteractions(scene, photoWorldInteractionCatalog(scene, catalog)) };
+      planInteractions: (scene: Parameters<typeof planSceneInteractions>[0]) => planSceneInteractions(scene, photoWorldInteractionCatalog(scene, catalog)),
+      ...(experimental ? {
+        locator: (blueprint: Parameters<typeof locateWorld>[0]) => locateWorld(blueprint, agentsRunner()),
+        director: (context: Parameters<typeof directWorld>[0], blueprint: Parameters<typeof simulateWorld>[0]) => directWorld(context, agentsRunner(), { simulate: (design, composition) => simulateWorld(blueprint, design, composition) }),
+      } : {}) };
     if (state.checkpoint.blueprint && buildSceneAssetJobs(state.checkpoint.blueprint, input).some(job => !state.checkpoint.assets[job.id])) {
       await advanceWorldAssetBatch(input, state.checkpoint, deps, async (checkpoint, event, total) => {
         const next: JobState = { ...progress, checkpoint, total, completed: Object.keys(checkpoint.assets).length,

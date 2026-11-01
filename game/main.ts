@@ -1,8 +1,9 @@
-import { resolveDayAsset, type DayManifest, type TransitLeg, type TravelPoint, type JourneyLeg, type Journey } from "@/lib/day";
+import { resolveDayAsset, type DayManifest, type DayScene, type InteractEffect, type TransitLeg, type TravelPoint, type JourneyLeg, type Journey, type WorldObject } from "@/lib/day";
 import { activeJourney, advanceJourney, checkpointJourney, departureJourney, journeyPhaseDuration, journeyStorageKey, restoreJourney, type JourneyEvent, type JourneyState } from "./journey";
 import { dayProgressScope } from "../lib/game-progress";
 import type { InteractionAction, InteractionAsset } from "../lib/interactions";
 import { advanceInteraction, beginInteraction, buildInteractionChoices, commitInteraction, currentInteractionStep, emptyInteractionProgress, findInteractionPath, interactionStorageKey, lookupInteractionAsset, nearbyInteractionActions, restoreInteractionProgress, sceneInteractionId, visibleInteractionScene, type InteractionEvent, type InteractionMenuChoice, type InteractionRun, type WorldPoint } from "./interactions";
+import { drawWaterShimmer, renderGround } from "./ground-render";
 import { worldCollision } from "./world-layout";
 import { BASE_MAPS, FRAMES, MAP_H, MAP_W, TILE, VIEW_H, VIEW_W, groundBlocked, hash, placeLandmark } from "./maps";
 
@@ -10,14 +11,15 @@ import { BASE_MAPS, FRAMES, MAP_H, MAP_W, TILE, VIEW_H, VIEW_W, groundBlocked, h
 export type GameHandle = { destroy: () => void };
 type Direction = "up" | "down" | "left" | "right";
 type Talk = { text: string; icon?: string };
-type Sprite = { image: HTMLImageElement; x: number; feet: number; width?: number; height?: number; shadow?: number; player?: boolean; objectId?: string };
+type Sprite = { image: HTMLImageElement; x: number; feet: number; width?: number; height?: number; shadow?: number; player?: boolean; objectId?: string; home?: number; roam?: number; phase?: number };
+type Effect = { kind: InteractEffect; x: number; y: number; at: number };
 const DIR: Record<Direction, [number, number]> = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const KEY: Record<string, Direction> = { ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right" };
 const PAPER = "#f6f1df", INK = "#1f1a2e";
 
 export async function createGame(parent: HTMLElement, manifest: DayManifest, manifestUrl: string, onShare?: () => Promise<void> | undefined): Promise<GameHandle> {
   const images = new Map<string, HTMLImageElement>();
-  const urls = new Set(["/tiles/dq-atlas.png", "/tiles/dq/tree.png", "/transit/bus.png", "/transit/tube.png", "/transit/city.png", "/transit/nelson.png", resolveDayAsset(manifest.player.sprite, manifestUrl)]);
+  const urls = new Set(["/tiles/dq/water.png", "/tiles/dq-atlas.png", "/tiles/dq/tree.png", "/transit/bus.png", "/transit/tube.png", "/transit/city.png", "/transit/nelson.png", resolveDayAsset(manifest.player.sprite, manifestUrl)]);
   if (manifest.journeys?.length) {
     urls.add("/transit/library/bus_stop.png"); urls.add("/transit/library/station.png");
   }
@@ -77,6 +79,9 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
   let x = 0, y = 0, facing: Direction = "up", moving = false, elapsed = 0, chapterAt = 0;
   let dialogue: (Talk & { shown: number; remaining: string[] }) | undefined;
   let blocked = new Set<string>(), talks = new Map<string, Talk>(), sprites: Sprite[] = [];
+  let effects: Effect[] = [];
+  let groundCache: { scene: number; canvas: HTMLCanvasElement } | undefined;
+  const lampsOn = new Set<string>(), spoken = new Map<string, number>();
   let transit: { leg: TransitLeg; change?: string; duration: number }[] = [], transitIndex = 0, transitAt = 0;
   let shareNote = "", destroyed = false;
   const keys = new Set<Direction>();
@@ -84,7 +89,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
   function enterChapter() {
     const scene = manifest.scenes[index];
     cancelInteraction(undefined, false);
-    blocked = new Set(); talks = new Map(); sprites = []; dialogue = undefined;
+    blocked = new Set(); talks = new Map(); sprites = []; dialogue = undefined; effects = []; lampsOn.clear(); spoken.clear();
     viewWidth = scene.world ? 480 : VIEW_W; viewHeight = scene.world ? 320 : VIEW_H;
     canvas.width = viewWidth; canvas.height = viewHeight;
     resize();
@@ -94,7 +99,8 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     mode = "highlight"; chapterAt = elapsed;
     if (scene.world) {
       for (const object of scene.world.objects) {
-        sprites.push({ image: asset(object.sprite), x: object.x, feet: object.y, width: object.width, height: object.height, objectId: object.id, shadow: Math.min(80, object.width * .65) });
+        sprites.push({ image: asset(object.sprite), x: object.x, feet: object.y, width: object.width, height: object.height, objectId: object.id, shadow: Math.min(80, object.width * .65),
+          home: object.x, roam: object.role === "npc" ? object.roam ?? 0 : 0, phase: object.id.length * 1.7 });
       }
     } else {
     for (let row = 0; row < MAP_H; row++) for (let col = 0; col < MAP_W; col++) {
@@ -161,10 +167,33 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
       if (food && Math.hypot(food.tile.x * TILE + 8 - x, food.tile.y * TILE + 11 - y) < 32) {
         startTalk({ text: food.text, icon: food.icon ?? food.sprite }); return;
       }
-      const nearest = world.objects.filter(object => object.text && Math.hypot(object.x - x, object.y - y) < Math.max(34, object.width / 2 + 10) && (object.x - x) * dx + (object.y - y) * dy > -6)
-        .sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0];
-      if (nearest?.text) startTalk({ text: nearest.text });
+      const distance = (object: WorldObject) => { const point = objectPosition(object); return Math.hypot(point.x - x, point.y - y); };
+      const nearest = world.objects.filter(object => {
+        const point = objectPosition(object);
+        return object.text && distance(object) < Math.max(34, object.width / 2 + 10) && (point.x - x) * dx + (point.y - y) * dy > -6;
+      }).sort((a, b) => distance(a) - distance(b))[0];
+      if (nearest) useObject(nearest);
     }
+  }
+  function objectPosition(object: WorldObject) {
+    const sprite = sprites.find(item => item.objectId === object.id);
+    return { x: sprite?.x ?? object.x, y: sprite?.feet ?? object.y };
+  }
+  /** NPCs speak their lines in rotation; interactables run one of a small closed list of effects the renderer draws itself. */
+  function useObject(object: WorldObject) {
+    if (object.role === "npc") {
+      const lines = [object.text!, ...(object.lines ?? [])], turn = spoken.get(object.id) ?? 0;
+      spoken.set(object.id, turn + 1);
+      const point = objectPosition(object);
+      effects.push({ kind: "wave", x: point.x, y: point.y - object.height, at: elapsed });
+      startTalk({ text: `${object.name}: ${lines[turn % lines.length]}` });
+      return;
+    }
+    if (object.role === "interactable" && object.effect) {
+      if (object.effect === "toggle_lamp") { if (lampsOn.has(object.id)) lampsOn.delete(object.id); else lampsOn.add(object.id); }
+      else effects.push({ kind: object.effect, x: object.x, y: object.y - object.height * .55, at: elapsed });
+    }
+    if (object.text) startTalk({ text: object.text });
   }
   function nearTravelPoint(point: TravelPoint) {
     return Math.hypot(x - (point.approach.x * TILE + 8), y - (point.approach.y * TILE + 15)) < 34;
@@ -486,23 +515,55 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     ctx.drawImage(asset(supplied.src), frame * supplied.width, 0, supplied.width, supplied.height,
       Math.round(px - anchor.x), Math.round(py - anchor.y), supplied.width, supplied.height);
   }
+  /** Small pixel flourishes. Lamps stay lit until used again; everything else lasts about a second and a half. */
+  function drawEffects(world: NonNullable<DayScene["world"]>) {
+    for (const object of world.objects) {
+      if (!lampsOn.has(object.id)) continue;
+      const glow = .30 + Math.sin(elapsed / 300) * .04, cx = object.x, cy = object.y - object.height + 8;
+      ctx.fillStyle = `rgba(255,214,120,${glow})`; ctx.beginPath(); ctx.arc(cx, cy, 34, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,238,170,.55)"; ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill();
+    }
+    effects = effects.filter(effect => elapsed - effect.at < 1500);
+    for (const effect of effects) {
+      const t = (elapsed - effect.at) / 1500, fade = 1 - t;
+      if (effect.kind === "ring" || effect.kind === "press_button") {
+        ctx.strokeStyle = effect.kind === "ring" ? `rgba(246,241,223,${fade})` : `rgba(255,236,120,${fade})`; ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(effect.x, effect.y, 6 + t * 30 + i * 8, 0, Math.PI * 2); ctx.stroke(); }
+      } else if (effect.kind === "shake_leaves") {
+        for (let i = 0; i < 16; i++) {
+          const fall = Math.min(1, t * 1.5 + (i % 5) * .05), px = effect.x + Math.sin(i * 2.3 + t * 6) * (12 + i), py = effect.y - 34 + fall * 52;
+          ctx.fillStyle = ["#d9822b", "#b5452f", "#e0b33a", "#8f9a3a"][i % 4]; ctx.globalAlpha = fade; ctx.fillRect(Math.round(px), Math.round(py), 3, 3);
+        }
+        ctx.globalAlpha = 1;
+      } else {
+        // sit, pet, feed, wave: hearts drifting up.
+        for (let i = 0; i < 3; i++) text("♥", effect.x - 10 + i * 10, effect.y - 6 - t * 28 - i * 5, 8, `rgba(224,92,120,${fade})`, "center");
+      }
+    }
+  }
   function drawWorld() {
     const scene = visibleScene(), world = scene.world!;
+    // Keep an NPC still while the player reads or chooses an action, and use the
+    // same visible position when checking whether that NPC is within reach.
+    if (!dialogue && !runningInteraction && !menuChoices.length) for (const sprite of sprites) {
+      if (sprite.roam) sprite.x = Math.round((sprite.home ?? sprite.x) + Math.sin(elapsed / 1400 + (sprite.phase ?? 0)) * sprite.roam);
+    }
     const visibleSprites = sprites.filter(sprite => !sprite.objectId || (sprite.objectId === "food" ? Boolean(scene.food) : world.objects.some(object => object.id === sprite.objectId)));
     const cameraX = Math.round(Math.max(0, Math.min(world.width * TILE - viewWidth, x - viewWidth / 2)));
     const cameraY = Math.round(Math.max(0, Math.min(world.height * TILE - viewHeight, y - viewHeight * .62)));
-    const materials: Record<string, string> = { g: "grass", f: "flowers", p: "pavement", c: "cobble", r: "road", k: "kerb" };
     ctx.fillStyle = "#85a77b"; ctx.fillRect(0, 0, viewWidth, viewHeight);
     ctx.save(); ctx.translate(-cameraX, -cameraY);
-    for (let row = 0; row < world.height; row++) for (let col = 0; col < world.width; col++) {
-      if (world.ground[row][col] === "w") { ctx.fillStyle = "#568fa4"; ctx.fillRect(col * TILE, row * TILE, TILE, TILE); continue; }
-      ctx.drawImage(picture(`/tiles/dq/library/${materials[world.ground[row][col]] ?? "pavement"}.png`), col * TILE, row * TILE, TILE, TILE);
+    if (groundCache?.scene !== index) groundCache = { scene: index, canvas: renderGround(world, picture) };
+    ctx.drawImage(groundCache.canvas, 0, 0);
+    drawWaterShimmer(ctx, world, elapsed, cameraX, cameraY, viewWidth, viewHeight);
+    // Painted road markings and a pedestrian crossing keep a street legible. Layouts without a road have none.
+    if (world.crossing) {
+      const { col: crossCol, row: crossRow, rows: crossRows } = world.crossing;
+      ctx.fillStyle = "#eee5bc";
+      for (let col = 0; col < world.width; col += 4) if (col < crossCol - 1 || col > crossCol + 4) ctx.fillRect(col * TILE, (crossRow + crossRows / 2) * TILE - 2, 24, 2);
+      ctx.fillStyle = "#ece7d2";
+      for (let row = crossRow; row < crossRow + crossRows; row++) ctx.fillRect(crossCol * TILE, row * TILE + 3, 64, 7);
     }
-    // Painted road markings and a pedestrian crossing keep the street legible.
-    ctx.fillStyle = "#eee5bc";
-    for (let col = 0; col < world.width; col += 4) if (col < 17 || col > 22) ctx.fillRect(col * TILE, 16 * TILE - 2, 24, 2);
-    ctx.fillStyle = "#ece7d2";
-    for (let row = 14; row < 18; row++) ctx.fillRect(18 * TILE, row * TILE + 3, 64, 7);
     if (scene.food) {
       const tile = scene.food.tile;
       ctx.fillStyle = "#48372b"; ctx.fillRect(tile.x * TILE + 1, tile.y * TILE + 10, 14, 9);
@@ -530,6 +591,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     const animated = runningInteraction && currentInteractionStep(runningInteraction.run, runningInteraction.action);
     const effect = animated?.type === "animate" ? scene.interactionPack?.catalog.assets.find(item => item.id === animated.assetId && item.kind === "effect") : undefined;
     if (effect) drawSuppliedAsset(effect, x, y - 45, runningInteraction?.run.elapsedMs ?? 0);
+    drawEffects(world);
     if (incoming) drawTravelPoint(incoming.arrival, false, true);
     if (departure) drawTravelPoint(departure.departure, true, true);
     if (!journeyState || index === manifest.scenes.length - 1) {

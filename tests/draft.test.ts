@@ -48,3 +48,13 @@ test("allows several photos per slot and an extra slot, but only one fit", () =>
   const many = Array.from({ length: 13 }, (_, i) => ({ kind: "extra", url: `https://assets.example.com/extra-${i}.png` }));
   assert.equal(parseDraft({ sessionId, uploads: many }), null);
 });
+
+
+test("the complete gallery handoff accepts thirty photos and rejects an overfull draft", () => {
+  const photos = (kind: string, count: number) => Array.from({ length: count }, (_, i) => ({ kind, url: `https://assets.example.com/${kind}-${i}.png` }));
+  const uploads = [fit, ...photos("lunch", 12), ...photos("landmark", 12), ...photos("extra", 5)];
+  const ready = { sessionId, uploads, spriteUrl };
+  assert.equal(parseDraft(ready)?.uploads.length, 30);
+  assert.equal(isReadyDraft(ready), true);
+  assert.equal(parseDraft({ ...ready, uploads: [...uploads, ...photos("extra", 1)] }), null);
+});

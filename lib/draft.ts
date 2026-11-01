@@ -6,7 +6,7 @@ export type Draft = { sessionId: string; uploads: { kind: UploadKind; url: strin
 export const NOTE_MAX_LENGTH = 140;
 /** Photos allowed per slot; Fit drives the character so it stays single. */
 export const MAX_UPLOADS_PER_KIND = 12;
-const MAX_UPLOADS = 30;
+export const MAX_UPLOADS = 30;
 export type ReadyDraft = Draft & { spriteUrl: string };
 
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
