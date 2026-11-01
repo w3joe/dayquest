@@ -136,7 +136,7 @@ npm run build
 
 Development and production builds also prepare the shared game art and validate interaction assets locally.
 
-Deployment is manual. Follow the [deployment guide](docs/DEPLOYMENT.md) for the existing Vercel project, environment setup and `npm run deploy:vercel`. That command deploys committed `origin/main`; pushes do not trigger deployments.
+Pushes to `main` automatically deploy to production through Vercel's GitHub integration once the repository is connected. Other branches do not trigger deployments. See the [deployment guide](docs/DEPLOYMENT.md) for the GitHub connection, environment setup and the optional `npm run deploy:vercel` manual fallback.
 
 ## A little further into the code
 

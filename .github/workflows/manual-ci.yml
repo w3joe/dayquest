@@ -37,5 +37,5 @@ jobs:
       - name: Write run summary
         run: |
           echo "Typecheck, existing tests and production build passed." >> "$GITHUB_STEP_SUMMARY"
-          echo 'Deploy manually from your signed-in computer with `npm run deploy:vercel`.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Vercel deploys pushes to main automatically when the GitHub integration is connected.' >> "$GITHUB_STEP_SUMMARY"
           echo "This workflow creates no deployments and needs no Vercel token." >> "$GITHUB_STEP_SUMMARY"
