@@ -5,7 +5,9 @@ import { buildSceneAssetJobs, generateSceneAsset } from "./scene-assets";
 import type { ImageGenerator } from "./imagegen";
 import type { DayStore } from "./publish";
 import type { SceneBlueprint, ScenePlanInput } from "./scene-types";
-import { resolveDesign, type Designer } from "./world-design";
+import { buildWorldContext, type Environment } from "./world-context";
+import { fallbackDesign } from "./world-design";
+import type { DirectorRun } from "./world-director";
 import type { GenerateEvent, UploadKind } from "./types";
 
 export type WorldCheckpoint = {
@@ -19,13 +21,15 @@ export type WorldBuildInput = {
   name: string;
   uploads: Partial<Record<UploadKind, Buffer>>;
   player: Buffer;
+  /** Optional season, weather and location data. Location is optional: without it the world is built from the photos alone. */
+  environment?: Environment;
 };
 export type WorldBuildDependencies = {
   plan(input: ScenePlanInput): Promise<SceneBlueprint>;
   images: ImageGenerator;
   store: DayStore;
-  /** Optional agent that proposes NPCs and interactables; the hand-written fallback is used when absent or rejected. */
-  designer?: Designer;
+  /** The world builder: full scene context in, validated design out. The hand-written fallback is used when absent or when it fails. */
+  director?: (context: ReturnType<typeof buildWorldContext>, blueprint: SceneBlueprint) => Promise<DirectorRun>;
   styleReferences?: Buffer[];
 };
 
@@ -62,11 +66,12 @@ export async function advanceWorldBuild(input: WorldBuildInput, checkpoint: Worl
   if (!checkpoint.blueprint) {
     const planned = await deps.plan({ landmark: input.uploads.landmark, lunch: input.uploads.lunch,
       context: { name: input.name, date: input.date } });
-    const { design } = await resolveDesign(planned, deps.designer);
+    const run = await deps.director?.(buildWorldContext(planned, { name: input.name, date: input.date }, input.environment), planned).catch(() => undefined);
+    const design = run?.design ?? fallbackDesign(planned.ground);
     const blueprint = { ...planned, design };
     const jobs = buildSceneAssetJobs(blueprint, input);
     return { checkpoint: { ...checkpoint, blueprint }, total: jobs.length,
-      event: { step: "landmarks", label: `Scene planned: ${blueprint.title}. ${jobs.length} sprites to create.` } };
+      event: { step: "landmarks", label: `Scene planned: ${blueprint.title}. ${jobs.length} sprites to create. Added ${design.interactables.length} things to do and ${design.npcs.length} characters${design.source === "agent" ? ", designed for this place" : ""}.` } };
   }
   const blueprint = checkpoint.blueprint;
   const jobs = buildSceneAssetJobs(blueprint, { ...input, styleReferences: deps.styleReferences });

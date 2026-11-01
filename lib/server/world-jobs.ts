@@ -13,6 +13,8 @@ import { buildSceneAssetJobs } from "../../pipeline/scene-assets";
 import { openAIImageGenerator } from "../../pipeline/imagegen";
 import { loadStoredAsset, storeForDay } from "../../pipeline/publish";
 import { planScene } from "../../pipeline/scene-plan";
+import { agentsRunner, directWorld } from "../../pipeline/world-director";
+import { simulateWorld } from "../../pipeline/world-sim";
 import type { UploadKind } from "../../pipeline/types";
 
 type JobState = WorldJob & { checkpoint: WorldCheckpoint; date: string };
@@ -89,7 +91,9 @@ async function processWorldStep(state: JobState, draft: ReadyDraft, lease: strin
     }
     const input = { id: state.id, date: state.date, name: "You", uploads, player };
     const deps = { plan: (input: Parameters<typeof planScene>[0]) => planScene(input, new OpenAI({ timeout: 60_000, maxRetries: 0 })),
-      images: openAIImageGenerator(new OpenAI({ timeout: 110_000, maxRetries: 0 })), store: storeForDay(state.id), styleReferences };
+      images: openAIImageGenerator(new OpenAI({ timeout: 110_000, maxRetries: 0 })), store: storeForDay(state.id), styleReferences,
+      // The world builder sees the finished layout before delivery; it never throws and falls back to a hand-written, inspected design.
+      director: (context: Parameters<typeof directWorld>[0], blueprint: Parameters<typeof simulateWorld>[0]) => directWorld(context, agentsRunner(), { simulate: design => simulateWorld(blueprint, design) }) };
     if (state.checkpoint.blueprint && buildSceneAssetJobs(state.checkpoint.blueprint, input).some(job => !state.checkpoint.assets[job.id])) {
       await advanceWorldAssetBatch(input, state.checkpoint, deps, async (checkpoint, event, total) => {
         const next: JobState = { ...progress, checkpoint, total, completed: Object.keys(checkpoint.assets).length,

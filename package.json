@@ -14,13 +14,15 @@
     "prove:fit-check": "node scripts/prove-fit-check.mjs"
   },
   "dependencies": {
+    "@openai/agents": "^0.21.0",
     "@vercel/blob": "^2.8.2",
     "exifr": "^7.1.3",
     "next": "^16.4.3",
     "openai": "^7.47.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
