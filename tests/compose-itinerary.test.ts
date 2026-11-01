@@ -4,6 +4,7 @@ import { buildWorldLayout } from "../game/world-layout";
 import { parseDayManifest, type DayManifest } from "../lib/day";
 import { composeWorldItinerary, importWorldPlayer, importWorldScene } from "../pipeline/compose-itinerary";
 import { mockScenePlan } from "../pipeline/scene-plan";
+import { compileInteractionPack } from "../lib/interactions";
 
 function location(id: string): DayManifest {
   const blueprint = mockScenePlan({ lunch: Buffer.from("fixture") });
@@ -53,4 +54,24 @@ test("local source URLs remain local and malformed imports fail before composing
   assert.throws(() => importWorldScene(source, "/days/source-a/day.json", "../a"), /stable scene ID/);
   assert.throws(() => importWorldScene(source, "/days/source-a/day.json", "a", 20), /completed world/);
   assert.throws(() => importWorldScene({ ...source, player: { name: "You", sprite: "data:image/png,invalid" } }, "/days/source-a/day.json", "a"), /Invalid day/);
+});
+
+test("imported interaction packs retain their asset origins and cannot mutate source interactions", () => {
+  const source = location("source-a"), originalScene = source.scenes[0];
+  originalScene.interactionPack = compileInteractionPack(originalScene, { actions: [
+    { id: "look", targetId: "cafe_board", label: "Read the board", repeatable: true,
+      steps: [{ type: "animate", assetId: "sparkle", durationMs: 600 }, { type: "say", text: "Sample sign." }] },
+  ] }, { version: 1, assets: [
+    { id: "sparkle", src: "effects/sparkle.png", kind: "effect", width: 16, height: 16, anchor: { x: 8, y: 16 } },
+    { id: "shared", src: "/tiles/dq/library/aboard.png", kind: "prop", width: 21, height: 28 },
+  ] });
+  const before = structuredClone(source);
+  const imported = importWorldScene(source, "https://a.example/days/source-a/day.json", "imported");
+  assert.equal(imported.interactionPack!.catalog.assets[0].src, "https://a.example/days/source-a/effects/sparkle.png");
+  assert.equal(imported.interactionPack!.catalog.assets[1].src, "/tiles/dq/library/aboard.png");
+  imported.interactionPack!.actions[0].steps.push({ type: "wait", durationMs: 200 });
+  imported.interactionPack!.catalog.assets[0].anchor!.x = 7;
+  assert.deepEqual(source, before);
+  const local = importWorldScene(source, "/days/source-a/day.json", "local");
+  assert.equal(local.interactionPack!.catalog.assets[0].src, "/days/source-a/effects/sparkle.png");
 });

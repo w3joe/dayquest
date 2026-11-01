@@ -92,3 +92,9 @@ The transport layer accepts completed location scenes and explicit journeys inde
 Run `npm run preview:transport`, then open `http://localhost:3000/day/transport-preview` while the development server is running. This offline fixture has four sample locations linked by bus, a Tube journey with a line change, and a walk. Walk to the departure point and use Space/Enter or the touch action button to confirm boarding. Travel can be skipped to arrival, and refreshing resumes at a safe scene checkpoint. Only the last location has a finish/share exit.
 
 Bus-stop and station sprites are pre-generated and shared across journeys. Builds validate the committed PNGs locally; runtime travel never calls an image service. Exact ImageGen prompts are recorded in `scripts/transport-art-prompts.json`.
+
+### Generated item interactions
+
+World scenes can carry contextual action sequences composed from a fixed asset catalogue. The production catalogue is empty until the supplied artwork arrives; text interactions work without extra assets. [Interaction integration](docs/INTERACTION-INTEGRATION.md) describes asset delivery, scene handoff, sequence instructions and saved outcomes. Run `npm run assets:check` when adding artwork.
+
+Run `npm run preview:interactions` and visit `http://localhost:3000/day/interaction-preview` with the development server running. This offline fixture reuses existing artwork to demonstrate choosing actions, approaching an item, temporary effects, carrying a prop, cancellation and progress across travel. It makes no API calls.

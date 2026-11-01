@@ -14,6 +14,8 @@ import { openAIImageGenerator } from "../../pipeline/imagegen";
 import { loadStoredAsset, storeForDay } from "../../pipeline/publish";
 import { planScene } from "../../pipeline/scene-plan";
 import type { UploadKind } from "../../pipeline/types";
+import { loadInteractionCatalog } from "./interaction-catalog";
+import { planSceneInteractions } from "../../pipeline/interaction-plan";
 
 type JobState = WorldJob & { checkpoint: WorldCheckpoint; date: string };
 // Greater than the route's 300s maximum; a timed-out request cannot overlap the next worker.
@@ -33,9 +35,9 @@ export function publicWorldJob(state: WorldJob): WorldJob {
     total: state.total, updatedAt: state.updatedAt, ...(state.error ? { error: state.error } : {}) };
 }
 
-export function worldJobId(draft: ReadyDraft): string {
+export function worldJobId(draft: ReadyDraft, catalogFingerprint = loadInteractionCatalog().fingerprint): string {
   const uploads = [...draft.uploads].sort((a, b) => a.kind.localeCompare(b.kind));
-  return createHash("sha256").update(JSON.stringify({ version: 1, session: draft.sessionId, uploads, player: draft.spriteUrl,
+  return createHash("sha256").update(JSON.stringify({ version: 2, catalogFingerprint, session: draft.sessionId, uploads, player: draft.spriteUrl,
     imageModel: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2.5-flare", textModel: process.env.OPENAI_TEXT_MODEL || "gpt-5.4-mini" })).digest("hex").slice(0, 32);
 }
 
@@ -88,8 +90,11 @@ async function processWorldStep(state: JobState, draft: ReadyDraft, lease: strin
       throw new RequestError("Your saved character could not be loaded. Return to Today and retry your character.", 422);
     }
     const input = { id: state.id, date: state.date, name: "You", uploads, player };
+    const { catalog, fingerprint } = loadInteractionCatalog();
+    if (worldJobId(draft, fingerprint) !== state.id) throw new RequestError("The interaction catalogue changed while this world was being created. Return to Today to start the updated world.", 409);
     const deps = { plan: (input: Parameters<typeof planScene>[0]) => planScene(input, new OpenAI({ timeout: 60_000, maxRetries: 0 })),
-      images: openAIImageGenerator(new OpenAI({ timeout: 110_000, maxRetries: 0 })), store: storeForDay(state.id), styleReferences };
+      images: openAIImageGenerator(new OpenAI({ timeout: 110_000, maxRetries: 0 })), store: storeForDay(state.id), styleReferences,
+      planInteractions: (scene: Parameters<typeof planSceneInteractions>[0]) => planSceneInteractions(scene, catalog) };
     if (state.checkpoint.blueprint && buildSceneAssetJobs(state.checkpoint.blueprint, input).some(job => !state.checkpoint.assets[job.id])) {
       await advanceWorldAssetBatch(input, state.checkpoint, deps, async (checkpoint, event, total) => {
         const next: JobState = { ...progress, checkpoint, total, completed: Object.keys(checkpoint.assets).length,

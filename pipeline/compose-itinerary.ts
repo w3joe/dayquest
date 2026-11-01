@@ -20,6 +20,11 @@ export function importWorldScene(sourceDay: DayManifest, manifestUrl: string, sc
     })) },
     ...(scene.food ? { food: { ...scene.food, tile: { ...scene.food.tile }, sprite: resolve(scene.food.sprite),
       ...(scene.food.icon ? { icon: resolve(scene.food.icon) } : {}) } } : {}),
+    ...(scene.interactionPack ? { interactionPack: {
+      ...structuredClone(scene.interactionPack),
+      catalog: { ...scene.interactionPack.catalog,
+        assets: scene.interactionPack.catalog.assets.map(asset => ({ ...structuredClone(asset), src: resolve(asset.src) })) },
+    } } : {}),
   };
 }
 

@@ -16,7 +16,7 @@ export default async function DayPage({ params }: { params: Promise<{ id: string
   let manifestUrl;
   try {
     // Local dev without Blob: B's pipeline writes generated days to public/days/<id>/ too.
-    if (process.env.NODE_ENV !== "production" && (!process.env.BLOB_BASE_URL || ["world-preview", "transport-preview"].includes(id))) {
+    if (process.env.NODE_ENV !== "production" && (!process.env.BLOB_BASE_URL || ["world-preview", "transport-preview", "interaction-preview"].includes(id))) {
       manifestUrl = `/days/${id}/day.json`;
       const raw = await readFile(path.join(process.cwd(), "public", "days", id, "day.json"), "utf8");
       manifest = parseDayManifest(JSON.parse(raw), id);

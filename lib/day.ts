@@ -1,3 +1,5 @@
+import { validateInteractionPack, type InteractionPack } from "./interactions";
+
 export type Tile = { x: number; y: number };
 export type Landmark = { name: string; sprite: string; footprint: "S" | "M" | "L"; slot: number; text: string };
 export type WorldObject = {
@@ -12,6 +14,8 @@ export type WorldObject = {
   /** Absolute world-pixel rectangle, independent of the visible sprite bounds. */
   collision?: { x: number; y: number; width: number; height: number };
   text?: string;
+  /** Scene-author capability: interactions may hide/show only explicitly removable objects. */
+  removable?: boolean;
 };
 export type SceneWorld = {
   /** Ground dimensions in tiles; each string is one row of g/f/p/c/r/k/w tiles. */
@@ -29,6 +33,7 @@ export type DayScene = {
   base: "city" | "street" | "park";
   skyline?: string;
   world?: SceneWorld;
+  interactionPack?: InteractionPack;
   spawn: Tile;
   exit: Tile;
   landmarks: Landmark[];
@@ -89,7 +94,7 @@ function object(value: unknown): value is Record<string, unknown> {
 function text(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.length <= 5000;
 }
-function asset(value: unknown): value is string {
+export function isDayAsset(value: unknown): value is string {
   if (!text(value) || value !== value.trim() || /[\u0000-\u001f\u007f]/.test(value) || value.startsWith("//")) return false;
   try {
     // Check before URL normalisation, including encoded traversal and backslashes.
@@ -116,10 +121,10 @@ function validWorld(value: unknown): value is SceneWorld {
   const ids = new Set<string>();
   for (const item of value.objects) {
     if (!object(item) || !text(item.id) || !/^[A-Za-z0-9_-]{1,64}$/.test(item.id) || ids.has(item.id) ||
-      !text(item.name) || !asset(item.sprite) || !integer(item.x, 0, width) || !integer(item.y, 0, height) ||
+      !text(item.name) || !isDayAsset(item.sprite) || !integer(item.x, 0, width) || !integer(item.y, 0, height) ||
       !integer(item.width, 1, width) || !integer(item.height, 1, height) ||
       item.x - item.width / 2 < 0 || item.x + item.width / 2 > width || item.y - item.height < 0 ||
-      (item.text !== undefined && !text(item.text))) return false;
+      (item.text !== undefined && !text(item.text)) || (item.removable !== undefined && typeof item.removable !== "boolean")) return false;
     ids.add(item.id);
     if (item.collision !== undefined) {
       const box = item.collision;
@@ -222,8 +227,8 @@ export function validateJourneys(scenes: DayScene[], value: unknown): asserts va
 /** Reject partial pipeline output before a game attempts to load it. */
 export function parseDayManifest(value: unknown, expectedId: string): DayManifest {
   if (!object(value) || value.id !== expectedId || !isDayId(expectedId) || !text(value.date) ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(value.date) || !object(value.player) || !text(value.player.name) || !asset(value.player.sprite) ||
-    (value.player.walkSheet !== undefined && !asset(value.player.walkSheet)) || !Array.isArray(value.scenes) || !Array.isArray(value.transit)) throw new Error("Invalid day manifest");
+    !/^\d{4}-\d{2}-\d{2}$/.test(value.date) || !object(value.player) || !text(value.player.name) || !isDayAsset(value.player.sprite) ||
+    (value.player.walkSheet !== undefined && !isDayAsset(value.player.walkSheet)) || !Array.isArray(value.scenes) || !Array.isArray(value.transit)) throw new Error("Invalid day manifest");
   const worlds = value.scenes.length >= 1 && value.scenes.length <= 12 && value.scenes.every(scene => object(scene) && scene.world !== undefined);
   const legacy = value.scenes.length === 3 && value.transit.length === 2 && value.journeys === undefined && value.scenes.every(scene => object(scene) && scene.world === undefined);
   if (!legacy && !(worlds && value.transit.length === 0)) throw new Error("Invalid day scene sequence");
@@ -236,7 +241,7 @@ export function parseDayManifest(value: unknown, expectedId: string): DayManifes
     const width = world ? world.width : 20, height = world ? world.height : 15;
     if (!(worlds ? kinds.includes(String(scene.kind)) : scene.kind === kinds[index]) || !["city", "street", "park"].includes(String(scene.base)) ||
       !text(scene.title) || !text(scene.time) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(scene.time) || !tile(scene.spawn, width, height) || !tile(scene.exit, width, height) ||
-      (scene.skyline !== undefined && !asset(scene.skyline)) || !Array.isArray(scene.landmarks) || (world ? scene.landmarks.length > 3 : scene.landmarks.length !== 3)) {
+      (scene.skyline !== undefined && !isDayAsset(scene.skyline)) || !Array.isArray(scene.landmarks) || (world ? scene.landmarks.length > 3 : scene.landmarks.length !== 3)) {
       throw new Error("Invalid scene in day manifest");
     }
     if (scene.id !== undefined && (typeof scene.id !== "string" || !isDayId(scene.id))) throw new Error("Invalid scene ID");
@@ -245,17 +250,20 @@ export function parseDayManifest(value: unknown, expectedId: string): DayManifes
     }
     const slots = new Set<number>();
     for (const landmark of scene.landmarks) {
-      if (!object(landmark) || !text(landmark.name) || !asset(landmark.sprite) || !text(landmark.text) ||
+      if (!object(landmark) || !text(landmark.name) || !isDayAsset(landmark.sprite) || !text(landmark.text) ||
         !["S", "M", "L"].includes(String(landmark.footprint)) || !Number.isInteger(landmark.slot) ||
         (landmark.slot as number) < 0 || (landmark.slot as number) > 2 || slots.has(landmark.slot as number)) {
         throw new Error("Invalid landmark in day manifest");
       }
       slots.add(landmark.slot as number);
     }
-    if (scene.food !== undefined && (!object(scene.food) || !asset(scene.food.sprite) ||
-      (scene.food.icon !== undefined && !asset(scene.food.icon)) || !tile(scene.food.tile, width, height) || !text(scene.food.text))) {
+    if (scene.food !== undefined && (!object(scene.food) || !isDayAsset(scene.food.sprite) ||
+      (scene.food.icon !== undefined && !isDayAsset(scene.food.icon)) || !tile(scene.food.tile, width, height) || !text(scene.food.text))) {
       throw new Error("Invalid food in day manifest");
     }
+  }
+  for (const scene of value.scenes) {
+    if ((scene as DayScene).interactionPack !== undefined) validateInteractionPack(scene as DayScene, (scene as DayScene).interactionPack);
   }
   if (worlds && value.journeys !== undefined) validateJourneys(value.scenes as DayScene[], value.journeys);
   for (const transition of value.transit) {
