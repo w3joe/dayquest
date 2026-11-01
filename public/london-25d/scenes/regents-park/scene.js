@@ -46,7 +46,7 @@
       "tile_lake_edge", "tile_lake_edge_v", "tile_lake_corner", "tile_water", "tile_gravel", "tile_roses"],
     assets: ["tile_grass", "tile_paving", "tile_gravel", "tile_roses", "tile_water", "tile_lake_edge", "tile_lake_edge_v", "tile_lake_corner",
       "jubilee_gates", "triton", "bandstand", "swan", "rowing_boat", "willow", "deckchair", "noticeboard",
-      "tree", "hedge", "bench", "lamp", "bin_grey"],
+      "tree", "hedge", "bench", "lamp", "bin_grey", "npc_tourist", "npc_commuter", "npc_jogger", "npc_parent", "npc_elder", "npc_dogwalker", "npc_student", "npc_busker"],
 
     ground(c, r) {
       if (c < LAKE_C && r < LAKE_R) return { tile: "tile_water", solid: true };
@@ -82,7 +82,7 @@
       const tr = img.triton;
       const fy = (PLAZA.r0 + PLAZA.r1) / 2 * T + tr.height * 0.32;
       const ft = w.add("triton", midX - tr.width / 2, fy, { depth: Math.round(tr.height * 0.42), foot: [4, tr.width - 8], shadow: "none" });
-      w.talk(midX, ft.y, TEXT.fountain);
+      w.talk(midX, ft.y, TEXT.fountain, { action: "photo" });   // facing the fountain from the walk: take a photo
       w.talk(ft.x, ft.y - 20, TEXT.fountain);
       w.talk(ft.x + ft.w, ft.y - 20, TEXT.fountain);
 
@@ -157,6 +157,17 @@
       w.talk(nb.x + nb.w / 2, nb.y, TEXT.stats);
       w.add("bin_grey", 33 * T + 6, PATH_R0 * T - 4, { invented: true });
       w.exit(W - 28, PATH_R0 * T, 28, 2 * T, { label: "HOME" });
+
+      // park visitors (generic people, invented): a jogger lapping the walk, dog walkers and a slow stroll
+      const py = PATH_R0 * T + 22;
+      w.npc("npc_jogger", { path: [[midX - 22, 27 * T], [midX - 22, 9 * T + 20], [midX + 22, 9 * T + 20], [midX + 22, 27 * T]], speed: 1.2,
+        talk: "A jogger, not stopping: \"Morning! Well, afternoon. Three laps to go!\"" });
+      w.npc("npc_dogwalker", { path: [[(LAKE_C + 2) * T, py], [(COLS - 2) * T, py]], speed: 0.5, pause: 60,
+        talk: "A dog walker: \"Dogs have to stay on leads in the rose garden. He knows.\"" });
+      w.npc("npc_parent", { path: [[(LAKE_C + 3) * T, py + 14], [(WALK_C0 - 1) * T, py + 14]], speed: 0.4, delay: 200, pause: 90 });
+      w.npc("npc_elder", { path: [[midX + 30, 20 * T], [midX + 30, 26 * T]], speed: 0.28, pause: 150,
+        talk: "An older gentleman: \"I've walked these roses every summer for forty years.\"" });
+      w.npc("npc_tourist", { path: [[midX + 34, PLAZA.r1 * T + 30]], still: true, face: "up" });
       w.invented(W - 3 * T, PATH_R0 * T, 3 * T, 2 * T);
     },
   });

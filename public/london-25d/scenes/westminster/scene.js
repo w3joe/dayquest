@@ -3,21 +3,27 @@
 // Layout and facts: scenes/westminster/reference.md.
 (() => {
   const T = DQ.T;
-  const COLS = 60, ROWS = 31;
+  const COLS = 60, ROWS = 41;
   const ROW_TOP = 9;            // first ground row on the far bank (above it: sky)
-  const ROW_FAR_KERB = 11;      // Victoria Embankment road: kerb row, then asphalt
-  const ROW_FAR_ROAD = 12;      // two asphalt rows (12, 13)
-  const ROW_FAR_KERB2 = 14;
-  const ROW_FAR_EDGE = 16;      // far river wall
-  const ROW_NEAR_EDGE = 22;     // near river wall (water rows are 17..21)
-  const BRIDGE_C = 30, BRIDGE_W = 5;   // bridge / Bridge Street columns 30..34
+  const ROW_SQ0 = 10, ROW_SQ1 = 13;   // Parliament Square lawn rows (west of the Palace = above it)
+  const ROW_SM = 15;            // St Margaret Street: kerb 15, asphalt 16, kerb 17, between the Square and the Palace
+  const ROW_FAR_KERB = 21;      // Victoria Embankment road: kerb row, then asphalt
+  const ROW_FAR_ROAD = 22;      // two asphalt rows (22, 23)
+  const ROW_FAR_KERB2 = 24;
+  const ROW_FAR_EDGE = 26;      // far river wall
+  const ROW_NEAR_EDGE = 32;     // near river wall (water rows are 27..31)
+  const BRIDGE_C = 30, BRIDGE_W = 5;   // bridge columns 30..34; Bridge Street: pavement 30, road 31..33, pavement 34
   const BX0 = BRIDGE_C * T, BX1 = (BRIDGE_C + BRIDGE_W) * T;
   const onBridge = (c) => c >= BRIDGE_C && c < BRIDGE_C + BRIDGE_W;
+  const SQ_C0 = 12, SQ_C1 = 26;       // Parliament Square lawn columns
 
   const TEXT = {
     bigBen: "Took a photo of Big Ben from the end of the bridge.\nThe tower has been called Elizabeth Tower since 2012; Big Ben is really the 13.7-tonne bell inside. It is 96 m tall and was finished in 1859.",
     bridge: "Walked Westminster Bridge. It opened on 24 May 1862, designed by Thomas Page with Gothic details by Charles Barry.\nIt's painted green like the benches in the House of Commons. Lambeth Bridge, upriver, is red like the Lords.",
     eye: "Rode the London Eye. One slow turn takes about 30 minutes, 135 m up at the top, in one of 32 glass capsules.\nIt opened to the public in March 2000. Got a photo of the view from the top.",
+    square: "Parliament Square, laid out in 1868 by Charles Barry, with the Palace on one side and the Supreme Court and Westminster Abbey on the others.\nIts statues include Winston Churchill (Ivor Roberts-Jones, 1973), facing Parliament, and Millicent Fawcett (2018), the first statue of a woman here.",
+    churchill: "Winston Churchill in his greatcoat, by Ivor Roberts-Jones, unveiled in 1973. He faces the Houses of Parliament.",
+    tube: "Westminster station: the Jubilee, District and Circle lines.\nIt opened in 1868 on the District Railway; the deep Jubilee line platforms opened in 1999, built together with Portcullis House above them.",
     palace: "Looked across the river at the Palace of Westminster. Charles Barry and Augustus Pugin rebuilt it after the fire of 16 October 1834.\nIt has over 1,100 rooms. The Union Flag flies from the Victoria Tower.",
     boudica: "Boudica and her daughters in a scythed chariot, by Thomas Thornycroft.\nThe bronze was put up here in 1902, at the end of the bridge, facing Parliament.",
     portcullis: "Portcullis House: offices for MPs, opened in 2001.\nThe tall bronze chimneys aren't for fires. They're part of its natural ventilation.",
@@ -38,10 +44,10 @@
     walkTop: ROW_TOP * T + 4,
     sky: "#a9d4f5",
     spawn: { x: BX0 + 80, y: ROWS * T - 14, dir: "up" },
-    own: ["palace", "big_ben", "portcullis", "london_eye", "boudica", "bus_stop", "catamaran", "pier", "shard",
-      "tile_water", "tile_embankment", "tile_embankment_near", "tile_bridge"],
-    assets: ["palace", "big_ben", "portcullis", "london_eye", "boudica", "bus_stop", "catamaran", "pier", "shard",
-      "tile_water", "tile_embankment", "tile_embankment_near", "tile_bridge",
+    own: ["palace", "big_ben", "portcullis", "london_eye", "boudica", "bus_stop", "catamaran", "pier", "shard", "statue", "tube_entrance",
+      "tile_water", "tile_embankment", "tile_embankment_near", "tile_bridge", "tile_kerb_l", "tile_kerb_r"],
+    assets: ["palace", "big_ben", "portcullis", "london_eye", "boudica", "bus_stop", "catamaran", "pier", "shard", "statue", "tube_entrance",
+      "tile_water", "tile_embankment", "tile_embankment_near", "tile_bridge", "tile_kerb_l", "tile_kerb_r",
       "tile_paving", "tile_asphalt", "tile_kerb", "tile_grass", "tile_flowers",
       "tree", "hedge", "bench", "lamp", "bollard", "phone_box", "bin_grey", "bus"],
     transit: [{ mode: "bus", route: "24", destination: "Hampstead Heath", title: "BUS 24 → HAMPSTEAD HEATH",
@@ -57,12 +63,22 @@
         return { tile: "tile_water", solid: true };
       }
       if (r < ROW_FAR_EDGE) {
-        // far bank: Bridge Street runs straight up from the bridge; Victoria Embankment runs off to the right
-        if (onBridge(c)) return c === BRIDGE_C || c === BRIDGE_C + BRIDGE_W - 1 ? "tile_paving" : "tile_asphalt";
-        if (c > BRIDGE_C) {
+        // far bank: Bridge Street runs straight up (west) from the bridge; Victoria Embankment runs off to the right
+        const embRow = r >= ROW_FAR_KERB && r <= ROW_FAR_KERB2;
+        const smRow = r >= ROW_SM && r <= ROW_SM + 2;
+        if (smRow && c <= BRIDGE_C + 1) return c > BRIDGE_C ? "tile_asphalt" : r === ROW_SM ? "tile_kerb" : r === ROW_SM + 2 ? { tile: "tile_kerb", flipY: true } : "tile_asphalt";
+        if (c === BRIDGE_C + 1) return "tile_kerb_l";
+        if (c === BRIDGE_C + 2) return "tile_asphalt";
+        if (c === BRIDGE_C + 3) return embRow ? "tile_asphalt" : "tile_kerb_r";
+        if (c > BRIDGE_C + 3 && embRow) {
           if (r === ROW_FAR_KERB) return "tile_kerb";
-          if (r === ROW_FAR_ROAD || r === ROW_FAR_ROAD + 1) return "tile_asphalt";
           if (r === ROW_FAR_KERB2) return { tile: "tile_kerb", flipY: true };
+          return "tile_asphalt";
+        }
+        // Parliament Square: lawn with a cross of paths, west of (above) the Palace
+        if (r >= ROW_SQ0 && r <= ROW_SQ1 && c >= SQ_C0 && c <= SQ_C1) {
+          if (r === ROW_SQ0 + 2 || c === SQ_C0 + 7) return "tile_paving";
+          return "tile_grass";
         }
         return "tile_paving";
       }
@@ -97,24 +113,41 @@
         lamp(BX1 - 4, y, { shadow: "none" });
       }
 
-      // ---- far bank, left: the Palace sits right on the river wall; its grounds are closed
-      const palaceBase = farEdgeY + 14;
+      // ---- far bank, left: the Palace's river front runs south (left) from Elizabeth Tower at the bridge foot,
+      // on its riverside terrace (row ROW_FAR_EDGE - 1) behind the stone river wall; the terrace is not public
       const bb = img.big_ben;
-      const bbX = BX0 - bb.width - 6;
-      w.add("palace", bbX - img.palace.width - 14, palaceBase, { solid: false, shadow: "base" });
-      w.add("big_ben", bbX, palaceBase - 4, { solid: false, shadow: "base" });
-      w.block(0, ROW_TOP * T, BX0, farEdgeY + 19 - ROW_TOP * T);
-      w.talk(BX0 - 2, palaceBase - 30, TEXT.bigBen);
-      tree(bbX + bb.width - 4, ROW_TOP * T + 60, { solid: false });
+      const bbX = BX0 - bb.width;           // the tower's right side meets Bridge Street's pavement
+      const towerBase = farEdgeY - 2;
+      const palaceBase = farEdgeY - 10;     // a little behind the tower so the tower draws in front
+      w.add("palace", bbX - img.palace.width + 18, palaceBase, { solid: false, shadow: "base" });
+      w.add("big_ben", bbX, towerBase, { solid: false, shadow: "base" });
+      const palaceTop = palaceBase - 170;   // footprint: front face, Westminster Hall and New Palace Yard behind it
+      w.block(0, palaceTop, BX0 - 2, farEdgeY + 19 - palaceTop);
+      w.talk(BX0 + 4, towerBase - 40, TEXT.bigBen, { action: "photo" });   // "took a photo of Big Ben": photo pose + flash
+
+      // ---- Parliament Square, west of the Palace (above it here), with the skyline behind
+      const sqX0 = SQ_C0 * T, sqX1 = (SQ_C1 + 1) * T, sqY0 = ROW_SQ0 * T, sqY1 = (ROW_SQ1 + 1) * T;
+      w.talk((sqX0 + sqX1) / 2, sqY1 + 4, TEXT.square);
+      // Churchill stands on the east side, facing Parliament; the second plinth stands in for the other statues
+      w.add("statue", sqX0 + 15 * T - 14, sqY1 - 4, { depth: 10, foot: [2, 25], talk: TEXT.churchill });
+      w.add("statue", sqX0 + 4 * T - 14, sqY1 - 4, { depth: 10, foot: [2, 25], flip: true, invented: true });
+      tree(sqX0 + 40, sqY0 + 30, { invented: true });
+      for (let x = sqX0 + 60; x < sqX1; x += 180) lamp(x, sqY1 + 22, { invented: true });
 
       // ---- far bank, right: Boudica on the bridge corner, the Embankment, Portcullis House, the bus stop
       const bo = img.boudica;
       w.add("boudica", BX1 + 4, farEdgeY + 2, { depth: 20, shadow: "base", talk: TEXT.boudica, foot: [0, bo.width] });
-      const pcX = BX1 + 26;
-      const pc = w.add("portcullis", pcX, ROW_TOP * T + 18, { depth: 16, shadow: "base", foot: [0, img.portcullis.width] });
+      // Portcullis House across Bridge Street from the tower, on the corner with the Embankment
+      const pcX = BX1 + 96;
+      const pc = w.add("portcullis", pcX, ROW_FAR_KERB * T - 4, { depth: 60, shadow: "base", foot: [0, img.portcullis.width] });
       w.talk(pc.x + pc.w / 2, pc.y + 2, TEXT.portcullis);
-      for (let x = pc.x + pc.w + 60; x < W; x += 230) tree(x, ROW_TOP * T + 40);
-      w.add("bus", BX1 + 160, (ROW_FAR_ROAD + 2) * T - 4, { depth: 22, foot: [6, img.bus.width - 12] });
+      // Westminster station entrance on the Bridge Street pavement beside it (stairs go down: drawn under the player)
+      const te = img.tube_entrance;
+      w.add("tube_entrance", BX1 + 4, ROW_FAR_KERB * T - 2, { solid: false, shadow: "none", layer: "ground", talk: TEXT.tube });
+      w.invented(BX1 + 4, ROW_FAR_KERB * T - 2 - te.height, te.width, te.height);
+      for (let x = pc.x + pc.w + 60; x < W; x += 230) tree(x, ROW_FAR_KERB * T - 6);
+      for (let x = BX1 + 60; x < W; x += 200) tree(x, ROW_TOP * T + 150, { invented: true });
+      w.add("bus", BX1 + 200, (ROW_FAR_ROAD + 2) * T - 4, { depth: 22, foot: [6, img.bus.width - 12] });
       for (let x = BX1 + 150; x < W; x += 210) tree(x, farEdgeY - 2);
       for (let x = BX1 + 110; x < W; x += 210) lamp(x, farEdgeY + 4);
       // the pier floats below the wall, with a catamaran shuttling in and out
@@ -137,7 +170,7 @@
       w.add("bus_stop", stopX, ROW_TOP * T + 26, { depth: 6, foot: [img.bus_stop.width / 2 - 3, 6], talk: TEXT.busStop, invented: true });
       w.exit(BX0 + 40, ROW_TOP * T + 4, BX1 - BX0 - 80, 14, { label: "BUS 24" });
       w.add("phone_box", BX1 - 6, ROW_TOP * T + 74, { depth: 12, talk: TEXT.phone, invented: true });
-      for (const bx of [BX0 + 40, BX1 - 52]) w.add("bollard", bx, ROW_FAR_EDGE * T - 2, { invented: true });
+      for (const bx of [BX0 + 12, BX1 - 22]) w.add("bollard", bx, ROW_FAR_EDGE * T - 2, { invented: true });
       // trees along the top edge (towards Parliament Square and Whitehall Gardens)
       for (let x = 30; x < W; x += 120) if (x < BX0 - 40 || x > BX1 + 200) tree(x, ROW_TOP * T + 12, { solid: false, invented: true });
       for (let x = 0; x < W; x += 64) if (x + 66 < BX0 - 30 || x > BX1 + 200) w.add("hedge", x, ROW_TOP * T + 6, { solid: false, shadow: "none", invented: true });

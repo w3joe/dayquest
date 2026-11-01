@@ -14,7 +14,7 @@ Tile ending:
 
 > This is a single seamless repeating ground texture tile viewed straight down (orthographic, no perspective), filling the entire square image edge to edge, designed on a 16x16 grid of big pixels so it tiles seamlessly on all four sides. No border, no objects, no text. Square 1024x1024.
 
-## Calls (13)
+## Calls (15)
 
 ### big_ben (2026-11-01 14-46-06)
 
@@ -94,6 +94,20 @@ Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. 
 Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. A distant pointed glass skyscraper shaped like a tall thin pyramid shard of glass: pale blue-grey glass facets with light reflections, tapering to a sharp jagged open point, simple and slightly hazy as if far away. Very tall and thin, portrait 1024x1536. Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.
 ```
 
+### london_eye (2026-11-01 15-23-01)
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. A giant white observation wheel seen from the front, slightly from above: a thin white rim with many thin white cable spokes running to a central hub, and exactly 32 egg-shaped glass passenger capsules evenly spaced all the way around the OUTSIDE of the rim. It is held up by a huge white A-frame made of two very thick white legs splayed wide apart at the ground and meeting at the hub, leaning back away from the viewer, with thin white tension cables running back from the hub to the ground. The A-frame stands on a grey concrete landing platform at the bottom. Square 1024x1024. Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.
+```
+
+### statue (2026-11-01 15-23-17)
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. A dark bronze statue of a stout elderly statesman standing in a long heavy military greatcoat, leaning forward slightly, one hand resting on a walking stick, bare head, on a tall plain pale grey granite plinth with a simple moulded top and base. Seen from the front-left. No text, no inscription. Portrait 1024x1536. Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.
+```
+
 ## Notes
 
 After processing, match_water.py copies tile_water into the water band of tile_embankment_near, because the generated edge tile's water came out more teal and showed a seam along the South Bank wall.
+tile_kerb_l / tile_kerb_r are the shared tile_kerb rotated 90 degrees (PIL, no new image) for the kerbs of Bridge Street, which runs vertically in this map.
+tube_entrance.png is copied from scenes/kanada-ya/assets (generated there).

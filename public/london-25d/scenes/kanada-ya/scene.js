@@ -41,7 +41,7 @@
     own: ["kanadaya", "centre_point", "church", "angel_pub", "guitar_shop", "ramen_bowl", "ramen_icon", "table", "tube_entrance", "queue"],
     assets: ["tile_paving", "tile_asphalt", "tile_kerb",
       "kanadaya", "centre_point", "church", "angel_pub", "guitar_shop", "ramen_bowl", "ramen_icon", "table", "tube_entrance", "queue",
-      "shop_corner", "phone_box", "lamp", "bollard", "cycle_stand", "tree", "hedge", "bus", "bin_grey"],
+      "shop_corner", "phone_box", "lamp", "bollard", "cycle_stand", "tree", "hedge", "bus", "bin_grey", "npc_tourist", "npc_commuter", "npc_jogger", "npc_parent", "npc_elder", "npc_dogwalker", "npc_student", "npc_busker", "black_cab", "delivery_bike"],
     transit: [
       { mode: "tube", line: "Central", color: "#E32017", title: "CENTRAL LINE", caption: "Tottenham Court Road → Oxford Circus", frames: 200 },
       { mode: "tube", line: "Bakerloo", color: "#B36305", title: "CHANGE AT OXFORD CIRCUS · BAKERLOO LINE", caption: "Oxford Circus → Regent's Park", frames: 200 },
@@ -114,6 +114,15 @@
       w.talk(te.x - 10, te.y - 40, TEXT.tube);
       w.exit(te.x + 22, te.y - 50, 44, 30, { label: "TUBE" });
 
+      // passers-by and traffic (generic people, invented)
+      const southY = BASE + 62, northY = (ROW_KERB_BOTTOM + 1) * T + 34;
+      w.npc("npc_commuter", { path: [[70, northY], [W - 70, northY]], speed: 0.7, talk: "A commuter hurries past: \"Lunch hour. Half of Soho is in that ramen queue.\"" });
+      w.npc("npc_student", { path: [[W - 140, northY + 18], [180, northY + 18]], speed: 0.5, delay: 90 });
+      w.npc("npc_tourist", { path: [[W - 60, southY], [260, southY]], speed: 0.45, pause: 90, talk: "A tourist with a map: \"Is this the way to Denmark Street? The guitar shops?\"" });
+      w.npc("npc_busker", { path: [[W - 210, southY + 6]], still: true, face: "down", talk: "A busker tunes a guitar. Denmark Street, round the corner, was London's Tin Pan Alley." });
+      w.traffic("black_cab", { y: (ROW_KERB_TOP + 1) * T + 24, speed: 1.5, gap: 240 });
+      w.traffic("delivery_bike", { y: (ROW_KERB_TOP + 2) * T + 18, speed: -1.1, flip: true, gap: 360, offset: 400 });
+
       // buses use the street (route numbers on the shared sprite aren't this street's)
       w.mover("bus", { x: -260, y: (ROW_KERB_TOP + 2) * T + 22, invented: true, update(m) {
         if (m.wait > 0) { m.wait--; m.visible = false; return; }
@@ -181,21 +190,24 @@
       const tx = Math.round((W - img.table30.width) / 2), ty = 12 * T + 8;
       const fr = w.add("friend", Math.round(W / 2 - img.friend.width / 2), ty - img.table30.height + 14, { depth: 8, z: -1 });
       const t30 = w.add("table30", tx, ty, { depth: 28, foot: [4, img.table30.width - 8] });
-      w.talk(fr.x + fr.w / 2, fr.y, IN.friend);   // talk to the friend from behind their chair (from above)
+      w.talk(fr.x + fr.w / 2, fr.y, IN.friend, { action: "wave" });   // talk to the friend from behind their chair; Lucas waves
       for (const cx of [tx - img.chair.width + 2, tx + t30.w - 2]) w.add("chair", cx, ty - 6, { depth: 6, foot: [2, img.chair.width - 4] });
       // things on the table (z keeps them drawn above the table top)
       const top = ty - t30.h;              // top edge of the table sprite
-      const put = (name, x, y, text, icon) => {
+      // Lucas's seat: far side of the table at the right end, facing the camera; the table hides his legs
+      const seat = { x: tx + t30.w - 16, y: top + 16, dir: "down" };
+      const put = (name, x, y, text, icon, action) => {
         const base = top + y + img[name].height;
         const e = w.add(name, tx + x, base, { solid: false, shadow: "none", z: ty - base + 1 + y / 100 });
-        w.talk(e.x + e.w / 2, ty + 4, text, icon ? { icon } : {});
+        const fx = action === "eat" ? { fx: "fx_steam", fxAt: { x: e.x + e.w / 2, y: e.y - e.h + 2 } } : {};
+        w.talk(e.x + e.w / 2, ty + 4, text, { ...(icon ? { icon } : {}), ...(action ? { action, seat, ...fx } : {}) });
         return e;
       };
-      put("steel_cups", 6, 8, IN.cups);
-      put("bowl_shoyu", Math.round(t30.w * 0.30), 6, IN.shoyu, "icon_shoyu");
-      put("bowl_tonkotsu", Math.round(t30.w * 0.62), 6, IN.tonkotsu, "ramen_icon");
-      put("bowl_spicy", Math.round(t30.w * 0.16), 22, IN.spicy, "icon_spicy");
-      put("bowl_rich", Math.round(t30.w * 0.48), 24, IN.rich, "icon_rich");
+      put("steel_cups", 6, 8, IN.cups, null, "drink");
+      put("bowl_shoyu", Math.round(t30.w * 0.30), 6, IN.shoyu, "icon_shoyu", "eat");
+      put("bowl_tonkotsu", Math.round(t30.w * 0.62), 6, IN.tonkotsu, "ramen_icon", "eat");
+      put("bowl_spicy", Math.round(t30.w * 0.16), 22, IN.spicy, "icon_spicy", "eat");
+      put("bowl_rich", Math.round(t30.w * 0.48), 24, IN.rich, "icon_rich", "eat");
       put("condiment_pot", t30.w - 16, 24, IN.pot);
 
       // the shop door back to the street, just below Kanada-Ya's door

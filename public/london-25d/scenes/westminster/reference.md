@@ -25,8 +25,10 @@ What the photo itself adds:
 |---|---|---|
 | Sky / skyline (top) | Warm pale-blue sky; the Shard as a parallax backdrop | **Shard is invented for this view**: from the South Bank looking west, the Shard (Southwark, to the east) is behind the viewer. The spec wants it on the skyline, so it is drawn there and outlined by the Invented overlay. |
 | Far bank, left of the bridge | Palace of Westminster river front with Victoria Tower (left) and Central Tower spire; it sits directly on the river wall (the terrace is not public, so it's solid) | Photo; Wikipedia |
-| Far bank, at the bridge foot (left side) | Elizabeth Tower, right beside the bridge end | Photo; Wikipedia |
-| Far bank, up from the bridge | Bridge Street continues west from the bridge between Elizabeth Tower (south / left) and Portcullis House (north / right) towards Parliament Square | Real street plan (Westminster Bridge listing gives the address "Bridge Street SW1") |
+| Far bank, at the bridge foot (left side) | Elizabeth Tower at the north end of the Palace, directly at the west end of the bridge, joined to the Palace's river front, which runs south (left) along a riverside terrace behind the stone river wall | Photo; Wikipedia |
+| Far bank, up from the bridge | Bridge Street continues west from the bridge between Elizabeth Tower (south / left) and Portcullis House (north / right) towards Parliament Square: road with kerbs and stone pavements both sides | Real street plan (Westminster Bridge listing gives the address "Bridge Street SW1") |
+| Far bank, top left | St Margaret Street along the Palace's west side, then Parliament Square: lawn with paths, Churchill's statue on its east side facing Parliament, a second statue on a plinth; the skyline behind | Wikipedia (Parliament Square; Statue of Winston Churchill) |
+| Far bank, Bridge Street north pavement | Westminster tube station entrance beside Portcullis House (the station is under it) | Wikipedia (Westminster tube station) |
 | Far bank, right of the bridge | Boudica statue on the north corner of the bridge end; Victoria Embankment road running north (right) with a parked red double-decker; Portcullis House behind; plane trees; Westminster Millennium Pier on the river below the wall | Photo; Wikipedia (Boudica: "north side of the western end of Westminster Bridge… near Portcullis House and Westminster Pier"; pier: "next to Westminster Bridge on the north bank") |
 | Far bank street furniture | Bus stop (exit, "BUS 24"), red phone box, lamps, bollards, bins | Bus stop: SPEC.md (Parliament Square bus stop, 12:05). Phone box: SPEC.md. Exact positions are invented. |
 | River | Thames, grey-green, non-walkable; a white-and-grey catamaran crossing; river walls on both banks | Photo |
@@ -37,7 +39,7 @@ Ground surfaces: pale granite paving on both embankments and the bridge pavement
 
 Plants: London plane trees along both embankments (shared `tree` sprite).
 
-Things simplified or left out: the South Bank Lion and County Hall at the east end of the bridge, the Embankment's cast-iron "dolphin" (sturgeon) lamps (the shared lamp stands in), Westminster tube station under Portcullis House, the bridge's seven arches (seen only from the deck here), traffic.
+Things simplified or left out: the South Bank Lion and County Hall at the east end of the bridge, the Embankment's cast-iron "dolphin" (sturgeon) lamps (the shared lamp stands in), Westminster Hall, New Palace Yard and the Abbey (hidden behind the Palace or off-map), most of Parliament Square's twelve statues (one stand-in plinth), the Square's surrounding roads except St Margaret Street, the bridge's seven arches (seen only from the deck here), traffic.
 
 ## Facts used in dialogue
 
@@ -51,6 +53,9 @@ Things simplified or left out: the South Bank Lion and County Hall at the east e
 | London Eye: 135 m tall, 120 m wheel, 32 capsules (numbered 1–33, skipping 13), up to 25 people each, one turn about 30 minutes; cantilevered from an A-frame on one side; first passengers 1 Feb 2000, public 9 March 2000 | https://en.wikipedia.org/wiki/London_Eye |
 | Boudica ("Boadicea and Her Daughters") by Thomas Thornycroft, bronze, on a granite plinth; erected in June 1902 at the north side of the bridge's west end | https://en.wikipedia.org/wiki/Boadicea_and_Her_Daughters |
 | Portcullis House: Michael Hopkins and Partners, opened 2001; its chimneys are part of a natural-ventilation system, not for smoke | https://en.wikipedia.org/wiki/Portcullis_House |
+| Parliament Square: laid out in 1868 (design by Charles Barry), with the Palace to the east, the Supreme Court to the west and Westminster Abbey to the south; statues include Winston Churchill (Ivor Roberts-Jones, 1973) and Millicent Fawcett (Gillian Wearing, 2018, the first statue of a woman in the square) | https://en.wikipedia.org/wiki/Parliament_Square |
+| Churchill statue by Ivor Roberts-Jones, unveiled 1973, faces the Houses of Parliament | https://en.wikipedia.org/wiki/Statue_of_Winston_Churchill,_Parliament_Square |
+| Westminster station: Jubilee, District and Circle lines; opened 24 December 1868 (Metropolitan District Railway); Jubilee line platforms opened 22 December 1999, built with Portcullis House above | https://en.wikipedia.org/wiki/Westminster_tube_station |
 | Westminster Millennium Pier: next to the bridge on the north bank, opened 2000 | https://en.wikipedia.org/wiki/Westminster_Millennium_Pier |
 | Bus 24: Hampstead Heath – Pimlico via Whitehall, Trafalgar Square and Tottenham Court Road; dates from 1910 | https://en.wikipedia.org/wiki/London_Buses_route_24 |
 | Queen's Walk: the South Bank riverside walk from Lambeth Bridge to Tower Bridge, part of the Jubilee Walkway | https://en.wikipedia.org/wiki/The_Queen%27s_Walk_(South_Bank) |
@@ -62,4 +67,7 @@ Things simplified or left out: the South Bank Lion and County Hall at the east e
 - The Shard on the skyline (wrong direction for this view; spec requirement).
 - Benches, bins, bollards, both phone boxes and the bus stop, and the row of trees and hedges along the top edge of the far bank.
 - Not outlined: the parked bus (Shawn's photo shows a red bus by Boudica), the lamps and plane trees along both embankments (lamps and trees are in the photo), Jubilee Gardens' lawn (real, simplified).
+- The tube entrance's exact position and look (the shared Kanada-ya entrance sprite; the station is real, under Portcullis House).
+- The second statue on Parliament Square (stand-in, same sprite flipped), and the Square's tree and lamps. Churchill's statue is not outlined (real, on the east side facing Parliament, position approximate).
+- The plane trees north of Bridge Street, above Portcullis House.
 - The catamaran's route back and forth across the frame.

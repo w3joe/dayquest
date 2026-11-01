@@ -11,6 +11,18 @@
   const HIT = { w: 14, h: 6 };
   const SHARED = ["shawn", "bus", "tube_train", "nelson", "skyline", "national_gallery", "tube_tunnel",
     "tile_paving", "tile_asphalt", "tile_kerb", "shop_corner", "shop_cafe", "shop_laundry", "tree"];
+  const OPTIONAL = ["actions", "fx_steam", "fx_sparkle", "fx_heart", "fx_flash"]; // loaded if present
+  const NPC_VEHICLES = ["black_cab", "delivery_bike"];
+  const SITTABLE = ["bench", "deckchair", "chair"];
+  // player action strips in shared/assets/actions.png (4 cols x 6 rows of 32x48)
+  const ACT = {
+    eat: { row: 0, seq: [0, 1, 2, 3], speed: 9, loop: true, seated: true },
+    drink: { row: 1, seq: [0, 1, 2, 1, 0], speed: 12, seated: true },
+    sit: { row: 2, seq: [0, 1], speed: 10, bob: true },
+    photo: { row: 3, seq: [0, 1], speed: 16, flashAt: 1 },
+    wave: { row: 4, seq: [0, 1, 2, 1], speed: 8, loop: true },
+    point: { row: 5, seq: [0, 1], speed: 12 },
+  };
   const MARGIN = 24; // tiles of ground drawn past each map edge, so the canvas never shows empty space
 
   const scenes = [];
@@ -20,6 +32,7 @@
   const cache = {};
   function assetPath(scene, name) {
     if (scene && (scene.own || []).includes(name)) return `scenes/${scene.dir || scene.id}/assets/${name}.png`;
+    if (name.startsWith("npc_") || NPC_VEHICLES.includes(name)) return `shared/npcs/assets/${name}.png`;
     return `shared/assets/${name}.png`;
   }
   function load(path) {
@@ -80,11 +93,15 @@
   async function buildScene(def) {
     const names = new Set([...SHARED, ...(def.assets || [])]);
     const img = {};
-    await Promise.all([...names].map(async (n) => (img[n] = await load(assetPath(def, n)))));
+    // pedestrians and vehicles are optional: a scene still runs if their sheets aren't there
+    const optional = (n) => n.startsWith("npc_") || NPC_VEHICLES.includes(n);
+    await Promise.all([...names].filter((n) => !optional(n)).map(async (n) => (img[n] = await load(assetPath(def, n)))));
+    await Promise.all([...names].filter(optional).map((n) => load(assetPath(def, n)).then((i) => (img[n] = i), () => {})));
+    await Promise.all(OPTIONAL.map((n) => load(assetPath(def, n)).then((i) => (img[n] = i), () => {})));
     const w = {
       def, img, W: def.cols * T, H: def.rows * T,
       entities: [], talk: [], blocks: [], invented: [], exits: [], movers: [], backdrops: [],
-      solid: new Uint8Array(def.cols * def.rows),
+      solid: new Uint8Array(def.cols * def.rows), npcs: [],
     };
     // builder API handed to scene.build()
     const api = {
@@ -105,7 +122,32 @@
         return e;
       },
       // a point of interest: stand near (x, y) facing it and press A
-      talk(x, y, text, o = {}) { w.talk.push({ x, y, text, icon: o.icon }); },
+      // o.action: "eat" | "drink" | "sit" | "photo" | "wave" | "point"; o.seat {x, y} moves the player there first;
+      // o.fx: "fx_steam" etc. drawn at o.fxAt {x, y}
+      talk(x, y, text, o = {}) { w.talk.push({ x, y, text, icon: o.icon, action: o.action, seat: o.seat, fx: o.fx, fxAt: o.fxAt }); },
+      // a pedestrian walking a waypoint loop: sheet = 3x4 walk sheet (down/left/right/up)
+      npc(sheet, o) {
+        const pts = o.path;
+        const n = { sheet: img[sheet], x: pts[0][0], y: pts[0][1], path: pts, i: 1, speed: o.speed ?? 0.55, dir: "down",
+          anim: 0, wait: o.delay ?? 0, pause: o.pause ?? 0, invented: o.invented ?? true, still: !!o.still, face: o.face || "down" };
+        if (!n.sheet) return null;
+        if (o.talk) w.talk.push({ npc: n, x: n.x, y: n.y, text: o.talk });
+        w.npcs.push(n);
+        return n;
+      },
+      // a vehicle crossing the map on a lane, then waiting off-screen
+      traffic(name, o) {
+        const im = img[name];
+        if (!im) return null;
+        const dir = o.speed >= 0 ? 1 : -1;
+        const start = dir > 0 ? -im.width - 20 : w.W + 20;
+        return api.mover(name, { x: start + (o.offset || 0) * dir, y: o.y, flip: !!o.flip, invented: o.invented ?? true, shadow: "ellipse", update(m) {
+          if (m.wait > 0) { m.wait--; m.visible = false; return; }
+          m.visible = true;
+          m.x += o.speed;
+          if ((dir > 0 && m.x > w.W + 20) || (dir < 0 && m.x < -im.width - 20)) { m.x = start; m.wait = o.gap ?? 300; }
+        } });
+      },
       block(x, y, bw, bh) { w.blocks.push({ x, y, w: bw, h: bh }); },
       invented(x, y, iw, ih) { w.invented.push({ x, y, w: iw, h: ih }); },
       // stepping into this rect leaves the scene
@@ -165,6 +207,7 @@
     const hit = (k) => k && r > k.x && l < k.x + k.w && b > k.y && t < k.y + k.h;
     for (const e of world.entities) if (hit(e.box)) return true;
     for (const k of world.blocks) if (hit(k)) return true;
+    for (const n of world.npcs) if (hit({ x: n.x - 6, y: n.y - 6, w: 12, h: 6 })) return true;
     return false;
   }
 
@@ -261,6 +304,7 @@
     const fx = player.x + ahead[0], fy = player.y + ahead[1];
     let best = null, bestD = 30;
     for (const s of world.talk) {
+      if (s.npc) { s.x = s.npc.x; s.y = s.npc.y; }
       const d = Math.hypot(s.x - fx, (s.y - fy) * 1.4);
       if (d < bestD) { best = s; bestD = d; }
     }
@@ -276,7 +320,14 @@
       return;
     }
     const s = nearbyTalk();
-    if (s) {
+    if (s && s.action) startAction(s.action, s);
+    else {
+      // benches and deckchairs seat the player, with or without a line to read
+      const seat = nearbySeat();
+      if (seat) startAction("sit", { seat: { x: seat.x + seat.w / 2, y: seat.y + 2 } });
+    }
+    if (!s) return;
+    if (s.text) {
       // keep numbers with their units on one line ("96 m", "3.8 km")
       dialogue = { text: s.text.replace(/(\d) (?=(m|km|ft|kg|tonnes?|minutes?|min|steps|%)\b)/g, "$1\u00a0"), shown: 0 };
       dlgIcon.hidden = !s.icon;
@@ -284,6 +335,25 @@
       dlg.hidden = false;
       player.still = 0;
     }
+  }
+
+  // ---------- player actions (sit, eat, drink, photo, wave, point) ----------
+  let flashTimer = 0;
+  function nearbySeat() {
+    const ahead = { up: [0, -10], down: [0, 10], left: [-12, -4], right: [12, -4] }[player.dir];
+    const fx = player.x + ahead[0], fy = player.y + ahead[1];
+    return world.entities.find((e) => SITTABLE.includes(e.name) && fx > e.x - 6 && fx < e.x + e.w + 6 && fy > e.y - e.h - 6 && fy < e.y + 8);
+  }
+  function startAction(name, s) {
+    if (!world.img.actions && name !== "sit") return;
+    player.act = { name, t: 0, prev: { x: player.x, y: player.y, dir: player.dir }, seat: s.seat, fx: s.fx, fxAt: s.fxAt, flashed: false };
+    if (s.seat) { player.x = s.seat.x; player.y = s.seat.y; player.dir = s.seat.dir || "down"; }
+    player.still = 0;
+  }
+  function standUp() {
+    const a = player.act;
+    if (a.seat) { player.x = a.prev.x; player.y = a.prev.y; }
+    player.act = null;
   }
 
   function toggleInvented() {
@@ -395,6 +465,16 @@
       dlgNext.style.visibility = dialogue.shown >= dialogue.text.length ? "visible" : "hidden";
     }
     for (const m of world.movers) m.update && m.update(m, frameNo);
+    updateNpcs();
+    if (flashTimer > 0) flashTimer--;
+    if (player.act) {
+      const a = player.act, d = ACT[a.name];
+      a.t++;
+      if (d && d.flashAt != null && !a.flashed && Math.floor(a.t / d.speed) >= d.flashAt) { a.flashed = true; flashTimer = 14; }
+      const pressed = ["up", "down", "left", "right"].some((k) => keys.has(k));
+      if (pressed && !dialogue) standUp();
+      else return;
+    }
 
     let dx = 0, dy = 0;
     if (!dialogue) {
@@ -470,19 +550,23 @@
       else if (e.shadow === "base") { ctx.fillStyle = "rgba(20, 16, 40, 0.22)"; ctx.fillRect(e.x + 3, e.y - 2, e.w, 7); }
     }
     for (const m of world.movers) if (m.visible && m.shadow === "ellipse") drawShadow(m.x + m.im.width / 2, m.y, m.im.width * 0.8);
+    for (const n of world.npcs) drawShadow(n.x, n.y, 16);
     drawShadow(player.x, player.y, 18);
 
     const list = [];
     for (const e of world.entities) if (e.layer !== "ground") list.push({ y: e.y + e.z, e });
     for (const m of world.movers) if (m.visible) list.push({ y: m.y + m.z, m });
+    for (const n of world.npcs) list.push({ y: n.y, npc: n });
     list.push({ y: player.y, player: true });
     list.sort((a, b) => a.y - b.y);
     for (const it of list) {
       if (it.player) drawPlayer();
+      else if (it.npc) drawNpc(it.npc);
       else if (it.m) drawSprite(it.m.im, Math.round(it.m.x), Math.round(it.m.y - it.m.im.height), it.m.flip);
       else drawSprite(it.e.im, it.e.x, it.e.y - it.e.h, it.e.flip);
     }
 
+    drawActionFx();
     if (showInvented) drawInvented();
 
     // exit markers
@@ -507,8 +591,51 @@
     }
   }
 
+  function updateNpcs() {
+    for (const n of world.npcs) {
+      if (n.still) continue;
+      if (n.wait > 0) { n.wait--; n.moving = false; continue; }
+      const [tx, ty] = n.path[n.i];
+      const dx = tx - n.x, dy = ty - n.y, dist = Math.hypot(dx, dy);
+      if (dist <= n.speed) { n.x = tx; n.y = ty; n.i = (n.i + 1) % n.path.length; n.wait = n.pause; n.moving = false; continue; }
+      const nx = n.x + (dx / dist) * n.speed, ny = n.y + (dy / dist) * n.speed;
+      // step aside for nobody: just wait while the player is in the way
+      if (Math.abs(nx - player.x) < 12 && Math.abs(ny - player.y) < 7) { n.moving = false; continue; }
+      n.x = nx; n.y = ny; n.moving = true; n.anim += 0.1;
+      n.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? "left" : "right") : (dy < 0 ? "up" : "down");
+    }
+  }
+  function drawNpc(n) {
+    const row = DIR_ROW[n.still ? n.face : n.dir], col = n.moving ? [1, 0, 1, 2][Math.floor(n.anim) % 4] : 1;
+    ctx.drawImage(n.sheet, col * FW, row * FH, FW, FH, Math.round(n.x - FW / 2), Math.round(n.y - FH + 1), FW, FH);
+  }
+  function drawActionFx() {
+    const a = player.act;
+    if (!a) return;
+    const I = world.img;
+    if (a.fx && I[a.fx] && a.fxAt) {
+      for (let k = 0; k < 2; k++) {
+        const rise = (a.t * 0.35 + k * 10) % 20;
+        ctx.globalAlpha = 1 - rise / 20;
+        ctx.drawImage(I[a.fx], Math.round(a.fxAt.x - I[a.fx].width / 2 + (k ? 3 : -3)), Math.round(a.fxAt.y - I[a.fx].height - rise));
+      }
+      ctx.globalAlpha = 1;
+    }
+    if (a.name === "eat" && I.fx_heart && a.t > 80 && a.t % 200 < 110) ctx.drawImage(I.fx_heart, Math.round(player.x + 4), Math.round(player.y - FH - 10));
+    if (a.name === "sit" && I.fx_sparkle && a.t < 40) ctx.drawImage(I.fx_sparkle, Math.round(player.x + 8), Math.round(player.y - FH + 2 - a.t / 4));
+    if (a.name === "photo" && flashTimer > 0 && I.fx_flash) ctx.drawImage(I.fx_flash, Math.round(player.x - I.fx_flash.width / 2), Math.round(player.y - FH - 8));
+  }
+
   function drawPlayer() {
     let col, row;
+    const a = player.act, d = a && ACT[a.name];
+    if (a && d && world.img.actions) {
+      const k = Math.floor(a.t / d.speed), seq = d.seq;
+      const idx = d.loop ? seq[k % seq.length] : seq[Math.min(k, seq.length - 1)];
+      const bob = d.bob && k >= seq.length ? Math.floor(a.t / 24) % 2 : 0;
+      ctx.drawImage(world.img.actions, idx * FW, d.row * FH, FW, FH, Math.round(player.x - FW / 2), Math.round(player.y - FH + 1 + bob), FW, FH);
+      return;
+    }
     if (!player.moving && player.still > 120 && !dialogue) { row = 4; col = 0; }
     else { row = DIR_ROW[player.dir]; col = player.moving ? [1, 0, 1, 2][Math.floor(player.anim) % 4] : 1; }
     ctx.drawImage(world.img.shawn, col * FW, row * FH, FW, FH, Math.round(player.x - FW / 2), Math.round(player.y - FH + 1), FW, FH);

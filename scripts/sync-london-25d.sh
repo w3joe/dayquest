@@ -6,7 +6,7 @@ SRC=${1:-../openai-hack/london-25d}
 DST=public/london-25d
 rm -rf "$DST"
 mkdir -p "$DST"
-rsync -a --exclude 'raw/' --exclude 'logs/' --exclude 'tools/' --exclude 'dist/' --exclude 'screenshots/' \
+rsync -a --exclude 'raw/' --exclude 'logs/' --exclude 'tools/' --exclude 'dist/' --exclude 'screenshots/' --exclude 'qa/' --exclude 'QA.md' \
   --exclude '*.py' --exclude '__pycache__/' --exclude 'screenshot*.png' "$SRC/" "$DST/"
 # 32x48 front-facing frame for the Today screen's character preview
 python3 - "$DST" <<'PY'
