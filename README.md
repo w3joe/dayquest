@@ -44,7 +44,7 @@ The idea began as a four-hour OpenAI hackathon project: make everyday life feel 
 </table>
 
 1. **Start with your fit.** Open **Try me** and add a full-body front photo to generate your pixel character. Preview it before setting off.
-2. **Collect the details.** Add photos to **Food**, **Place** and **More**, with a short note for each. Pick several at once, drag them in, or use the camera button on your phone. The first Place and Food photos guide the scenery and meal.
+2. **Collect the details.** Add photos to **Food**, **Place** and **More**, with a short note for each. Pick several at once, drag them in, or use the camera button on your phone. Each of those photos becomes its own scene; a food photo looks up the restaurant.
 3. **Create your world.** Follow the generation log as the scene takes shape. Completed sprites are saved, so a refresh or retry can continue the build.
 4. **Invite someone in.** Share the `/day/<id>` link. The viewer opens without an account, with keyboard and touch controls for exploring and interacting.
 
@@ -52,7 +52,7 @@ The idea began as a four-hour OpenAI hackathon project: make everyday life feel 
 
 The **Demo** tab shows a filled example day with sample images, captions, a London route over OpenStreetMap, transport chips and walking stats. Try me also accepts a Google Timeline JSON or GPX file and shows the number of imported location points and their date range. A sound toggle lets you switch the interface's little audio cues on or off.
 
-> **Current scope:** The connected creation flow builds one neighbourhood using your fit and the first Food and Place photo. Additional photos and notes are saved in the draft; location-history imports currently show a local summary and are not passed to generation. The Demo tab's route, journeys and walking stats are sample data. The renderer supports connected locations, travel and saved interactions through the development previews below. All screenshots were captured locally without paid generation calls.
+> **Current scope:** The connected creation flow builds one scene per Food, Place and extra photo, with walks between them. A food photo tries to identify the restaurant and build that place. Location-history imports currently show a local summary and are not passed to generation. The Demo tab's route, journeys and walking stats are sample data. All screenshots were captured locally without paid generation calls.
 
 ## How we built it
 
@@ -115,8 +115,9 @@ Set `OPENAI_API_KEY` in `.env.local`, with API credits and access to the configu
 | Variable | Purpose |
 | --- | --- |
 | `OPENAI_API_KEY` | Required for character, scene and artwork generation. Keep it server-side. |
-| `OPENAI_TEXT_MODEL` | Scene and interaction planning; defaults to `gpt-5.4-mini`. |
+| `OPENAI_TEXT_MODEL` | Scene and interaction planning; defaults to `gpt-6-astra`. |
 | `OPENAI_IMAGE_MODEL` | Character and sprite generation; defaults to `gpt-image-2.5-flare`. |
+| `WORLD_DESIGN_AGENTS` | Defaults to `live` (Cloud Agents API, one hosted sandbox per specialist). `sdk` uses the in-process Agents SDK. `template` or `off` skips agent calls. |
 | `BLOB_READ_WRITE_TOKEN` | Public Vercel Blob storage; required in production. |
 | `BLOB_BASE_URL` | The same store's public base URL; required in production. |
 

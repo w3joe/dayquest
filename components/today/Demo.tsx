@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import day from "../../data/input.json";
 import RealMap from "./RealMap";
 
-/** Sample photos, notes and location history shown on the Demo page. */
+/**
+ * Sample photos shown as already uploaded on the Demo page.
+ * These are the restamped copies: capture time and GPS sit on the demo route.
+ * The outfit photo is the original file; food and place were restamped.
+ */
 export const DEMO_UPLOADS = [
   { kind: "lunch", url: "/demo/food.jpg", note: "four bowls at Kanada-Ya, table 30" },
   { kind: "landmark", url: "/demo/place.jpg", note: "Big Ben from the South Bank" },
@@ -12,6 +16,15 @@ export const DEMO_UPLOADS = [
   { kind: "extra", url: "/ui/heart.png", note: "best day" },
 ];
 export const DEMO_FIT = { url: "/demo/fit.jpg", note: "red puffer, ready for London" };
+
+/** Fetch a demo photo with its EXIF intact, so the page can read the capture time. */
+export async function demoPhotoFile(url: string): Promise<File> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Could not load the demo photo.");
+  const name = url.split("/").pop() || "photo.jpg";
+  return new File([await response.blob()], name, { type: "image/jpeg" });
+}
+
 export const DEMO_SPRITE = "/days/demo/player.png";
 export const DEMO_PLACES = { name: "demo", count: day.locations.length, range: "London" };
 

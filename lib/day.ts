@@ -1,4 +1,7 @@
 import { validateInteractionPack, type InteractionPack } from "./interactions";
+import { parseSceneWeather, type SceneWeather } from "./weather";
+
+export type { SceneWeather };
 
 export type Tile = { x: number; y: number };
 export type Landmark = { name: string; sprite: string; footprint: "S" | "M" | "L"; slot: number; text: string };
@@ -31,7 +34,7 @@ export type WorldObject = {
   roam?: number;
 };
 export type SceneWorld = {
-  /** Ground dimensions in tiles; each string is one row of g/f/p/c/r/k/w tiles. */
+  /** Ground dimensions in tiles; each string is one row of g/f/p/c/r/k/w/b tiles. `b` is a walkable bridge deck. */
   width: number;
   height: number;
   ground: string[];
@@ -54,6 +57,9 @@ export type DayScene = {
   landmarks: Landmark[];
   /** sprite: 16×16 on the table; icon: 32×32 for the textbox (optional, fall back to sprite). */
   food?: { sprite: string; icon?: string; tile: Tile; text: string; name?: string; description?: string };
+  /** Omitted when the lookup failed or no place/time was known. */
+  weather?: SceneWeather;
+
 };
 export type TransitLeg =
   | { mode: "bus"; route: string; destination: string; from: string; to: string }
@@ -140,7 +146,7 @@ function validActor(item: Record<string, unknown>): boolean {
 function validWorld(value: unknown): value is SceneWorld {
   if (!object(value) || !integer(value.width, 20, 128) || !integer(value.height, 15, 128) ||
     !Array.isArray(value.ground) || value.ground.length !== value.height ||
-    !value.ground.every(row => typeof row === "string" && row.length === value.width && /^[gfpcrkw]+$/.test(row)) ||
+    !value.ground.every(row => typeof row === "string" && row.length === value.width && /^[gfpcrkwb]+$/.test(row)) ||
     !Array.isArray(value.objects) || value.objects.length === 0 || value.objects.length > 128) return false;
   if (value.crossing !== undefined && !(object(value.crossing) && integer(value.crossing.col, 0, value.width - 4) &&
     integer(value.crossing.row, 0, value.height - 1) && integer(value.crossing.rows, 1, Math.min(8, value.height - value.crossing.row)))) return false;
@@ -291,6 +297,7 @@ export function parseDayManifest(value: unknown, expectedId: string): DayManifes
       (scene.food.description !== undefined && (!text(scene.food.description) || scene.food.description.length > 1800)))) {
       throw new Error("Invalid food in day manifest");
     }
+    if (scene.weather !== undefined) parseSceneWeather(scene.weather);
   }
   for (const scene of value.scenes) {
     if ((scene as DayScene).interactionPack !== undefined) validateInteractionPack(scene as DayScene, (scene as DayScene).interactionPack);

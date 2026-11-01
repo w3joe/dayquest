@@ -8,7 +8,7 @@ import SpritePreview, { type SpriteVerification } from "./SpritePreview";
 import { browserId } from "../../lib/browser-id";
 import { sfx } from "../../lib/sound";
 import Link from "next/link";
-import { DEMO_FIT, DEMO_PLACES, DEMO_SPRITE, DEMO_UPLOADS, DemoRoute } from "./Demo";
+import { DEMO_FIT, DEMO_PLACES, DEMO_SPRITE, DEMO_UPLOADS, DemoRoute, demoPhotoFile } from "./Demo";
 import { MAX_LOCATION_FILE_BYTES, parseLocationHistory } from "../../lib/location-history";
 import AppShell from "./AppShell";
 import CameraButton from "./CameraButton";
@@ -54,7 +54,20 @@ export default function Today({ demo = false }: { demo?: boolean }) {
   const requests = useRef(new Set<AbortController>());
   useEffect(() => {
     setToday(new Date());
-    if (demo) { gallery.restore(DEMO_UPLOADS); return; }
+    if (demo) {
+      gallery.restore(DEMO_UPLOADS);
+      void (async () => {
+        try {
+          const fitTime = await matchPhoto(await demoPhotoFile(DEMO_FIT.url));
+          if (mounted.current) setPhotos(current => ({ ...current, fit: { ...current.fit, url: DEMO_FIT.url, preview: DEMO_FIT.url, matching: fitTime } }));
+          for (const upload of DEMO_UPLOADS) {
+            const matching = await matchPhoto(await demoPhotoFile(upload.url));
+            if (mounted.current) gallery.setMatching(upload.url, matching);
+          }
+        } catch { /* The photos stay visible if a capture time cannot be read. */ }
+      })();
+      return;
+    }
     try {
       const draft = parseStoredDraft(sessionStorage.getItem(DRAFT_STORAGE_KEY));
       if (draft) {
@@ -272,12 +285,13 @@ export default function Today({ demo = false }: { demo?: boolean }) {
         </label>
         {(photo?.preview || photo?.error) && <div className="dq-photo-info">
           {photo?.preview && <input type="text" className="dq-caption" maxLength={NOTE_MAX_LENGTH} placeholder="Add a note" aria-label={`Note about ${quest.name}`} value={notes[quest.kind] ?? ""} readOnly={demo} onChange={event => setNotes(current => ({ ...current, [quest.kind]: event.target.value }))}/>}
+          {photo?.matching?.startsWith("Photo time") && <p className="dq-photo-match">{photo.matching}</p>}
           {photo?.error && <><p className="dq-error" role="alert">{photo.error}</p>{photo.pending && <div className="dq-actions"><button type="button" className="dq-small-button" onClick={() => void upload(quest.kind, pendingFiles.current[quest.kind])}>Retry</button><button type="button" className="dq-small-button" onClick={() => discardReplacement(quest.kind)}>{photo.url ? "Keep old" : "Discard"}</button></div>}</>}
         </div>}
       </div>; })}
         {galleries.map(g => <GalleryCard key={g.kind} missing={g.kind !== "extra" && !have[g.kind] && !demo} title={g.name} sprite={g.sprite} kind={g.kind} wide={"wide" in g} readOnly={demo} ready={!!sessionId} items={gallery.items.filter(item => item.kind === g.kind)} onAdd={files => gallery.add(g.kind, files)} onRemove={gallery.remove} onRetry={gallery.retry} onNote={gallery.setNote} />)}
       </div>
-      {!demo && <p className="dq-cta-hint">The first Place and Food photos anchor your world. Other photos and notes add context.</p>}
+      {!demo && <p className="dq-cta-hint">Each Place, Food and extra photo becomes its own scene. A food photo looks up the restaurant.</p>}
       {gallery.notice && <p className="dq-error" role="alert">{gallery.notice}</p>}
       {!allThree && <div className="dq-sprite-status" aria-live="polite"><PixelSprite name="face" size={4}/><div><strong>{added} of 3 photos added</strong><span>Add your {missingNames} photo to get your adventure ready.</span></div></div>}
       <div hidden={!allThree}>{spriteUrl ? <SpritePreview url={spriteUrl} onStatusChange={setSpriteVerification} onRegenerate={() => void makeSprite()} disabled={demo || spriteBusy || uploading || pendingChanges} retained={pendingChanges} /> : <div className="dq-sprite-status" aria-live="polite"><PixelSprite name="face" size={4} className={spriteBusy ? "dq-hop" : undefined}/><div><strong>{spriteBusy ? "Making your character…" : "Your character"}</strong><span>{spriteError || (spriteBusy ? "Just a minute" : "Add a fit photo to start")}</span></div>{spriteError && <button type="button" className="dq-small-button" disabled={spriteBusy || pendingFitChanges} onClick={() => void makeSprite()}>Retry</button>}</div>}</div>

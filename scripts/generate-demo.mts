@@ -15,6 +15,7 @@ import sharp from "sharp";
 import { modeFromEnv, runGenerateDay } from "@/pipeline/generate";
 import { localDayStore } from "@/pipeline/publish";
 import type { DayInput, GenerateEvent, UploadKind } from "@/pipeline/types";
+import { scriptedDemoWeather } from "@/lib/weather";
 
 try { process.loadEnvFile(".env.local"); } catch { /* optional */ }
 
@@ -44,6 +45,7 @@ const events: GenerateEvent[] = [];
 await runGenerateDay({
   id: "demo", input, store: localDayStore(dir, "/days/demo/day.json"), uploads,
   player: values.player ? await readFile(values.player) : undefined, ...mode,
+  weather: async scene => scriptedDemoWeather(scene.time, scene.kind),
 }, (event) => {
   events.push({ ...event, at: Date.now() - started });
   console.log(`${String(Date.now() - started).padStart(6)}ms  ${event.label}`);

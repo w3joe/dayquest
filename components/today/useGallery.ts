@@ -99,6 +99,9 @@ export function useGallery(sessionId: string) {
     if (item && file) void send(id, item.kind, file);
   }, [send]);
   const setNote = useCallback((id: string, note: string) => patch(id, { note }), [patch]);
+  const setMatching = useCallback((url: string, matching: string) => {
+    setItems(current => current.map(item => (item.url === url ? { ...item, matching } : item)));
+  }, []);
   const restore = useCallback((saved: { kind: string; url: string; note?: string }[]) => {
     for (const controller of controllers.current.values()) controller.abort();
     controllers.current.clear(); files.current.clear();
@@ -106,7 +109,7 @@ export function useGallery(sessionId: string) {
   }, [commit]);
 
   return {
-    items, notice, add, remove, retry, setNote, restore,
+    items, notice, add, remove, retry, setNote, setMatching, restore,
     busy: items.some(item => item.busy),
     failed: items.some(item => item.error && !item.busy),
     saved: items.filter(item => item.url).map(item => ({ kind: item.kind, url: item.url as string, note: item.note || undefined })),

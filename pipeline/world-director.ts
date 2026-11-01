@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { runCloudAgent } from "./cloud-agents";
 import { INTERACT_EFFECTS } from "../lib/day";
 import { actorById } from "../lib/actor-library";
 import { FEATURE_KINDS, SHAPES, checkComposition, type Composition } from "../game/composition";
@@ -16,7 +17,7 @@ import type { SimulatedWorld } from "./world-sim";
  *
  * Models choose WHAT appears and roughly WHERE (`near`); code decides exact positions, enforces physics, and has the last word.
  * It never throws: any failure degrades to a smaller, hand-written design that is itself inspected.
- * Repairs and the final tuning pass use a stronger model (default `gpt-6-astra`, set OPENAI_DIRECTOR_STRONG_MODEL) when the first pass is not enough.
+ * Repairs and the final tuning pass have a separate model override (`OPENAI_DIRECTOR_STRONG_MODEL`); both tiers default to `gpt-6-astra`.
  */
 export type TraceStep = { agent: "brief" | "compose" | "design" | "validator" | "critic" | "inspector" | "tuner" | "fallback"; summary: string; issues?: string[]; ms: number; model?: string };
 export type SceneBrief = { mood: string; standout: string; tone: string; seasonal: string; cautions: string[] };
@@ -119,23 +120,36 @@ const normalise = (raw: z.infer<typeof designSchema>) => ({
   npcs: raw.npcs.map((n) => ({ ...n, library: orNull(n.library), description: orNull(n.description) })),
 });
 
-const modelFor = (tier: Tier) => tier === "strong" ? process.env.OPENAI_DIRECTOR_STRONG_MODEL || "gpt-6-astra" : process.env.OPENAI_TEXT_MODEL || "gpt-5.4-mini";
+const modelFor = (tier: Tier) => tier === "strong" ? process.env.OPENAI_DIRECTOR_STRONG_MODEL || "gpt-6-astra" : process.env.OPENAI_TEXT_MODEL || "gpt-6-astra";
 
-/** Production runner: one Agents SDK agent per call with structured output. A strong-tier failure retries once on the default model. */
-export function agentsRunner(): AgentRunner {
-  const once = async (name: string, instructions: string, input: string, schema: z.ZodType, model: string, webSearch?: boolean) => {
+function withStrongRetry(run: (model: string, call: Parameters<AgentRunner>[0]) => Promise<unknown>): AgentRunner {
+  return async (call) => {
+    try { return await run(modelFor(call.tier), call); }
+    catch (error) {
+      if (call.tier === "default") throw error;
+      return run(modelFor("default"), call);
+    }
+  };
+}
+
+/** Production runner: one Cloud Agents session (hosted sandbox / VM) per specialist. */
+export function cloudAgentsRunner(): AgentRunner {
+  return withStrongRetry((model, call) => runCloudAgent({ ...call, model }));
+}
+
+/** In-process Agents SDK runner. Opt in with WORLD_DESIGN_AGENTS=sdk; it has no sandbox. */
+export function sdkAgentsRunner(): AgentRunner {
+  return withStrongRetry(async (model, { name, instructions, input, schema, webSearch }) => {
     const { Agent, run, webSearchTool } = await import("@openai/agents");
     const agent = new Agent({ name, instructions, model, outputType: schema as z.ZodObject<z.ZodRawShape>, ...(webSearch ? { tools: [webSearchTool()] } : {}) });
     const result = await run(agent, input);
     return result.finalOutput;
-  };
-  return async ({ name, instructions, input, schema, tier, webSearch }) => {
-    try { return await once(name, instructions, input, schema, modelFor(tier), webSearch); }
-    catch (error) {
-      if (tier === "default") throw error;
-      return once(name, instructions, input, schema, modelFor("default"), webSearch);
-    }
-  };
+  });
+}
+
+/** Live world design: Cloud Agents API unless WORLD_DESIGN_AGENTS=sdk. */
+export function agentsRunner(): AgentRunner {
+  return process.env.WORLD_DESIGN_AGENTS === "sdk" ? sdkAgentsRunner() : cloudAgentsRunner();
 }
 
 export async function directWorld(ctx: WorldContext, runner: AgentRunner = agentsRunner(), options: { simulate?: Simulate; deadlineMs?: number } = {}): Promise<DirectorRun> {

@@ -2,8 +2,9 @@ import { prepareWorldConstruction, needsConstructionUpgrade } from "./world-cons
 import { WorldPlacementError } from "../game/block-placement";
 import { RequestError } from "../lib/server/errors";
 import { buildWorldKit, furnitureBlock } from "../lib/world-kit";
-import type { DayManifest } from "../lib/day";
-import { parseDayManifest } from "../lib/day";
+import { parseDayManifest, type DayManifest, type DayScene } from "../lib/day";
+import type { SceneWeather } from "../lib/weather";
+import { attachJourneys, type JourneyConnection } from "../lib/itinerary";
 import { buildWorldLayout } from "../game/world-layout";
 import { buildSceneAssetJobs, generateSceneAsset } from "./scene-assets";
 import type { ImageGenerator } from "./imagegen";
@@ -17,6 +18,7 @@ import { fallbackDesign } from "./world-design";
 import type { DirectorRun } from "./world-director";
 import type { GenerateEvent, UploadKind } from "./types";
 import { validateInteractionPack, type InteractionPack } from "../lib/interactions";
+import { sceneUnits, type SceneUnit } from "./scene-sources";
 
 export type WorldCheckpoint = {
   blueprint?: SceneBlueprint;
@@ -26,6 +28,8 @@ export type WorldCheckpoint = {
   interactionPack?: InteractionPack;
   /** Perceptual hashes of the building sprites saved so far, to catch one picture drawn several times. */
   hashes?: Record<string, string>;
+  /** Completed photo-scenes waiting for the rest of the day, or for publication. */
+  completedScenes?: DayScene[];
 };
 export type WorldBuildInput = {
   id: string;
@@ -49,13 +53,60 @@ export type WorldBuildDependencies = {
   styleReferences?: Buffer[];
   /** Explicit production planner; omitted by legacy/offline pipeline consumers. */
   planInteractions?(scene: import("../lib/day").DayScene): Promise<InteractionPack>;
+  weather?: (query: { time: string; photo?: Buffer }) => Promise<SceneWeather | undefined>;
 };
+
+function planInputFor(input: WorldBuildInput, unit: SceneUnit): ScenePlanInput {
+  const meal = unit.photoKind === "lunch";
+  const notes = unit.note ?? (sceneUnits(input).length === 1 ? input.environment?.notes : undefined);
+  return {
+    ...(meal ? { lunch: unit.bytes } : unit.bytes ? { landmark: unit.bytes } : {}),
+    focus: meal ? "meal" : "place", sceneId: unit.id, kind: unit.kind,
+    context: { name: input.name, date: input.date, ...(notes ? { notes } : {}) },
+  };
+}
+
+function assetSources(input: WorldBuildInput, unit: SceneUnit) {
+  return {
+    player: input.player,
+    uploads: {
+      ...(unit.photoKind === "lunch" ? { lunch: unit.bytes } : unit.bytes ? { landmark: unit.bytes } : {}),
+      ...(input.uploads.fit ? { fit: input.uploads.fit } : {}),
+    },
+  };
+}
+
+function unitFor(input: WorldBuildInput, checkpoint: WorldCheckpoint): SceneUnit {
+  const units = sceneUnits(input);
+  return units.find(item => item.id === checkpoint.blueprint?.sceneId) ?? units[checkpoint.completedScenes?.length ?? 0] ?? units[0];
+}
+
+function scopedJobs(input: WorldBuildInput, checkpoint: WorldCheckpoint, deps: WorldBuildDependencies, unit: SceneUnit) {
+  const jobs = buildSceneAssetJobs(checkpoint.blueprint!, { ...assetSources(input, unit), styleReferences: deps.styleReferences });
+  const pending = checkpoint.assets.player_walk ? jobs.filter(job => job.id !== "player_walk") : jobs;
+  if (sceneUnits(input).length === 1) return pending;
+  return pending.map(job => job.id === "player_walk" ? job : { ...job, file: `${unit.id}_${job.file}` });
+}
+
+/** Jobs remaining for the in-progress photo-scene, with per-scene filenames when a day has several. */
+export function worldAssetJobs(input: WorldBuildInput, checkpoint: WorldCheckpoint, deps: WorldBuildDependencies) {
+  if (!checkpoint.blueprint) return [];
+  return scopedJobs(input, checkpoint, deps, unitFor(input, checkpoint));
+}
+
+function walkConnections(scenes: DayScene[]): JourneyConnection[] {
+  return scenes.slice(0, -1).map((from, index) => {
+    const to = scenes[index + 1];
+    return { id: `${from.id}_to_${to.id}`, fromSceneId: from.id!, toSceneId: to.id!,
+      legs: [{ mode: "walk" as const, from: from.title, to: to.title, durationMs: 4000, estimated: true as const }] };
+  });
+}
 
 /** Independent sprites run in a bounded batch. Save each success even if its neighbour fails. */
 export async function advanceWorldAssetBatch(input: WorldBuildInput, checkpoint: WorldCheckpoint, deps: WorldBuildDependencies,
   save: (checkpoint: WorldCheckpoint, event: GenerateEvent, total: number) => Promise<void>, concurrency = 3): Promise<void> {
   if (!checkpoint.blueprint) throw new Error("Plan the scene before generating sprites.");
-  const jobs = buildSceneAssetJobs(checkpoint.blueprint, { ...input, styleReferences: deps.styleReferences });
+  const jobs = worldAssetJobs(input, checkpoint, deps);
   const pending = jobs.filter(job => !checkpoint.assets[job.id]).slice(0, Math.max(1, Math.min(3, Math.floor(concurrency))));
   let latest = checkpoint;
   let writes = Promise.resolve();
@@ -89,29 +140,31 @@ export async function advanceWorldAssetBatch(input: WorldBuildInput, checkpoint:
 export async function advanceWorldBuild(input: WorldBuildInput, checkpoint: WorldCheckpoint, deps: WorldBuildDependencies): Promise<{
   checkpoint: WorldCheckpoint; event: GenerateEvent; total: number; manifest?: DayManifest;
 }> {
+  const units = sceneUnits(input);
+  const done = checkpoint.completedScenes?.length ?? 0;
   if (!checkpoint.blueprint) {
-    const planned = await deps.plan({ landmark: input.uploads.landmark, lunch: input.uploads.lunch,
-      ...(input.photos ? { photos: input.photos } : {}),
-      context: { name: input.name, date: input.date, ...(input.environment?.notes ? { notes: input.environment.notes } : {}) } });
-    // Research may fill unobserved supporting slots; all photographed buildings retain their references.
+    const unit = units[done] ?? units[0];
+    const plannedInput = planInputFor(input, unit);
+    const planned = await deps.plan(plannedInput);
     const located = await deps.locator?.(planned).catch(() => undefined);
     const base = prepareWorldConstruction(applyLocation(planned, located));
-    const run = await deps.director?.(buildWorldContext(base, { name: input.name, date: input.date }, { ...input.environment, ...(located ? { place: located.place } : {}) }), base).catch(() => undefined);
+    const run = await deps.director?.(buildWorldContext(base, { name: input.name, date: input.date }, { ...input.environment, notes: plannedInput.context?.notes, ...(located ? { place: located.place } : {}) }), base).catch(() => undefined);
     const chosen = templateFor({ ground: base.ground, template: run?.template ?? base.template });
     const design = run?.design ?? fallbackDesign(chosen.grounds[0], chosen.zones);
-    const blueprint: SceneBlueprint = { ...base, design, template: chosen.id, ...(run?.composition ? { composition: run.composition } : {}) };
+    const blueprint: SceneBlueprint = { ...base, design, template: chosen.id, sceneId: unit.id, kind: unit.kind, ...(run?.composition ? { composition: run.composition } : {}) };
     blueprint.kit = buildWorldKit(blueprint);
-    const jobs = buildSceneAssetJobs(blueprint, input);
+    const jobs = scopedJobs(input, { ...checkpoint, blueprint }, deps, unit);
     return { checkpoint: { ...checkpoint, blueprint }, total: jobs.length,
-      event: { step: "landmarks", label: `Scene planned: ${blueprint.title}. ${jobs.length} sprites to create. Added ${design.interactables.length} things to do and ${design.npcs.length} characters${design.source === "agent" ? ", designed for this place" : ""}.` } };
+      event: { step: "landmarks", label: `${units.length > 1 ? `Scene ${done + 1} of ${units.length}: ` : ""}Scene planned: ${blueprint.title}. ${jobs.length} sprites to create. Added ${design.interactables.length} things to do and ${design.npcs.length} characters${design.source === "agent" ? ", designed for this place" : ""}.` } };
   }
+  const unit = unitFor(input, checkpoint);
   // Existing paid artwork is authoritative. Repair only construction context,
   // before interactions acquire geometry-dependent approach coordinates.
   if (!checkpoint.interactionPack && needsConstructionUpgrade(checkpoint.blueprint)) {
     checkpoint = { ...checkpoint, blueprint: prepareWorldConstruction(checkpoint.blueprint) };
   }
   const blueprint = checkpoint.blueprint!;
-  const jobs = buildSceneAssetJobs(blueprint, { ...input, styleReferences: deps.styleReferences });
+  const jobs = scopedJobs(input, checkpoint, deps, unit);
   const next = jobs.find(job => !checkpoint.assets[job.id]);
   if (next) {
     const bytes = await generateSceneAsset(next, deps.images);
@@ -126,8 +179,8 @@ export async function advanceWorldBuild(input: WorldBuildInput, checkpoint: Worl
     console.error("World layout failed", { code: error.code, objectId: error.objectId });
     throw new RequestError("Your sprites are saved, but the layout could not safely fit a photographed object. Retry to continue from your saved artwork.", 422);
   }
-  const scene = { kind: "tourist" as const, title: blueprint.title, time: blueprint.time,
-    base: blueprint.ground === "park" ? "park" as const : "street" as const, spawn: layout.spawn, exit: layout.exit,
+  const scene: DayScene = { id: unit.id, kind: unit.kind, title: blueprint.title, time: blueprint.time,
+    base: blueprint.ground === "park" ? "park" : "street", spawn: layout.spawn, exit: layout.exit,
     landmarks: [], world: layout.world,
     ...(blueprint.food ? { food: { sprite: checkpoint.assets.food, icon: checkpoint.assets.food,
       tile: layout.foodTile, text: blueprint.food.text, name: blueprint.food.name, description: blueprint.food.description } } : {}) };
@@ -137,8 +190,6 @@ export async function advanceWorldBuild(input: WorldBuildInput, checkpoint: Worl
     return { checkpoint: { ...checkpoint, interactionPack }, total: jobs.length,
       event: { step: "landmarks", label: `${interactionPack.actions.length} contextual interactions planned and saved.` } };
   }
-  // Publish the reusable blocks and their actual assembly beside the playable day.
-  // This is deliberately written before day.json, so failed storage remains retryable.
   const kit = blueprint.kit ?? buildWorldKit(blueprint);
   const placed = layout.world.objects.map(object => {
     const block = layout.blockContexts[object.id]
@@ -147,19 +198,28 @@ export async function advanceWorldBuild(input: WorldBuildInput, checkpoint: Worl
       connections: block.connectsTo === "front_path" ? [{ kind: "path", x: object.x, y: object.y + 30, clearancePx: block.clearancePx }] : [],
       placement: { x: object.x, y: object.y, ...(object.collision ? { collision: object.collision } : {}) } };
   });
-  await deps.store.put("world-kit.json", Buffer.from(JSON.stringify({ ...kit, blocks: placed,
+  await deps.store.put(units.length > 1 ? `${unit.id}-world-kit.json` : "world-kit.json", Buffer.from(JSON.stringify({ ...kit, blocks: placed,
     meal: blueprint.food ? { ...kit.blocks.find(block => block.id === "food"), sprite: checkpoint.assets.food, tile: layout.foodTile } : undefined,
     character: { ...kit.blocks.find(block => block.id === "player_walk"), sprite: "player.png", walkSheet: checkpoint.assets.player_walk },
   }, null, 2)), "application/json");
-  // The accepted fit-check sprite remains the preview/canonical character.
+  let weather: SceneWeather | undefined;
+  try { weather = await deps.weather?.({ time: blueprint.time, photo: unit.bytes ?? input.uploads.landmark }); } catch { /* Scene stays neutral. */ }
+  const finished: DayScene = { ...scene, ...(checkpoint.interactionPack ? { interactionPack: checkpoint.interactionPack } : {}), ...(weather ? { weather } : {}) };
+  const completed = [...(checkpoint.completedScenes ?? []), finished];
+  if (completed.length < units.length) {
+    const kept: Record<string, string> = {};
+    if (checkpoint.assets.player_walk) kept.player_walk = checkpoint.assets.player_walk;
+    return { checkpoint: { assets: kept, completedScenes: completed }, total: jobs.length,
+      event: { step: "landmarks", label: `Scene ${completed.length} of ${units.length} ready: ${finished.title}.` } };
+  }
   await deps.store.put("player.png", input.player, "image/png");
+  const connected = attachJourneys(completed, walkConnections(completed));
   const manifest: DayManifest = {
     id: input.id, date: input.date,
     player: { name: input.name, sprite: "player.png", walkSheet: checkpoint.assets.player_walk },
-    scenes: [{ ...scene, ...(checkpoint.interactionPack ? { interactionPack: checkpoint.interactionPack } : {}) }],
-    transit: [],
+    ...connected,
   };
   parseDayManifest(manifest, input.id);
   await deps.store.put("day.json", Buffer.from(JSON.stringify(manifest, null, 2)), "application/json");
-  return { checkpoint, total: jobs.length, manifest, event: { step: "done", label: "Your world is ready to explore.", id: input.id } };
+  return { checkpoint: { ...checkpoint, completedScenes: completed }, total: jobs.length, manifest, event: { step: "done", label: "Your world is ready to explore.", id: input.id } };
 }

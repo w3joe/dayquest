@@ -1,3 +1,4 @@
+import type { DayScene } from "../lib/day";
 import type { BlockUsage, WorldKit } from "../lib/world-kit";
 import type { Composition } from "../game/composition";
 import type { TemplateId } from "../game/layout-templates";
@@ -15,6 +16,11 @@ export type SceneBlueprint = {
   props: { id: string; name: string; description: string; library?: string; usage?: BlockUsage }[];
   food?: { name: string; description: string; text: string };
   source: "photo" | "fit-only";
+  /** Set when this inventory is one scene in a multi-photo day. */
+  sceneId?: string;
+  kind?: DayScene["kind"];
+  /** User note for this photo, used by restaurant/place research. Not published. */
+  notes?: string;
   /** NPCs and interactables chosen by the design step (agents or the hand-written fallback). */
   design?: WorldDesign;
   /** The kind of place to build. Chosen by the world builder; when absent it follows `ground`. */
@@ -32,4 +38,8 @@ export type ScenePlanInput = {
   /** All uploaded inputs; only the first place/meal images anchor their sprites. */
   photos?: { kind: UploadKind; bytes: Buffer; note?: string }[];
   context?: { name?: string; date?: string; notes?: string };
+  /** One-photo scenes: a place picture or a meal that should resolve to its restaurant. */
+  focus?: "place" | "meal";
+  sceneId?: string;
+  kind?: DayScene["kind"];
 };

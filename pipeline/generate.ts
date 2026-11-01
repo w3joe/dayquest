@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { RequestError } from "@/lib/server/errors";
 import { parseDayManifest, type DayManifest, type DayScene } from "@/lib/day";
+import type { SceneWeather } from "@/lib/weather";
 import { planWithLLM, templatePlan } from "./highlights";
 import { foodPrompt, landmarkPrompt, mapLimit, mockImageGenerator, openAIImageGenerator, playerPrompt, type ImageGenerator, type ImageRequest } from "./imagegen";
 import { BASE_LAYOUT, buildTransit } from "./layout";
@@ -22,6 +23,8 @@ export type PipelineOptions = {
   uploads?: Partial<Record<UploadKind, Buffer>>;
   /** C's finished 32×48 back-facing sprite. Missing → placeholder. */
   player?: Buffer;
+  /** Optional; a failed lookup must not sink the day. */
+  weather?: (scene: { kind: DayScene["kind"]; time: string }) => Promise<SceneWeather | undefined>;
 };
 
 /**
@@ -111,6 +114,9 @@ export async function runGenerateDay(opts: PipelineOptions, emit: (event: Genera
   emit({ step: "pixelate", label: `PIXELATING… ${jobs.length} SPRITES ✓` });
 
   // 6. Manifest
+  const weathers = await Promise.all(plan.scenes.map(async scene => {
+    try { return opts.weather ? await opts.weather(scene) : undefined; } catch { return undefined; }
+  }));
   const manifest: DayManifest = {
     id,
     date: input.date,
@@ -122,6 +128,7 @@ export async function runGenerateDay(opts: PipelineOptions, emit: (event: Genera
         spawn: layout.spawn, exit: layout.exit,
         landmarks: scene.landmarks.map((l) => ({ name: l.name, sprite: `s${s}_l${l.slot}.png`, footprint: l.footprint, slot: l.slot, text: l.text })),
         ...(scene.food ? { food: { sprite: `s${s}_food.png`, icon: `s${s}_food_icon.png`, tile: layout.food ?? { x: 9, y: 8 }, text: scene.food.text } } : {}),
+        ...(weathers[s] ? { weather: weathers[s] } : {}),
       };
     }),
     transit: buildTransit(input.transport),
