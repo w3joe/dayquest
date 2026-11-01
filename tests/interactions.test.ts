@@ -158,3 +158,23 @@ test("scene-author capability permits food/removable object outcomes and protect
   Reflect.set(invalid.world!.objects[0], "removable", "yes");
   assert.throws(() => parseDayManifest({ id: "invalid_capability", date: "2026-11-01", player: { name: "You", sprite: "player.png" }, scenes: [invalid], transit: [] }, "invalid_capability"), /Invalid scene world/);
 });
+
+test("automatic three-quarter building approaches prefer the visible front without overriding authored approaches", () => {
+  const location = scene(); delete location.food;
+  location.world!.objects = [{ id: "building_1", name: "Shop", sprite: "shop.png", x: 320, y: 160, width: 160, height: 128,
+    collision: { x: 248, y: 135, width: 144, height: 25 } }];
+  const action = { id: "visit_shop", targetId: "building_1", label: "Look at the shop", repeatable: true,
+    steps: [{ type: "say", text: "The shop front." }] };
+  const emptyCatalog: InteractionCatalog = { version: 1, assets: [] };
+  const front = compileInteractionPack(location, { actions: [action] }, emptyCatalog).actions[0].approach;
+  assert.deepEqual(front, { x: 20, y: 10 });
+  assert.ok(front.y * 16 + 15 >= location.world!.objects[0].y, "the avatar must sort in front of the building, even though its back edge is closer");
+  const authoredBack = { x: 24, y: 7 };
+  assert.deepEqual(compileInteractionPack(location, { actions: [{ ...action, approach: authoredBack }] }, emptyCatalog).actions[0].approach, authoredBack);
+
+  location.world!.ground = Array.from({ length: 28 }, (_, y) => (y < 8 ? "p" : "w").repeat(40));
+  location.spawn = { x: 20, y: 7 }; location.exit = { x: 39, y: 7 };
+  const fallback = compileInteractionPack(location, { actions: [action] }, emptyCatalog).actions[0].approach;
+  assert.ok(fallback.y < 8, "a reachable back-side approach remains valid when water disconnects the front");
+  assert.ok(sceneReachableTiles(location).has(`${fallback.x},${fallback.y}`));
+});

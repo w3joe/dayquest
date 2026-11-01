@@ -4,7 +4,7 @@ import path from "node:path";
 import { parseInteractionCatalog, type InteractionCatalog } from "../interactions";
 
 /** Bump when the interpretation or generated instruction schema changes. */
-export const INTERACTION_PLANNER_VERSION = 1;
+export const INTERACTION_PLANNER_VERSION = 2;
 
 export function interactionCatalogFingerprint(bytes: string): string {
   return createHash("sha256").update(`interaction-planner:${INTERACTION_PLANNER_VERSION}\n`).update(bytes).digest("hex");

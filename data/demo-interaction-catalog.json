@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "id": "lucas_photo_v1",
+      "src": "/interactions/library/lucas-photo-demo-v1.png",
+      "kind": "pose",
+      "width": 32,
+      "height": 48,
+      "frames": 2,
+      "frameMs": 150,
+      "description": "DEMO ONLY: two full-body back-facing photo-taking frames for the fixed Shawn/Lucas demo persona in the supplied walk sheet. Holds a phone up to take a picture. Compatible only with that exact character, never an arbitrary photo-generated avatar.",
+      "tags": ["demo-only", "lucas", "photo", "phone", "full-body"]
+    },
+    {
+      "id": "lucas_wave_v1",
+      "src": "/interactions/library/lucas-wave-demo-v1.png",
+      "kind": "pose",
+      "width": 32,
+      "height": 48,
+      "frames": 3,
+      "frameMs": 150,
+      "description": "DEMO ONLY: three full-body front-facing waving frames for the fixed Shawn/Lucas demo persona in the supplied walk sheet. Compatible only with that exact character, never an arbitrary photo-generated avatar.",
+      "tags": ["demo-only", "lucas", "wave", "greeting", "full-body"]
+    },
+    {
+      "id": "lucas_point_v1",
+      "src": "/interactions/library/lucas-point-demo-v1.png",
+      "kind": "pose",
+      "width": 32,
+      "height": 48,
+      "frames": 2,
+      "frameMs": 150,
+      "description": "DEMO ONLY: two full-body back-facing pointing frames for the fixed Shawn/Lucas demo persona in the supplied walk sheet. Raises an arm to point towards a visible detail. Compatible only with that exact character, never an arbitrary photo-generated avatar.",
+      "tags": ["demo-only", "lucas", "point", "notice", "full-body"]
+    }
+  ]
+}

@@ -5,9 +5,12 @@ import path from "node:path";
 import sharp from "sharp";
 import { parseInteractionCatalog } from "../lib/interactions";
 
-const catalog = parseInteractionCatalog(JSON.parse(await readFile(path.join(process.cwd(), "data", "interaction-catalog.json"), "utf8")));
+const catalogs = await Promise.all(["interaction-catalog.json", "demo-interaction-catalog.json"].map(async name => ({
+  name, catalog: parseInteractionCatalog(JSON.parse(await readFile(path.join(process.cwd(), "data", name), "utf8"))),
+})));
 const publicDirectory = await realpath(path.join(process.cwd(), "public"));
-for (const asset of catalog.assets) {
+for (const { name, catalog } of catalogs) for (const asset of catalog.assets) {
+  assert.ok(name !== "interaction-catalog.json" || asset.kind !== "pose", `${asset.id}: identity-specific poses belong in the demo catalogue, not the global photo-avatar catalogue`);
   assert.ok(asset.src.startsWith("/interactions/library/") && !/[?#]/.test(asset.src), `${asset.id}: use a local /interactions/library/ PNG path`);
   const filename = await realpath(path.join(publicDirectory, decodeURIComponent(asset.src)));
   assert.ok(filename.startsWith(`${publicDirectory}${path.sep}`), `${asset.id}: asset must stay inside public/`);
@@ -21,4 +24,4 @@ for (const asset of catalog.assets) {
   const stats = await source.ensureAlpha().stats();
   assert.ok(stats.channels[3].max > 0 && stats.channels[3].min < 255, `${asset.id}: PNG needs visible content and transparent space`);
 }
-console.log(`Interaction catalogue verified locally (${catalog.assets.length} assets; no API calls).`);
+console.log(`Interaction catalogues verified locally (${catalogs.reduce((count, item) => count + item.catalog.assets.length, 0)} assets; no API calls).`);

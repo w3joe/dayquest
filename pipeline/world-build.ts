@@ -82,7 +82,7 @@ export async function advanceWorldBuild(input: WorldBuildInput, checkpoint: Worl
     base: blueprint.ground === "park" ? "park" as const : "street" as const, spawn: layout.spawn, exit: layout.exit,
     landmarks: [], world: layout.world,
     ...(blueprint.food ? { food: { sprite: checkpoint.assets.food, icon: checkpoint.assets.food,
-      tile: layout.foodTile, text: blueprint.food.text } } : {}) };
+      tile: layout.foodTile, text: blueprint.food.text, name: blueprint.food.name, description: blueprint.food.description } } : {}) };
   if (deps.planInteractions && !checkpoint.interactionPack) {
     const interactionPack = await deps.planInteractions(scene);
     validateInteractionPack(scene, interactionPack);

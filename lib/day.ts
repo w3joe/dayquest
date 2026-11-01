@@ -38,7 +38,7 @@ export type DayScene = {
   exit: Tile;
   landmarks: Landmark[];
   /** sprite: 16×16 on the table; icon: 32×32 for the textbox (optional, fall back to sprite). */
-  food?: { sprite: string; icon?: string; tile: Tile; text: string };
+  food?: { sprite: string; icon?: string; tile: Tile; text: string; name?: string; description?: string };
 };
 export type TransitLeg =
   | { mode: "bus"; route: string; destination: string; from: string; to: string }
@@ -258,7 +258,9 @@ export function parseDayManifest(value: unknown, expectedId: string): DayManifes
       slots.add(landmark.slot as number);
     }
     if (scene.food !== undefined && (!object(scene.food) || !isDayAsset(scene.food.sprite) ||
-      (scene.food.icon !== undefined && !isDayAsset(scene.food.icon)) || !tile(scene.food.tile, width, height) || !text(scene.food.text))) {
+      (scene.food.icon !== undefined && !isDayAsset(scene.food.icon)) || !tile(scene.food.tile, width, height) || !text(scene.food.text) ||
+      (scene.food.name !== undefined && (!text(scene.food.name) || scene.food.name.length > 100)) ||
+      (scene.food.description !== undefined && (!text(scene.food.description) || scene.food.description.length > 1800)))) {
       throw new Error("Invalid food in day manifest");
     }
   }

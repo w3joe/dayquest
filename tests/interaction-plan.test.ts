@@ -11,10 +11,11 @@ import { advanceWorldBuild, type WorldBuildDependencies, type WorldCheckpoint } 
 
 function completeScene() {
   const blueprint = mockScenePlan({ lunch: Buffer.from("test fixture") });
+  blueprint.food = { name: "Tomato sandwich", description: "Two slices of seeded bread with red tomato and green leaves.", text: "A quiet pause halfway through the day." };
   const assets = { building_0: "building_0.png", building_1: "building_1.png", building_2: "building_2.png", food: "food.png", player_walk: "player_walk.png" };
   const layout = buildWorldLayout(blueprint, assets);
   const scene: DayScene = { kind: "tourist", title: blueprint.title, base: "street", time: "12:00", landmarks: [],
-    spawn: layout.spawn, exit: layout.exit, world: layout.world, food: { sprite: "food.png", tile: layout.foodTile, text: "Your photographed lunch." } };
+    spawn: layout.spawn, exit: layout.exit, world: layout.world, food: { sprite: "food.png", tile: layout.foodTile, ...blueprint.food } };
   return { blueprint, assets, scene };
 }
 
@@ -51,6 +52,12 @@ test("live interaction adapter sends only supplied inventory and validates struc
     assert.match(input, /building_0/);
     assert.match(input, /sample_pose/);
     assert.match(input, /removable/);
+    const supplied = JSON.parse((request.input as { content: string }[])[0].content);
+    assert.equal(supplied.scene.food.name, "Tomato sandwich");
+    assert.equal(supplied.scene.food.description, "Two slices of seeded bread with red tomato and green leaves.");
+    assert.equal(supplied.scene.food.text, "A quiet pause halfway through the day.");
+    assert.equal(supplied.scene.food.consumable, true);
+    assert.equal(supplied.scene.food.removable, true);
     assert.doesNotMatch(input, /api_key|data:image|fit-front/);
     return { status: "completed", output_text: JSON.stringify(proposal) };
   } } };
@@ -148,6 +155,9 @@ test("interaction plan checkpoints before publication and is reused when final s
   const result = await advanceWorldBuild(input, saved, deps);
   assert.equal(planned, 1);
   assert.deepEqual(result.manifest?.scenes[0].interactionPack, saved.interactionPack);
+  assert.equal(result.manifest?.scenes[0].food?.name, blueprint.food!.name);
+  assert.equal(result.manifest?.scenes[0].food?.description, blueprint.food!.description);
+  assert.equal(result.manifest?.scenes[0].food?.text, blueprint.food!.text);
 });
 
 test("invalid injected interaction planning cannot poison the persisted build checkpoint", async () => {

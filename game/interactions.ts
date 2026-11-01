@@ -1,9 +1,15 @@
-import type { DayManifest, DayScene, Tile } from "../lib/day";
+import type { DayManifest, DayScene, Journey, Tile } from "../lib/day";
 import { isSceneTileWalkable, sceneCanStep } from "../lib/day";
 import type { InteractionAction, InteractionAsset, InteractionStep } from "../lib/interactions";
 import { worldCollision } from "./world-layout";
 
 export type AssetReference = { sceneId: string; assetId: string };
+export type InteractionMenuChoice = { kind: "action"; action: InteractionAction } | { kind: "travel"; journeyId: string; label: string };
+/** Preserve both capabilities when an item and a departure share the same approach. */
+export function buildInteractionChoices(actions: InteractionAction[], journey?: Journey): InteractionMenuChoice[] {
+  return [...(journey ? [{ kind: "travel" as const, journeyId: journey.id, label: `Travel to ${journey.arrival.label}` }] : []),
+    ...actions.map(action => ({ kind: "action" as const, action }))];
+}
 export type InteractionProgress = { version: 1; completed: string[]; hidden: string[]; carried: AssetReference | null };
 export type InteractionRun = {
   sceneId: string; actionId: string; targetId: string;
@@ -28,16 +34,21 @@ export function restoreInteractionProgress(manifest: DayManifest, saved?: unknow
   try {
     const value = typeof saved === "string" ? JSON.parse(saved) : saved;
     if (!value || typeof value !== "object" || value.version !== 1 || !Array.isArray(value.completed) || !Array.isArray(value.hidden)) return empty;
-    const actions = new Set<string>(), targets = new Set<string>();
+    const actions = new Set<string>(), targets = new Set<string>(), attached = new Set<string>();
     for (const scene of manifest.scenes) {
       const id = sceneInteractionId(manifest, scene);
-      for (const action of scene.interactionPack?.actions ?? []) { actions.add(interactionScope(id, action.id)); targets.add(interactionScope(id, action.targetId)); }
+      for (const action of scene.interactionPack?.actions ?? []) {
+        actions.add(interactionScope(id, action.id));
+        const removable = action.targetId === "food" && Boolean(scene.food) || scene.world?.objects.some(object => object.id === action.targetId && object.removable === true);
+        if (removable && action.steps.some(step => step.type === "setObject")) targets.add(interactionScope(id, action.targetId));
+        for (const step of action.steps) if (step.type === "attach") attached.add(interactionScope(id, step.assetId));
+      }
     }
     const completed = [...new Set<string>(value.completed.filter((key: unknown): key is string => typeof key === "string" && actions.has(key)))];
     const hidden = [...new Set<string>(value.hidden.filter((key: unknown): key is string => typeof key === "string" && targets.has(key)))];
     const reference = value.carried;
     const carried = reference && typeof reference.sceneId === "string" && typeof reference.assetId === "string" &&
-      lookupInteractionAsset(manifest, reference)?.kind === "prop" ? { sceneId: reference.sceneId, assetId: reference.assetId } : null;
+      attached.has(interactionScope(reference.sceneId, reference.assetId)) && lookupInteractionAsset(manifest, reference)?.kind === "prop" ? { sceneId: reference.sceneId, assetId: reference.assetId } : null;
     return { version: 1, completed, hidden, carried };
   } catch { return empty; }
 }

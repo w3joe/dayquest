@@ -1,7 +1,8 @@
-import { resolveDayAsset, type DayManifest, type TransitLeg, type TravelPoint, type JourneyLeg } from "@/lib/day";
+import { resolveDayAsset, type DayManifest, type TransitLeg, type TravelPoint, type JourneyLeg, type Journey } from "@/lib/day";
 import { activeJourney, advanceJourney, checkpointJourney, departureJourney, journeyPhaseDuration, journeyStorageKey, restoreJourney, type JourneyEvent, type JourneyState } from "./journey";
+import { dayProgressScope } from "../lib/game-progress";
 import type { InteractionAction, InteractionAsset } from "../lib/interactions";
-import { advanceInteraction, beginInteraction, commitInteraction, currentInteractionStep, emptyInteractionProgress, findInteractionPath, interactionStorageKey, lookupInteractionAsset, nearbyInteractionActions, restoreInteractionProgress, sceneInteractionId, visibleInteractionScene, type InteractionEvent, type InteractionRun, type WorldPoint } from "./interactions";
+import { advanceInteraction, beginInteraction, buildInteractionChoices, commitInteraction, currentInteractionStep, emptyInteractionProgress, findInteractionPath, interactionStorageKey, lookupInteractionAsset, nearbyInteractionActions, restoreInteractionProgress, sceneInteractionId, visibleInteractionScene, type InteractionEvent, type InteractionMenuChoice, type InteractionRun, type WorldPoint } from "./interactions";
 import { worldCollision } from "./world-layout";
 import { BASE_MAPS, FRAMES, MAP_H, MAP_W, TILE, VIEW_H, VIEW_W, groundBlocked, hash, placeLandmark } from "./maps";
 
@@ -60,18 +61,19 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
   const walkSheet = manifest.player.walkSheet ? asset(manifest.player.walkSheet) : undefined;
   if (walkSheet && (walkSheet.width !== 96 || walkSheet.height !== 192)) throw new Error("Character walking artwork has an invalid frame layout");
   let viewWidth = VIEW_W, viewHeight = VIEW_H;
+  const progressScope = dayProgressScope(manifest);
   let storedJourney: string | null = null;
-  if (manifest.journeys?.length) { try { storedJourney = localStorage.getItem(journeyStorageKey(manifest.id)); } catch { /* Browsing still works without persistent storage. */ } }
+  if (manifest.journeys?.length) { try { storedJourney = localStorage.getItem(journeyStorageKey(progressScope)); } catch { /* Browsing still works without persistent storage. */ } }
   let journeyState: JourneyState | undefined = manifest.journeys?.length ? restoreJourney(manifest, storedJourney) : undefined;
   let index = journeyState ? Math.max(0, manifest.scenes.findIndex(scene => scene.id === journeyState?.sceneId)) : 0;
   let mode: "highlight" | "transit" | "journey" | "end" = "highlight";
   let boardingOrigin = { x: 0, y: 0 };
   const hasInteractions = manifest.scenes.some(scene => Boolean(scene.interactionPack?.actions.length));
   let savedInteractions: string | null = null;
-  if (hasInteractions) { try { savedInteractions = localStorage.getItem(interactionStorageKey(manifest.id)); } catch { /* In-memory play remains available. */ } }
+  if (hasInteractions) { try { savedInteractions = localStorage.getItem(interactionStorageKey(progressScope)); } catch { /* In-memory play remains available. */ } }
   let interactionProgress = restoreInteractionProgress(manifest, savedInteractions);
   let runningInteraction: { run: InteractionRun; action: InteractionAction; path: WorldPoint[]; pages: string[]; page: number } | undefined;
-  let menuActions: InteractionAction[] = [], menuSelection = 0;
+  let menuChoices: InteractionMenuChoice[] = [], menuSelection = 0;
   let x = 0, y = 0, facing: Direction = "up", moving = false, elapsed = 0, chapterAt = 0;
   let dialogue: (Talk & { shown: number; remaining: string[] }) | undefined;
   let blocked = new Set<string>(), talks = new Map<string, Talk>(), sprites: Sprite[] = [];
@@ -129,7 +131,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
   function nextChapter() { index++; keys.clear(); enterChapter(); }
   function confirm() {
     if (runningInteraction) { confirmInteraction(); return; }
-    if (menuActions.length) return;
+    if (menuChoices.length) return;
     if (journeyState) {
       if (journeyState.phase === "prompt") { changeJourney({ type: "confirm" }); return; }
       if (["boarding", "riding", "transfer"].includes(journeyState.phase)) { changeJourney({ type: "skip" }); return; }
@@ -144,11 +146,12 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
       return;
     }
     const departure = journeyState && departureJourney(manifest, journeyState);
-    if (departure && nearTravelPoint(departure.departure)) {
-      changeJourney({ type: "prompt", journeyId: departure.id, nearby: true }); return;
-    }
+    const nearbyDeparture = departure && nearTravelPoint(departure.departure) ? departure : undefined;
     const actions = availableInteractions();
-    if (actions.length) { openInteractionMenu(actions); return; }
+    if (actions.length) { openInteractionMenu(actions, nearbyDeparture); return; }
+    if (nearbyDeparture) {
+      changeJourney({ type: "prompt", journeyId: nearbyDeparture.id, nearby: true }); return;
+    }
     const [dx, dy] = DIR[facing], col = Math.floor(x / TILE), row = Math.floor(y / TILE);
     const target = talks.get(`${col + dx},${row + dy}`);
     if (target && (!manifest.scenes[index].world || visibleScene().food)) { startTalk(target); return; }
@@ -168,7 +171,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
   }
   function saveJourney() {
     if (!journeyState) return;
-    try { localStorage.setItem(journeyStorageKey(manifest.id), JSON.stringify(checkpointJourney(manifest, journeyState))); } catch { /* Optional browser persistence. */ }
+    try { localStorage.setItem(journeyStorageKey(progressScope), JSON.stringify(checkpointJourney(manifest, journeyState))); } catch { /* Optional browser persistence. */ }
   }
   function changeJourney(event: JourneyEvent) {
     if (!journeyState) return;
@@ -215,23 +218,32 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     button.style.cssText = "min-height:42px;margin:4px 8px 4px 0;border:1px solid #ded3a9;padding:8px 12px;background:#3b4d3a;color:#fff8df;font:inherit;touch-action:manipulation";
     button.addEventListener("click", onClick); return button;
   }
-  function openInteractionMenu(actions: InteractionAction[]) {
+  function openInteractionMenu(actions: InteractionAction[], travel?: Journey) {
     if (mode !== "highlight" || runningInteraction || dialogue || (journeyState && journeyState.phase !== "exploring")) return;
-    keys.clear(); moving = false; menuActions = actions; menuSelection = 0;
+    keys.clear(); moving = false; menuChoices = buildInteractionChoices(actions, travel); menuSelection = 0;
     actionPanel.replaceChildren(); actionPanel.hidden = false; actionPanel.setAttribute("role", "dialog");
-    actionPanel.setAttribute("aria-label", `${interactionTargetName(actions[0].targetId)} actions`);
-    const heading = document.createElement("strong"); heading.textContent = interactionTargetName(actions[0].targetId); actionPanel.append(heading);
-    const description = document.createElement("p"); description.textContent = "Choose an action. Escape closes this menu."; actionPanel.append(description);
-    for (const action of actions) { const button = panelButton(action.label, () => startInteraction(action)); button.dataset.action = action.id; actionPanel.append(button); }
+    actionPanel.setAttribute("aria-label", travel ? "Nearby actions and travel" : `${interactionTargetName(actions[0].targetId)} actions`);
+    const heading = document.createElement("strong"); heading.textContent = travel ? "Choose what to do here" : interactionTargetName(actions[0].targetId); actionPanel.append(heading);
+    const description = document.createElement("p"); description.textContent = travel ? "Choose an item action or travel. Escape closes this menu." : "Choose an action. Escape closes this menu."; actionPanel.append(description);
+    for (const [choiceIndex, choice] of menuChoices.entries()) {
+      const button = panelButton(choice.kind === "action" ? choice.action.label : choice.label, () => selectInteractionChoice(choice));
+      button.dataset.choice = String(choiceIndex); actionPanel.append(button);
+    }
     actionPanel.append(panelButton("Cancel", () => cancelInteraction(undefined)));
-    actionPanel.querySelector<HTMLButtonElement>("button[data-action]")?.focus({ preventScroll: true });
+    actionPanel.querySelector<HTMLButtonElement>("button[data-choice]")?.focus({ preventScroll: true });
     actionPanel.scrollIntoView({ block: "nearest" });
   }
+  function selectInteractionChoice(choice: InteractionMenuChoice) {
+    if (choice.kind === "action") { startInteraction(choice.action); return; }
+    const departure = journeyState && departureJourney(manifest, journeyState);
+    if (runningInteraction || mode !== "highlight" || !departure || departure.id !== choice.journeyId || !nearTravelPoint(departure.departure)) return;
+    cancelInteraction(undefined); changeJourney({ type: "prompt", journeyId: departure.id, nearby: true });
+  }
   function saveInteractions() {
-    try { localStorage.setItem(interactionStorageKey(manifest.id), JSON.stringify(interactionProgress)); } catch { /* All durable outcomes are one atomic write when browser storage is available. */ }
+    try { localStorage.setItem(interactionStorageKey(progressScope), JSON.stringify(interactionProgress)); } catch { /* All durable outcomes are one atomic write when browser storage is available. */ }
   }
   function cancelInteraction(message?: string, focus = true) {
-    runningInteraction = undefined; menuActions = []; keys.clear(); moving = false;
+    runningInteraction = undefined; menuChoices = []; keys.clear(); moving = false;
     actionPanel.hidden = true; actionPanel.replaceChildren();
     if (message) interactionStatus.textContent = message;
     if (focus) canvas.focus({ preventScroll: true });
@@ -243,7 +255,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     // Hidden art retains its original footprint. Never feed the draw-only projection to pathfinding.
     const path = run && findInteractionPath(scene, { x, y }, action.approach);
     if (!run || !path) { cancelInteraction("There is no clear path to this spot."); return; }
-    menuActions = []; keys.clear(); dialogue = undefined; interactionStatus.textContent = "";
+    menuChoices = []; keys.clear(); dialogue = undefined; interactionStatus.textContent = "";
     runningInteraction = { run, action, path, pages: [], page: 0 }; canvas.focus({ preventScroll: true });
     renderInteractionPanel();
     if (!path.length) updateInteraction({ type: "approached" });
@@ -260,13 +272,20 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     const current = runningInteraction;
     if (!current) return;
     const step = currentInteractionStep(current.run, current.action);
+    const hadPanelFocus = actionPanel.contains(document.activeElement);
+    const focusedControl = document.activeElement instanceof HTMLElement ? document.activeElement.dataset.interactionControl : undefined;
     actionPanel.replaceChildren(); actionPanel.hidden = false; actionPanel.setAttribute("role", "region"); actionPanel.setAttribute("aria-label", "Current action");
     const heading = document.createElement("strong"); heading.textContent = current.action.label; actionPanel.append(heading);
     const body = document.createElement("p"); body.setAttribute("aria-live", "polite");
     body.textContent = current.run.phase === "approach" ? "Walking over…" : step?.type === "say" ? current.pages[current.page] ?? step.text : "Taking a moment…";
     actionPanel.append(body);
-    if (step?.type === "say") actionPanel.append(panelButton(current.page < current.pages.length - 1 ? "Continue reading" : "Continue", confirmInteraction));
-    actionPanel.append(panelButton("Cancel action", () => cancelInteraction("Action cancelled.")));
+    if (step?.type === "say") {
+      const next = panelButton(current.page < current.pages.length - 1 ? "Continue reading" : "Continue", confirmInteraction);
+      next.dataset.interactionControl = "continue"; actionPanel.append(next);
+    }
+    const cancel = panelButton("Cancel action", () => cancelInteraction("Action cancelled."));
+    cancel.dataset.interactionControl = "cancel"; actionPanel.append(cancel);
+    if (hadPanelFocus) (focusedControl === "cancel" ? cancel : actionPanel.querySelector<HTMLButtonElement>('button[data-interaction-control="continue"]') ?? cancel).focus({ preventScroll: true });
     actionPanel.scrollIntoView({ block: "nearest" });
   }
   function updateInteraction(event: InteractionEvent) {
@@ -334,7 +353,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
   }
   const keydown = (event: KeyboardEvent) => {
     if (KEY[event.code]) { event.preventDefault(); keys.add(KEY[event.code]); }
-    if (event.code === "Escape" && (runningInteraction || menuActions.length)) { event.preventDefault(); cancelInteraction("Action cancelled."); return; }
+    if (event.code === "Escape" && (runningInteraction || menuChoices.length)) { event.preventDefault(); cancelInteraction("Action cancelled."); return; }
     if (event.code === "Escape" && dialogue) { event.preventDefault(); dialogue = undefined; return; }
     if (event.code === "Escape" && journeyState?.phase === "prompt") { event.preventDefault(); changeJourney({ type: "cancel" }); }
     if (event.code === "Space" || event.code === "Enter") { event.preventDefault(); if (!event.repeat) confirm(); }
@@ -357,12 +376,13 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
   interactionStatus.style.cssText = "color:#ded3a9;font:11px monospace;line-height:1.5;text-align:center;margin:5px 8px";
   if (hasInteractions) parent.append(actionPanel, interactionStatus);
   const panelKeydown = (event: KeyboardEvent) => {
+    if (event.repeat && (event.code === "Space" || event.code === "Enter")) { event.preventDefault(); return; }
     if (event.code === "Escape") { event.preventDefault(); event.stopPropagation(); cancelInteraction("Action cancelled."); return; }
-    if (menuActions.length && ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"].includes(event.code)) {
+    if (menuChoices.length && ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"].includes(event.code)) {
       event.preventDefault(); event.stopPropagation();
-      menuSelection = event.code === "Home" ? 0 : event.code === "End" ? menuActions.length - 1
-        : (menuSelection + (event.code === "ArrowUp" || event.code === "ArrowLeft" ? -1 : 1) + menuActions.length) % menuActions.length;
-      actionPanel.querySelectorAll<HTMLButtonElement>("button[data-action]")[menuSelection]?.focus({ preventScroll: true });
+      menuSelection = event.code === "Home" ? 0 : event.code === "End" ? menuChoices.length - 1
+        : (menuSelection + (event.code === "ArrowUp" || event.code === "ArrowLeft" ? -1 : 1) + menuChoices.length) % menuChoices.length;
+      actionPanel.querySelectorAll<HTMLButtonElement>("button[data-choice]")[menuSelection]?.focus({ preventScroll: true });
     }
   };
   actionPanel.addEventListener("keydown", panelKeydown);
@@ -521,16 +541,17 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     ctx.restore();
     ctx.fillStyle = "rgba(31,26,46,.88)"; ctx.fillRect(8, 8, viewWidth - 16, 25);
     text(`${scene.time} · ${scene.title}`, 16, 16, 8);
-    if (mode !== "journey" && !runningInteraction && !menuActions.length && (departure || elapsed - chapterAt < 6000) && !dialogue && journeyState?.phase !== "prompt") {
+    if (mode !== "journey" && !runningInteraction && !menuChoices.length && (departure || elapsed - chapterAt < 6000) && !dialogue && journeyState?.phase !== "prompt") {
       ctx.fillStyle = "rgba(31,26,46,.88)"; ctx.fillRect(8, viewHeight - 28, viewWidth - 16, 20);
       const hint = departure ? nearTravelPoint(departure.departure) ? "SPACE / READ: TRAVEL FROM THIS STOP" : `WALK TO ${departure.departure.label.toUpperCase()} →`
         : "WALK · SPACE TO READ · FOLLOW THE FINISH SIGN →";
       text(hint.slice(0, 75), viewWidth / 2, viewHeight - 22, 7, PAPER, "center");
     }
-    const nearbyActions = mode === "highlight" && !dialogue && !runningInteraction && !menuActions.length && (!journeyState || journeyState.phase === "exploring") && !(departure && nearTravelPoint(departure.departure)) ? availableInteractions() : [];
+    const nearbyActions = mode === "highlight" && !dialogue && !runningInteraction && !menuChoices.length && (!journeyState || journeyState.phase === "exploring") ? availableInteractions() : [];
     if (nearbyActions.length) {
       ctx.fillStyle = INK; ctx.fillRect(8, viewHeight - 30, viewWidth - 16, 22);
-      text(`SPACE / ACTION: ${interactionTargetName(nearbyActions[0].targetId)}`.slice(0, 72), viewWidth / 2, viewHeight - 23, 7, "#fff0a8", "center");
+      const hint = departure && nearTravelPoint(departure.departure) ? "SPACE / ACTION: CHOOSE ITEM ACTION OR TRAVEL" : `SPACE / ACTION: ${interactionTargetName(nearbyActions[0].targetId)}`;
+      text(hint.slice(0, 72), viewWidth / 2, viewHeight - 23, 7, "#fff0a8", "center");
     }
     if (journeyState?.phase === "prompt" && active) {
       ctx.fillStyle = INK; ctx.fillRect(8, viewHeight - 76, viewWidth - 16, 68);
@@ -713,7 +734,7 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     const dt = Math.min(40, now - previous); previous = now; elapsed += dt; moving = false;
     if (mode === "highlight") {
       if (runningInteraction) tickInteraction(dt);
-      else if (menuActions.length) { /* The menu owns input until an action or Cancel is chosen. */ }
+      else if (menuChoices.length) { /* The menu owns input until an action or Cancel is chosen. */ }
       else if (dialogue) dialogue.shown = Math.min(dialogue.text.length, dialogue.shown + dt * .04);
       else {
         const direction = [...keys].at(-1);

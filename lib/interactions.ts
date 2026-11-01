@@ -187,7 +187,10 @@ export function compileInteractionPack(scene: DayScene, proposal: unknown, catal
       let best: Tile | undefined, distance = Infinity;
       for (const key of reached) {
         const [x, y] = key.split(",").map(Number), point = { x, y };
-        const score = targetDistance(point, box);
+        // The front of a three-quarter-view building keeps the avatar above its art in y-sort.
+        // A full reach-radius penalty prefers any valid front position, retaining other sides as a fallback.
+        const behindFront = point.y * 16 + 15 < box.y + box.height;
+        const score = targetDistance(point, box) + (behindFront ? INTERACTION_LIMITS.reach + 1 : 0);
         if (nearby(point, box) && score < distance && clearReach(scene, point, raw.targetId, box)) { best = point; distance = score; }
       }
       if (!best) return invalid(`no safe approach for ${raw.targetId}`);

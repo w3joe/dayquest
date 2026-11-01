@@ -45,7 +45,7 @@ function schemaForTargets(targets: string[], catalog: InteractionCatalog): Recor
 function reachableInspections(scene: DayScene, catalog: InteractionCatalog): InteractionAction[] {
   validateInteractionCatalog(catalog);
   const targets = (scene.world?.objects ?? []).map(item => ({ id: item.id, name: item.name, text: item.text ?? item.name }));
-  if (scene.food) targets.push({ id: "food", name: "your lunch", text: scene.food.text });
+  if (scene.food) targets.push({ id: "food", name: scene.food.name ?? "your lunch", text: scene.food.text });
   return targets.flatMap((target, index) => {
     const action = { id: `inspect_${index}`, targetId: target.id, label: `Look at ${target.name}`.slice(0, 60), repeatable: true,
       steps: [{ type: "say", text: target.text.slice(0, 400) }] };
@@ -77,7 +77,8 @@ export async function planSceneInteractions(scene: DayScene, catalog: Interactio
       model: process.env.OPENAI_TEXT_MODEL || "gpt-5.4-mini", instructions: INTERACTION_PLAN_PROMPT,
       input: [{ role: "user", content: JSON.stringify({
         scene: { title: scene.title, objects: scene.world.objects.filter(item => eligible.has(item.id)).map(item => ({ id: item.id, name: item.name, description: item.text ?? "", removable: item.removable === true })),
-          food: scene.food && eligible.has("food") ? { id: "food", description: scene.food.text, removable: true, consumable: true } : null },
+          food: scene.food && eligible.has("food") ? { id: "food", name: scene.food.name ?? null,
+            description: scene.food.description ?? null, text: scene.food.text, removable: true, consumable: true } : null },
         catalog: catalog.assets,
       }) }],
       text: { format: { type: "json_schema", name: "scene_interactions", strict: true, schema: schemaForTargets(eligibleTargets, catalog) } },

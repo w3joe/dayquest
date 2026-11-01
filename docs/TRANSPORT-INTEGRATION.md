@@ -2,6 +2,8 @@
 
 The locations integration supplies completed location worlds and explicit route data. Transport composition does not infer visits, neighbourhoods, stations or routes from a photo. It does not change the locations UI, generate images or move existing buildings to make a route fit.
 
+Locations can also include an optional [interaction pack](INTERACTION-INTEGRATION.md). Imported item actions retain their original asset URLs. When an item and a travel stop share an approach, the game offers both actions and travel in the same chooser. [Saved progress](GAME-PROGRESS.md) is scoped to the manifest's content so updating an itinerary under the same day ID cannot restore an older route or item outcome.
+
 ## Deliverable for the locations integration
 
 Provide an ordered list of 1–12 world scenes. Give every scene a stable `id` when the list contains multiple scenes. IDs use 1–64 letters, digits, underscores or hyphens and must be unique within the day. Scene `kind` can repeat; for example four locations can all be `tourist`.

@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { DayManifest, DayScene } from "../lib/day";
+import type { DayManifest, DayScene, Journey } from "../lib/day";
 import type { InteractionAction } from "../lib/interactions";
-import { actionAvailable, advanceInteraction, beginInteraction, commitInteraction, emptyInteractionProgress, findInteractionPath, interactionPointBlocked, interactionScope, nearbyInteractionActions, restoreInteractionProgress, visibleInteractionScene } from "../game/interactions";
+import { actionAvailable, advanceInteraction, beginInteraction, buildInteractionChoices, commitInteraction, emptyInteractionProgress, findInteractionPath, interactionPointBlocked, interactionScope, nearbyInteractionActions, restoreInteractionProgress, visibleInteractionScene } from "../game/interactions";
 
 const take: InteractionAction = { id: "take", targetId: "snack", label: "Take snack", repeatable: false, approach: { x: 5, y: 6 }, steps: [
   { type: "face", direction: "right" }, { type: "attach", assetId: "snack_prop" }, { type: "wait", durationMs: 100 }, { type: "setObject", state: "hidden" }, { type: "say", text: "A little something for the journey." },
 ] };
 const put: InteractionAction = { id: "put", targetId: "snack", label: "Put away", repeatable: true, approach: { x: 5, y: 6 }, requires: { completed: ["take"] }, steps: [{ type: "detach" }, { type: "say", text: "Saved for later." }] };
 function scene(id = "street"): DayScene { return { id, kind: "tourist", title: "Test street", time: "12:00", base: "street", spawn: { x: 2, y: 6 }, exit: { x: 19, y: 12 }, landmarks: [],
-  world: { width: 20, height: 15, ground: Array(15).fill("p".repeat(20)), objects: [{ id: "snack", name: "Snack", sprite: "snack.png", x: 104, y: 111, width: 16, height: 16, collision: { x: 96, y: 103, width: 16, height: 8 } }] },
+  world: { width: 20, height: 15, ground: Array(15).fill("p".repeat(20)), objects: [{ id: "snack", name: "Snack", removable: true, sprite: "snack.png", x: 104, y: 111, width: 16, height: 16, collision: { x: 96, y: 103, width: 16, height: 8 } }] },
   interactionPack: { version: 1, catalog: { version: 1, assets: [{ id: "snack_prop", src: "snack.png", width: 16, height: 16, kind: "prop" }] }, actions: [take, put] } }; }
 const manifest = (): DayManifest => ({ id: "interactions-test", date: "2026-11-01", player: { name: "You", sprite: "player.png" }, scenes: [scene(), scene("park")], transit: [] });
 
@@ -95,4 +95,30 @@ test("nearby menus respect action availability and corrupt storage cannot grant 
   assert.deepEqual(restoreInteractionProgress(manifest(), "not JSON"), progress);
   const parsed = restoreInteractionProgress(manifest(), { version: 1, completed: ["missing/action", "street/take"], hidden: ["bad/object"], carried: { sceneId: "park", assetId: "missing" } });
   assert.deepEqual(parsed.completed, [interactionScope("street", "take")]); assert.deepEqual(parsed.hidden, []); assert.equal(parsed.carried, null);
+});
+
+
+test("co-located travel and item actions remain separately selectable even with identical IDs", () => {
+  const journey: Journey = { id: take.id, fromSceneId: "street", toSceneId: "park", departure: { kind: "bus_stop", label: "Street stop", tile: { x: 5, y: 7 }, approach: take.approach },
+    arrival: { kind: "bus_stop", label: "Park stop", tile: { x: 5, y: 7 }, approach: take.approach }, legs: [{ mode: "bus", route: "24", destination: "Park", from: "Street stop", to: "Park stop" }] };
+  const choices = buildInteractionChoices([take, put], journey);
+  assert.equal(choices.length, 3);
+  assert.deepEqual(choices[0], { kind: "travel", journeyId: take.id, label: "Travel to Park stop" });
+  assert.deepEqual(choices[1], { kind: "action", action: take });
+  assert.deepEqual(buildInteractionChoices([take]), [{ kind: "action", action: take }]);
+  assert.deepEqual(buildInteractionChoices([]), []);
+});
+
+test("restored visibility and held props are limited to outcomes explicitly allowed by the pack", () => {
+  const day = manifest(), street = day.scenes[0];
+  street.world!.objects.push({ id: "building", name: "Permanent building", sprite: "building.png", x: 200, y: 100, width: 32, height: 64 },
+    { id: "decoration", name: "Loose decoration", sprite: "decoration.png", x: 240, y: 100, width: 16, height: 16, removable: true });
+  street.interactionPack!.catalog.assets.push({ id: "unused_prop", src: "unused.png", kind: "prop", width: 16, height: 16 });
+  street.interactionPack!.actions.push({ ...take, id: "inspect_building", targetId: "building", steps: [{ type: "say", text: "Inspect only." }] },
+    { ...take, id: "inspect_decoration", targetId: "decoration", steps: [{ type: "say", text: "Never hide this decoration." }] });
+  const restored = restoreInteractionProgress(day, { version: 1, completed: ["street/take"], hidden: ["street/building", "street/decoration", "street/snack"], carried: { sceneId: "street", assetId: "unused_prop" } });
+  assert.deepEqual(restored.hidden, ["street/snack"]);
+  assert.equal(restored.carried, null, "an unused catalog prop is not a valid carried outcome");
+  street.world!.objects[0].removable = false;
+  assert.deepEqual(restoreInteractionProgress(day, restored).hidden, [], "a target that became permanent cannot stay hidden from old progress");
 });

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "sources": [
+    { "assetId": "ramen_bowl_v1", "source": "london-25d/assets/kanada-ya/ramen_bowl.png" },
+    { "assetId": "steam_v1", "source": "london-25d/assets/shared/fx_steam.png" },
+    { "assetId": "sparkle_v1", "source": "london-25d/assets/shared/fx_sparkle.png" },
+    { "assetId": "heart_v1", "source": "london-25d/assets/shared/fx_heart.png" },
+    { "assetId": "camera_flash_v1", "source": "london-25d/assets/shared/fx_flash.png" },
+    { "catalog": "demo", "assetId": "lucas_photo_v1", "source": "london-25d/assets/shared/actions.png", "extract": { "left": 0, "top": 144, "width": 64, "height": 48 } },
+    { "catalog": "demo", "assetId": "lucas_wave_v1", "source": "london-25d/assets/shared/actions.png", "extract": { "left": 0, "top": 192, "width": 96, "height": 48 } },
+    { "catalog": "demo", "assetId": "lucas_point_v1", "source": "london-25d/assets/shared/actions.png", "extract": { "left": 0, "top": 240, "width": 64, "height": 48 } }
+  ],
+  "excluded": [
+    {
+      "source": "london-25d/assets/shared/actions.png",
+      "reason": "All action poses depict the fixed Lucas demo persona and are excluded from the global catalogue. Only the full-body photo/wave/point rows are cropped into the separate demo catalogue. Waist-up eating/drinking rows need explicit body composition and remain excluded; sitting is also excluded pending positioning support."
+    }
+  ]
+}
