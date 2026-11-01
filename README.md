@@ -162,3 +162,7 @@ The Demo tab uses OpenStreetMap tiles and attribution. The interface pairs Pixel
 <div align="center">
   <sub>Made of the little things. ✦</sub>
 </div>
+
+## Lucas's London day (no setup)
+
+Open **Demo**, then press **Create my world**. The Demo page is prefilled with real Fit, Food and Place photos (`public/demo/`), the generating screen plays a scripted log, and `/day/demo` opens the hand-built pixel world: Westminster → bus 24 → Kanada-Ya (step inside for table 30) → Central + Bakerloo → Regent's Park. It needs no `.env`, API keys, logins or uploads: `npm install && npm run dev` is enough. The game is the vanilla-canvas engine and scenes copied from `london-25d/` into `public/london-25d/` by `scripts/sync-london-25d.sh`. iPhone HEIC/HEIF photos are converted to JPEG in the browser on every upload path.
