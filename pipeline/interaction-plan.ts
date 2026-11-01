@@ -45,7 +45,9 @@ function schemaForTargets(targets: string[], catalog: InteractionCatalog): Recor
 /** Explicit deterministic no-assets/offline path: real inspection text, no imaginary animations. */
 function reachableInspections(scene: DayScene, catalog: InteractionCatalog): InteractionAction[] {
   validateInteractionCatalog(catalog);
-  const targets = (scene.world?.objects ?? []).map(item => ({ id: item.id, name: item.name, text: item.text ?? item.name }));
+  // Supporting actors already have authored dialogue/effects. Generic inspection
+  // must not mask those behaviors with a second action for the same target.
+  const targets = (scene.world?.objects ?? []).filter(item => item.role !== "npc" && item.role !== "interactable").map(item => ({ id: item.id, name: item.name, text: item.text ?? item.name }));
   if (scene.food) targets.push({ id: "food", name: scene.food.name ?? "your lunch", text: scene.food.text });
   return targets.flatMap((target, index) => {
     const action = { id: `inspect_${index}`, targetId: target.id, label: `Look at ${target.name}`.slice(0, 60), repeatable: true,
@@ -87,7 +89,11 @@ export async function planSceneInteractions(scene: DayScene, catalog: Interactio
     if ((response.status && response.status !== "completed") || !response.output_text?.trim()) throw new RequestError("Interaction planning did not complete. Please retry to continue from your saved sprites.", 502);
     let proposal: unknown;
     try { proposal = JSON.parse(response.output_text); } catch { throw new RequestError("Interaction planning returned invalid data. Please retry.", 502); }
-    try { return compileInteractionPack(scene, proposal, catalog); }
+    try {
+      const pack = compileInteractionPack(scene, proposal, catalog);
+      if (pack.actions.some(action => !eligible.has(action.targetId))) throw new Error("Target is outside the planning inventory");
+      return pack;
+    }
     catch { throw new RequestError("Interaction planning referenced an unsupported action or asset. Please retry.", 502); }
   } catch (error) { throw safeOpenAIError(error, "Interaction planning"); }
 }

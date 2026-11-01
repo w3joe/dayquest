@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, mkdir, rm } from "node:fs/promises";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { BASE_LAYOUT, groundBlocked, MAP_H, MAP_W, placeLandmark } from "../game/maps";
 import { parseDayManifest, type DayScene } from "../lib/day";
@@ -47,41 +45,11 @@ test("demo and pipeline maps have reachable exits, landmarks and food", async ()
   }
 });
 
-test("generation rejects a missing sprite and publishes the supplied sprite unchanged", async () => {
-  // Explicit local fixture mode: no OpenAI requests and no public Blob writes.
-  const envKeys = ["NODE_ENV", "BLOB_READ_WRITE_TOKEN", "BLOB_BASE_URL", "PIPELINE_TEXT", "PIPELINE_IMAGES"];
-  const saved = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
-  Object.assign(process.env, { NODE_ENV: "development", BLOB_READ_WRITE_TOKEN: "", BLOB_BASE_URL: "", PIPELINE_TEXT: "mock", PIPELINE_IMAGES: "mock" });
-  const sessionId = randomUUID();
-  const dir = path.join(".data", "assets", "uploads", sessionId);
-  let generatedId: string | undefined;
-  try {
-    const { POST } = await import("../app/api/generate-day/route");
-    assert.equal((await POST(new Request("http://localhost/api/generate-day", { method: "POST", body: "{}" }))).status, 400);
-    await mkdir(dir, { recursive: true });
-    const sprite = await readFile("public/days/demo/player.png");
-    const { writeFile } = await import("node:fs/promises");
-    const fitFile = `fit-${randomUUID()}.png`;
-    const playerFile = `player-${randomUUID()}.png`;
-    await writeFile(path.join(dir, fitFile), sprite);
-    const prefix = `/api/assets/uploads/${sessionId}/`;
-    const draft = { sessionId, uploads: [{ kind: "fit", url: prefix + fitFile }], spriteUrl: prefix + playerFile };
-    const request = () => new Request("http://localhost/api/generate-day", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
-    assert.equal((await POST(request())).status, 422);
-    await writeFile(path.join(dir, playerFile), sprite);
-    const response = await POST(request());
-    assert.equal(response.status, 200);
-    const events = (await response.text()).trim().split("\n").map(line => JSON.parse(line));
-    generatedId = events.at(-1)?.id;
-    assert.equal(events.at(-1)?.step, "done");
-    assert.ok(generatedId);
-    assert.deepEqual(await readFile(path.join("public", "days", generatedId, "player.png")), sprite);
-    parseDayManifest(JSON.parse(await readFile(path.join("public", "days", generatedId, "day.json"), "utf8")), generatedId);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-    if (generatedId) await rm(path.join("public", "days", generatedId), { recursive: true, force: true });
-    for (const key of envKeys) {
-      if (saved[key] === undefined) delete process.env[key]; else process.env[key] = saved[key];
-    }
-  }
+test("retired generation endpoint cannot publish a static demo day or start paid generation", async () => {
+  const { POST } = await import("../app/api/generate-day/route");
+  const request = new Request("http://localhost/api/generate-day", { method: "POST", body: "{}" });
+  const response = await POST(request);
+  assert.equal(response.status, 410);
+  assert.match((await response.json()).error, /POST \/api\/world-jobs/);
+  assert.equal(request.bodyUsed, false, "retired route does not consume or process user input");
 });

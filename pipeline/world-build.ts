@@ -5,6 +5,12 @@ import { buildSceneAssetJobs, generateSceneAsset } from "./scene-assets";
 import type { ImageGenerator } from "./imagegen";
 import type { DayStore } from "./publish";
 import type { SceneBlueprint, ScenePlanInput } from "./scene-types";
+import { buildWorldContext, type Environment } from "./world-context";
+import { applyLocation, type Located } from "./locator";
+import { looksDuplicate, spriteHash } from "./sprite-similarity";
+import { templateFor } from "../game/world-layout";
+import { fallbackDesign } from "./world-design";
+import type { DirectorRun } from "./world-director";
 import type { GenerateEvent, UploadKind } from "./types";
 import { validateInteractionPack, type InteractionPack } from "../lib/interactions";
 
@@ -14,18 +20,28 @@ export type WorldCheckpoint = {
   assets: Record<string, string>;
   /** Planned once, persisted before publication so a retry never repeats planning. */
   interactionPack?: InteractionPack;
+  /** Perceptual hashes of the building sprites saved so far, to catch one picture drawn several times. */
+  hashes?: Record<string, string>;
 };
 export type WorldBuildInput = {
   id: string;
   date: string;
   name: string;
   uploads: Partial<Record<UploadKind, Buffer>>;
+  /** Every submitted photo and its note, in upload order; first per slot is canonical. */
+  photos?: { kind: UploadKind; bytes: Buffer; note?: string }[];
   player: Buffer;
+  /** Optional season, weather and location data. Location is optional: without it the world is built from the photos alone. */
+  environment?: Environment;
 };
 export type WorldBuildDependencies = {
   plan(input: ScenePlanInput): Promise<SceneBlueprint>;
   images: ImageGenerator;
   store: DayStore;
+  /** The world builder: full scene context in, validated design out. The hand-written fallback is used when absent or when it fails. */
+  /** Researches the place (web search) and chooses the location template and the real neighbours. Optional and never required. */
+  locator?: (blueprint: SceneBlueprint) => Promise<Located | undefined>;
+  director?: (context: ReturnType<typeof buildWorldContext>, blueprint: SceneBlueprint) => Promise<DirectorRun>;
   styleReferences?: Buffer[];
   /** Explicit production planner; omitted by legacy/offline pipeline consumers. */
   planInteractions?(scene: import("../lib/day").DayScene): Promise<InteractionPack>;
@@ -40,11 +56,19 @@ export async function advanceWorldAssetBatch(input: WorldBuildInput, checkpoint:
   let latest = checkpoint;
   let writes = Promise.resolve();
   const results = await Promise.allSettled(pending.map(async job => {
-    const bytes = await generateSceneAsset(job, deps.images);
-    await deps.store.put(job.file, bytes, "image/png");
+    let bytes = await generateSceneAsset(job, deps.images);
+    const isBuilding = job.id.startsWith("building_");
     // Checkpoint updates are serialised so concurrent completions cannot discard one another.
     const completed = writes.then(async () => {
-      const next = { ...latest, assets: { ...latest.assets, [job.id]: job.file } };
+      let hash = isBuilding ? await spriteHash(bytes) : undefined;
+      const building = checkpoint.blueprint?.buildings.find(candidate => candidate.id === job.id);
+      if (hash && deps.images.live && !building?.observed && looksDuplicate(hash, latest.hashes)) {
+        // Another building already looks like this one. Draw it once more, told to be clearly different; accept that result.
+        bytes = await generateSceneAsset({ ...job, prompt: `${job.prompt} Make this supporting building visibly distinct from the other buildings while preserving the supplied setting and style references.` }, deps.images);
+        hash = await spriteHash(bytes);
+      }
+      await deps.store.put(job.file, bytes, "image/png");
+      const next = { ...latest, assets: { ...latest.assets, [job.id]: job.file }, ...(hash ? { hashes: { ...latest.hashes, [job.id]: hash } } : {}) };
       await save(next, { step: "image", label: `${job.name} saved`, thumb: `data:image/png;base64,${bytes.toString("base64")}` }, jobs.length);
       latest = next;
     });
@@ -62,11 +86,19 @@ export async function advanceWorldBuild(input: WorldBuildInput, checkpoint: Worl
   checkpoint: WorldCheckpoint; event: GenerateEvent; total: number; manifest?: DayManifest;
 }> {
   if (!checkpoint.blueprint) {
-    const blueprint = await deps.plan({ landmark: input.uploads.landmark, lunch: input.uploads.lunch,
-      context: { name: input.name, date: input.date } });
+    const planned = await deps.plan({ landmark: input.uploads.landmark, lunch: input.uploads.lunch,
+      ...(input.photos ? { photos: input.photos } : {}),
+      context: { name: input.name, date: input.date, ...(input.environment?.notes ? { notes: input.environment.notes } : {}) } });
+    // Understand where this is: only the photographed building keeps the photo; the others are the place's real neighbours, drawn from text.
+    const located = await deps.locator?.(planned).catch(() => undefined);
+    const base = applyLocation(planned, located);
+    const run = await deps.director?.(buildWorldContext(base, { name: input.name, date: input.date }, { ...input.environment, ...(located ? { place: located.place } : {}) }), base).catch(() => undefined);
+    const chosen = templateFor({ ground: base.ground, template: run?.template ?? base.template });
+    const design = run?.design ?? fallbackDesign(chosen.grounds[0], chosen.zones);
+    const blueprint = { ...base, design, template: chosen.id, ...(run?.composition ? { composition: run.composition } : {}) };
     const jobs = buildSceneAssetJobs(blueprint, input);
     return { checkpoint: { ...checkpoint, blueprint }, total: jobs.length,
-      event: { step: "landmarks", label: `Scene planned: ${blueprint.title}. ${jobs.length} sprites to create.` } };
+      event: { step: "landmarks", label: `Scene planned: ${blueprint.title}. ${jobs.length} sprites to create. Added ${design.interactables.length} things to do and ${design.npcs.length} characters${design.source === "agent" ? ", designed for this place" : ""}.` } };
   }
   const blueprint = checkpoint.blueprint;
   const jobs = buildSceneAssetJobs(blueprint, { ...input, styleReferences: deps.styleReferences });

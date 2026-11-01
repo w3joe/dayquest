@@ -1,5 +1,6 @@
 "use client";
 
+import PixelSprite from "./pixel";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { browserId } from "../../lib/browser-id";
 
@@ -82,15 +83,15 @@ function SpriteImage({ url, onStatusChange, onRegenerate, disabled, retained }: 
         setResult({ status: "failed", error: "Your character image could not load. Check your connection and reload it." });
       }}
     />
-    {result.status !== "ready" && <span className="dq-character-placeholder" aria-hidden="true">♟</span>}
+    {result.status !== "ready" && <PixelSprite name="face" size={4} />}
     <div style={{ flex: "1 1 180px" }}>
-      <strong>{result.status === "ready" ? retained ? "Your previous adventurer is saved." : "Your little adventurer is ready." : result.status === "loading" ? "Checking your character image…" : "Your character needs another look."}</strong>
-      <span className={result.status === "failed" ? "dq-error" : undefined}>{result.error || (result.status === "ready" ? retained ? "Finish saving or discard your photo changes to continue." : "Same outfit. A whole new perspective." : "Making sure your saved character is ready for the adventure.")}</span>
+      <strong>{result.status === "ready" ? retained ? "Previous character saved" : "Your adventurer is ready!" : result.status === "loading" ? "Checking your character…" : "Character needs another look"}</strong>
+      <span className={result.status === "failed" ? "dq-error" : undefined}>{result.error || (result.status === "ready" ? retained ? "Finish or discard photo changes" : "Same outfit, new perspective" : "Almost there")}</span>
     </div>
     {result.status === "ready" && <span className="dq-sprite-tick" aria-label="Character image verified">✓</span>}
     {result.status === "failed" && <>
-      <button type="button" className="dq-small-button" disabled={disabled} onClick={reload}>Reload image</button>
-      {onRegenerate && <button type="button" className="dq-small-button" disabled={disabled} onClick={onRegenerate}>Retry character</button>}
+      <button type="button" className="dq-small-button" disabled={disabled} onClick={reload}>Reload</button>
+      {onRegenerate && <button type="button" className="dq-small-button" disabled={disabled} onClick={onRegenerate}>Retry</button>}
     </>}
   </div>;
 }

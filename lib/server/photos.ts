@@ -4,7 +4,7 @@ import { RequestError } from "./errors";
 export const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
 export const MAX_REQUEST_BYTES = MAX_PHOTO_BYTES + 64 * 1024;
 export const MAX_IMAGE_PIXELS = 20_000_000;
-export const UPLOAD_KINDS = ["fit", "fit_back", "lunch", "landmark", "park"] as const;
+export const UPLOAD_KINDS = ["fit", "fit_back", "lunch", "landmark", "park", "extra"] as const;
 export type UploadKind = (typeof UPLOAD_KINDS)[number];
 
 export function validateSessionId(value: FormDataEntryValue | null): string {
