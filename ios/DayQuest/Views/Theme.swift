@@ -37,7 +37,7 @@ struct Sprite: View {
     var name: String
     var size: CGFloat = 48
     var body: some View {
-        Image(name).resizable().interpolation(.none).frame(width: size, height: size)
+        Image(uiImage: UIImage(named: name) ?? UIImage()).resizable().interpolation(.none).frame(width: size, height: size)
     }
 }
 
@@ -48,7 +48,7 @@ struct PaperBackground: View {
     var body: some View {
         ZStack(alignment: .top) {
             Theme.paper
-            Canvas { context, size in
+            Canvas(rendersAsynchronously: true) { context, size in
                 let step: CGFloat = 22
                 for x in stride(from: CGFloat(0), through: size.width, by: step) {
                     for y in stride(from: CGFloat(0), through: size.height, by: step) {
@@ -56,6 +56,7 @@ struct PaperBackground: View {
                     }
                 }
             }
+            .drawingGroup()
             GeometryReader { geo in
                 Sprite(name: "cloud", size: 96).opacity(0.9)
                     .offset(x: geo.size.width * 0.04 + (drift ? 40 : 0), y: 70)

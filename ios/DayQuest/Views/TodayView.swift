@@ -36,6 +36,7 @@ private struct StartScreen: View {
                     .font(Theme.pixel(32)).foregroundStyle(Theme.ink).multilineTextAlignment(.center)
                 Text("Press start and go about your day. We'll quietly remember where you went, and turn it into a world someone can visit tonight.")
                     .font(Theme.body(15)).foregroundStyle(Theme.muted).multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: 420)
             }
             Spacer()
@@ -103,21 +104,22 @@ private struct RecordingScreen: View {
 private struct RecordingHeader: View {
     @Environment(DayEngine.self) private var engine
     @State private var blink = false
+    @State private var now = Date()
+    private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            HStack(spacing: 12) {
-                Circle().fill(Theme.hot).frame(width: 14, height: 14)
-                    .overlay(Circle().stroke(Theme.hot.opacity(0.4), lineWidth: blink ? 10 : 0))
-                    .onAppear { withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { blink = true } }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(engine.recorder.isRecording ? "Recording your day" : "Your day so far").font(Theme.pixel(22)).foregroundStyle(Theme.ink)
-                    Text(elapsed(at: context.date)).font(Theme.mono(12)).foregroundStyle(Theme.muted)
-                }
-                Spacer()
-                Sprite(name: "cat", size: 46).hop(5, duration: 0.45)
+        HStack(spacing: 12) {
+            Circle().fill(Theme.hot).frame(width: 14, height: 14)
+                .overlay(Circle().stroke(Theme.hot.opacity(0.4), lineWidth: blink ? 10 : 0))
+                .onAppear { withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { blink = true } }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(engine.recorder.isRecording ? "Recording your day" : "Your day so far").font(Theme.pixel(22)).foregroundStyle(Theme.ink)
+                Text(elapsed(at: now)).font(Theme.mono(12)).foregroundStyle(Theme.muted)
             }
+            Spacer()
+            Sprite(name: "cat", size: 46).hop(5, duration: 0.45)
         }
+        .onReceive(tick) { now = $0 }
     }
 
     private func elapsed(at now: Date) -> String {
@@ -186,7 +188,7 @@ private struct StopPin: View {
         .scaleEffect(shown ? 1 : 0.1)
         .onAppear {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.5)) { shown = true }
-            withAnimation(.easeOut(duration: 1.4).repeatForever(autoreverses: false)) { ripple = true }
+            if latest { withAnimation(.easeOut(duration: 1.4).repeatForever(autoreverses: false)) { ripple = true } }
         }
     }
 }
@@ -289,6 +291,13 @@ private struct BuildingScreen: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 8) {
+                            if engine.log.isEmpty && engine.failure == nil {
+                                HStack(spacing: 10) {
+                                    ProgressView().tint(Theme.hot)
+                                    Text("Reading your \(engine.store.stops.count) stops and picking today's highlights…")
+                                        .font(Theme.body(13)).foregroundStyle(Theme.ink)
+                                }
+                            }
                             ForEach(engine.log) { event in
                                 HStack(spacing: 10) {
                                     if let image = thumbnail(event.thumb) {
@@ -355,7 +364,8 @@ private struct DoneScreen: View {
             .onAppear { withAnimation(.spring(response: 0.8, dampingFraction: 0.55)) { burst = true } }
             Text("Your world is ready!").font(Theme.pixel(30)).foregroundStyle(Theme.ink)
             Text("\(engine.store.stops.count) stops turned into a little world you can walk around and share.")
-                .font(Theme.body(15)).foregroundStyle(Theme.muted).multilineTextAlignment(.center).frame(maxWidth: 420)
+                .font(Theme.body(15)).foregroundStyle(Theme.muted).multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true).frame(maxWidth: 420)
             Spacer()
             VStack(spacing: 12) {
                 PillButton(title: "Play my day", sprite: "star") { engine.presentedDayId = engine.generatedId }
