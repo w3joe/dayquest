@@ -8,7 +8,8 @@
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "demo:generate": "tsx scripts/generate-demo.mts"
+    "demo:generate": "tsx scripts/generate-demo.mts",
+    "prove:fit-check": "node scripts/prove-fit-check.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.2",

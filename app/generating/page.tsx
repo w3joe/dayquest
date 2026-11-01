@@ -4,17 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { GenerateEvent } from "@/pipeline/types";
+import { DRAFT_STORAGE_KEY, isReadyDraft, parseStoredDraft, type ReadyDraft } from "@/lib/draft";
 import styles from "./generating.module.css";
 
-type Draft = { sessionId: string; uploads: { kind: string; url: string }[]; spriteUrl: string };
 type Status = "running" | "done" | "error" | "no-draft";
 
 const REPLAY_SECONDS = 8;
 
-function readDraft(): Draft | null {
+function readDraft(): ReadyDraft | null {
   try {
-    const draft = JSON.parse(sessionStorage.getItem("dayquest:draft") ?? "null");
-    return draft && typeof draft.spriteUrl === "string" && Array.isArray(draft.uploads) ? draft : null;
+    const draft = parseStoredDraft(sessionStorage.getItem(DRAFT_STORAGE_KEY));
+    return isReadyDraft(draft) ? draft : null;
   } catch {
     return null;
   }
