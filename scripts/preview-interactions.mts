@@ -37,7 +37,7 @@ scenes[0].interactionPack = compileInteractionPack(scenes[0], { actions: [
     steps: [{ type: "face", direction: "down" }, { type: "animate", assetId: "lucas_wave_v1", durationMs: 900 },
       { type: "say", text: "A friendly wave from Lucas, using his supplied animation strip." }] },
   { id: "point", targetId: "cafe_board", label: "Point at the sample board", repeatable: true,
-    steps: [{ type: "face", direction: "down" }, { type: "animate", assetId: "lucas_point_v1", durationMs: 600 },
+    steps: [{ type: "face", direction: "up" }, { type: "animate", assetId: "lucas_point_v1", durationMs: 600 },
       { type: "say", text: "The supplied pointing animation belongs to this preview character." }] },
 ] }, catalog);
 scenes[1].interactionPack = compileInteractionPack(scenes[1], { actions: [

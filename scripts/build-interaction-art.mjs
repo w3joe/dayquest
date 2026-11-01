@@ -1,4 +1,4 @@
-/** Stage already-processed supplied art. Never generates, downloads or alters artwork. */
+/** Copy supplied art or crop its existing cells. No generation, downloads or repainting. */
 import assert from "node:assert/strict";
 import { copyFile, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
