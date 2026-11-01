@@ -1,3 +1,6 @@
+import { prepareWorldConstruction, needsConstructionUpgrade } from "./world-construction";
+import { WorldPlacementError } from "../game/block-placement";
+import { RequestError } from "../lib/server/errors";
 import { buildWorldKit, furnitureBlock } from "../lib/world-kit";
 import type { DayManifest } from "../lib/day";
 import { parseDayManifest } from "../lib/day";
@@ -92,7 +95,7 @@ export async function advanceWorldBuild(input: WorldBuildInput, checkpoint: Worl
       context: { name: input.name, date: input.date, ...(input.environment?.notes ? { notes: input.environment.notes } : {}) } });
     // Research may fill unobserved supporting slots; all photographed buildings retain their references.
     const located = await deps.locator?.(planned).catch(() => undefined);
-    const base = applyLocation(planned, located);
+    const base = prepareWorldConstruction(applyLocation(planned, located));
     const run = await deps.director?.(buildWorldContext(base, { name: input.name, date: input.date }, { ...input.environment, ...(located ? { place: located.place } : {}) }), base).catch(() => undefined);
     const chosen = templateFor({ ground: base.ground, template: run?.template ?? base.template });
     const design = run?.design ?? fallbackDesign(chosen.grounds[0], chosen.zones);
@@ -102,7 +105,12 @@ export async function advanceWorldBuild(input: WorldBuildInput, checkpoint: Worl
     return { checkpoint: { ...checkpoint, blueprint }, total: jobs.length,
       event: { step: "landmarks", label: `Scene planned: ${blueprint.title}. ${jobs.length} sprites to create. Added ${design.interactables.length} things to do and ${design.npcs.length} characters${design.source === "agent" ? ", designed for this place" : ""}.` } };
   }
-  const blueprint = checkpoint.blueprint;
+  // Existing paid artwork is authoritative. Repair only construction context,
+  // before interactions acquire geometry-dependent approach coordinates.
+  if (!checkpoint.interactionPack && needsConstructionUpgrade(checkpoint.blueprint)) {
+    checkpoint = { ...checkpoint, blueprint: prepareWorldConstruction(checkpoint.blueprint) };
+  }
+  const blueprint = checkpoint.blueprint!;
   const jobs = buildSceneAssetJobs(blueprint, { ...input, styleReferences: deps.styleReferences });
   const next = jobs.find(job => !checkpoint.assets[job.id]);
   if (next) {
@@ -111,7 +119,13 @@ export async function advanceWorldBuild(input: WorldBuildInput, checkpoint: Worl
     return { checkpoint: { ...checkpoint, assets: { ...checkpoint.assets, [next.id]: next.file } }, total: jobs.length,
       event: { step: "image", label: `${next.name} saved`, thumb: `data:image/png;base64,${bytes.toString("base64")}` } };
   }
-  const layout = buildWorldLayout(blueprint, checkpoint.assets);
+  let layout: ReturnType<typeof buildWorldLayout>;
+  try { layout = buildWorldLayout(blueprint, checkpoint.assets); }
+  catch (error) {
+    if (!(error instanceof WorldPlacementError)) throw error;
+    console.error("World layout failed", { code: error.code, objectId: error.objectId });
+    throw new RequestError("Your sprites are saved, but the layout could not safely fit a photographed object. Retry to continue from your saved artwork.", 422);
+  }
   const scene = { kind: "tourist" as const, title: blueprint.title, time: blueprint.time,
     base: blueprint.ground === "park" ? "park" as const : "street" as const, spawn: layout.spawn, exit: layout.exit,
     landmarks: [], world: layout.world,

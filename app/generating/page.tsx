@@ -106,7 +106,7 @@ export default function GeneratingPage() {
       <div className={styles.progressLabel}><span>{progress.completed} / {progress.total} sprites saved</span><span>{pct}%</span></div>
       <div className={styles.bar} role="progressbar" aria-label="Sprites saved" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.completed}><span style={{ width: `${pct}%` }} /></div>
     </div>}
-    <ol className={styles.log} ref={logRef}>{events.map((event, i) => <li key={i} className={event.step === "error" ? styles.error : undefined}>
+    <ol className={styles.log} ref={logRef}>{events.filter(event => event.step !== "error").map((event, i) => <li key={i} className={event.step === "error" ? styles.error : undefined}>
       <span className={styles.prompt}>&gt;</span><span className={styles.label}>{event.label}</span>
       {event.thumb && <span className={styles.thumb}><img src={event.thumb} alt="Completed sprite" /></span>}
       {event.step === "done" && <span className={styles.arrow}>→</span>}

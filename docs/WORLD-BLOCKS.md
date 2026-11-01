@@ -43,3 +43,21 @@ Validation: `npm test`, `npm run typecheck`, `npm run build`.
 The fixture from `npx tsx scripts/preview-world.mts` is explicitly an offline sample
 using existing artwork; it tests assembly without analysing photos or calling an
 image service. A fresh real build is required to assess the new image prompts.
+
+## Resuming construction after a placement correction
+
+Kit revision 2 repairs existing unfinished checkpoints using their completed PNGs.
+Roadside is pavement-compatible for lights and photographed structures; known
+shared vehicles retain road-only feet. Waterfront evidence can select the
+riverside template even for older inventories that only named street/park/plaza.
+New vision output selects street/garden/plaza/riverside explicitly.
+
+A requested placement area is an affinity, while dry footing, clearance and route
+reachability remain mandatory. If a required photographed object's affinity has
+no safe slot, layout can keep it on nearby compatible dry ground and records both
+`requestedUsage` and a `placementNote` in the published kit. It never drops that
+subject or replaces its PNG. An impossible physical placement returns a specific
+layout error. Geometry-dependent interaction checkpoints remain untouched.
+
+Job identity stays at version 4 for this correction so Continue Building resumes
+the existing paid sprites. No new job or automatic regeneration is required.

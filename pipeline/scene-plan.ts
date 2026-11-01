@@ -1,3 +1,4 @@
+import { TEMPLATE_IDS } from "../game/layout-templates";
 import { BLOCK_AREAS, defaultBlockUsage, parseBlockUsage } from "../lib/world-kit";
 import OpenAI from "openai";
 import sharp from "sharp";
@@ -12,7 +13,7 @@ Describe each asset separately as a transparent cutout for a coherent three-quar
 Choose up to six distinctive props. Reuse a library prop for generic lamp, tree, bollard, cycle_stand, aboard, hedge, bin_grey, bin_purple, car_red, car_blue. Set library:null for a distinctive photographed object that needs a custom sprite. Do not add invented logos or readable text.
 Only include food if LUNCH is provided; identify the visible food conservatively, describe its appearance, and write a short personal observation grounded in the photograph. No inferred restaurant or eating history. If no LUNCH, food:null.
 If no photos are provided, plan a modest generic street for the user's outfit with no factual claims about a place. time should be "12:00" unless the user explicitly supplies a time. Return the structured inventory, not geometry.
-Treat every sprite as a reusable building block for ONE cohesive world, not an independent diorama. For each building and prop supply usage: area (frontage, path_edge, greenery, roadside, waterfront or open), a short purpose explaining how it belongs in the scene, and near (building_0, building_1, building_2 or null). These building IDs refer to the inventory order. Buildings use frontage with near:null and face the shared walking space. A shop sign or cycle stand belongs near its associated building; vegetation belongs on greenery, cars on roadside, and a water-related object at waterfront only when the source supports that context. Never use near on a building or invent a photographed relationship. Describe assets at one common scale and perspective; the engine supplies continuous ground, entry paths and shadows.`;
+Treat every sprite as a reusable building block for ONE cohesive world, not an independent diorama. For each building and prop supply usage: area (frontage, path_edge, greenery, roadside, waterfront or open), a short purpose explaining how it belongs in the scene, and near (building_0, building_1, building_2 or null). These building IDs refer to the inventory order. Buildings use frontage with near:null and face the shared walking space. A shop sign or cycle stand belongs near its associated building; vegetation belongs on greenery, cars on roadside, and a water-related object at waterfront only when the source supports that context. Never use near on a building or invent a photographed relationship. Roadside means beside the road on pavement for signs, lights and photographed structures; only vehicles belong on the road. Choose template:riverside for a river, canal or shore, garden for a park or pond, plaza for an open square, and street for a road. A waterfront prop requires a template with water; do not choose street for a river scene. Describe assets at one common scale and perspective; the engine supplies continuous ground, entry paths and shadows.`;
 
 const string = { type: "string" };
 const usageSchema = { type: "object", additionalProperties: false, required: ["area", "purpose", "near"], properties: {
@@ -21,10 +22,11 @@ const usageSchema = { type: "object", additionalProperties: false, required: ["a
 } };
 export const SCENE_PLAN_SCHEMA = {
   type: "object", additionalProperties: false,
-  required: ["title", "locationName", "description", "time", "ground", "buildings", "props", "food"],
+  required: ["title", "locationName", "description", "time", "ground", "template", "buildings", "props", "food"],
   properties: {
     title: string, locationName: string, description: string, time: string,
     ground: { type: "string", enum: ["street", "park", "plaza"] },
+    template: { type: "string", enum: TEMPLATE_IDS },
     buildings: {
       type: "array", minItems: 3, maxItems: 3,
       items: { type: "object", additionalProperties: false, required: ["name", "description", "observed", "usage"],
@@ -54,6 +56,7 @@ export function normalizeScenePlan(raw: unknown, input: ScenePlanInput): SceneBl
   if (!record(raw) || !["street", "park", "plaza"].includes(String(raw.ground)) ||
     !Array.isArray(raw.buildings) || raw.buildings.length !== 3 || !Array.isArray(raw.props) || raw.props.length > 6 ||
     typeof raw.time !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(raw.time)) throw new Error("Invalid scene plan");
+  if (raw.template !== undefined && !TEMPLATE_IDS.includes(raw.template as never)) throw new Error("Invalid scene template");
   const buildings = raw.buildings.map((building, i) => {
     if (!record(building) || typeof building.observed !== "boolean") throw new Error("Invalid scene plan building");
     const usage = parseBlockUsage(building.usage, { area: "frontage", purpose: "A scenic anchor facing the shared walking space." });
@@ -82,7 +85,7 @@ export function normalizeScenePlan(raw: unknown, input: ScenePlanInput): SceneBl
     title: requiredText(raw.title, "title", 100),
     locationName: input.landmark ? requiredText(raw.locationName, "location name", 100) : "Your place",
     description: requiredText(raw.description, "description"), time: raw.time,
-    ground: raw.ground as SceneBlueprint["ground"], buildings, props,
+    ground: raw.ground as SceneBlueprint["ground"], ...(raw.template ? { template: raw.template as SceneBlueprint["template"] } : {}), buildings, props,
     ...(food ? { food } : {}), source: input.landmark || input.lunch || input.photos?.some(photo => photo.kind !== "fit" && photo.kind !== "fit_back") ? "photo" : "fit-only",
   };
 }
