@@ -71,7 +71,7 @@ export default function GeneratingPage() {
     <p className={styles.title}>{status === "done" ? "YOUR WORLD IS READY" : "TURNING YOUR PHOTOS INTO A PLACE"}</p>
     <p className={styles.summary}>Buildings, little details, lunch, your walking character, and item interactions. Completed work is saved as we go.</p>
     {progress.total > 0 && <div className={styles.progress}><span>{progress.completed} / {progress.total} sprites saved</span><progress aria-label="Sprites saved" max={progress.total} value={progress.completed} /></div>}
-    <ol className={styles.log} ref={logRef}>{events.map((event, i) => <li key={i} className={event.step === "error" ? styles.error : undefined}>
+    <ol className={styles.log} ref={logRef}>{events.filter(event => event.step !== "error").map((event, i) => <li key={i} className={event.step === "error" ? styles.error : undefined}>
       <span className={styles.prompt}>&gt;</span><span className={styles.label}>{event.label}</span>
       {event.thumb && <img className={styles.thumb} src={event.thumb} alt="Completed sprite" />}
       {event.step === "done" && <span className={styles.arrow}>→</span>}

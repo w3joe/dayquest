@@ -1,5 +1,17 @@
 import type { WorldBlock } from "../lib/world-kit";
 
+export class WorldPlacementError extends Error {
+  readonly code = "WORLD_PLACEMENT_FAILED";
+  constructor(public readonly objectId: string) { super(`No safe placement for photographed object ${objectId}`); }
+}
+
+/** Context is an affinity. Geometry, dry feet and collision safety remain mandatory. */
+export function relaxedBlockContext(block: WorldBlock): WorldBlock {
+  return { ...block, requestedUsage: block.usage, usage: { ...block.usage, area: "open" },
+    allowedGround: ["g", "f", "p", "c"], connectsTo: "none",
+    placementNote: "The requested area had no safe slot; this photographed object was kept on compatible dry ground nearby." };
+}
+
 export type BlockAnchor = { id: string; front: { x: number; y: number } };
 const groundAt = (ground: string[], x: number, y: number) => ground[Math.floor(y / 16)]?.[Math.floor(x / 16)];
 const adjacent = (ground: string[], x: number, y: number, materials: string, radius: number) => {
@@ -17,7 +29,6 @@ export function blockFitsGround(block: WorldBlock, ground: string[], x: number, 
     if (!block.allowedGround.includes(groundAt(ground, x + dx, y + dy) ?? "")) return false;
   }
   if (block.usage.area === "greenery" && !"gf".includes(groundAt(ground, x, y) ?? "?")) return false;
-  if (block.usage.area === "roadside" && groundAt(ground, x, y) !== "r") return false;
   if (block.usage.area === "frontage" && !"pc".includes(groundAt(ground, x, y) ?? "?")) return false;
   if (block.usage.area === "path_edge" && !adjacent(ground, x, y, "pc", 16)) return false;
   if (block.usage.area === "waterfront" && !adjacent(ground, x, y, "w", 32)) return false;

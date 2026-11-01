@@ -1,6 +1,8 @@
 import type { SceneBlueprint } from "../pipeline/scene-types";
 import { actorById } from "./actor-library";
 
+export const WORLD_KIT_REVISION = 2;
+
 export const BLOCK_AREAS = ["frontage", "path_edge", "greenery", "roadside", "waterfront", "open"] as const;
 export type BlockArea = typeof BLOCK_AREAS[number];
 /** Descriptive choices from vision; geometry and executable behavior stay in code. */
@@ -10,6 +12,8 @@ export type WorldBlock = {
   role: "building" | "prop" | "npc" | "interactable" | "food" | "character";
   source: "photo" | "generated" | "shared";
   usage: BlockUsage;
+  requestedUsage?: BlockUsage;
+  placementNote?: string;
   render: { width: number; height: number; anchor: "bottom_center" };
   footprint: { width: number; depth: number };
   clearancePx: number;
@@ -18,6 +22,8 @@ export type WorldBlock = {
 };
 export type WorldKit = {
   version: 1;
+  /** Absent on older saved jobs; those can upgrade using the same completed sprites. */
+  revision?: number;
   setting: { name: string; description: string };
   style: { perspective: string; light: string; scale: string; palette: string };
   blocks: WorldBlock[];
@@ -52,7 +58,7 @@ export function parseBlockUsage(value: unknown, fallback: BlockUsage): BlockUsag
 export function furnitureBlock(id: string, name: string, kind: string, usage = defaultBlockUsage(kind)): WorldBlock {
   const spec = FURNITURE_BLOCKS[kind] ?? { width: 32, height: 48, depth: 8 };
   const intrinsic = kind.startsWith("car_") ? ["r"] : kind === "tree" || kind === "hedge" ? ["g", "f"] : ["g", "f", "p", "c"];
-  const surface = usage.area === "roadside" ? ["r"] : usage.area === "greenery" ? ["g", "f"] : usage.area === "frontage" ? ["p", "c"] : ["g", "f", "p", "c"];
+  const surface = usage.area === "roadside" ? ["p", "c", "r"] : usage.area === "greenery" ? ["g", "f"] : usage.area === "frontage" ? ["p", "c"] : ["g", "f", "p", "c"];
   return { id, name, description: name, role: "prop", source: "shared", usage,
     render: { width: spec.width, height: spec.height, anchor: "bottom_center" },
     footprint: { width: Math.min(spec.width - 4, 28), depth: spec.depth }, clearancePx: 8,
@@ -88,7 +94,7 @@ export function buildWorldKit(plan: SceneBlueprint): WorldKit {
   blocks.push({ id: "player_walk", name: "Your walking character", description: "The accepted character, with no replacement identity or outfit.", role: "character", source: "photo",
     usage: { area: "open", purpose: "Walk along connected paths between blocks." }, render: { width: 32, height: 48, anchor: "bottom_center" },
     footprint: { width: 8, depth: 5 }, clearancePx: 8, allowedGround: ["p", "c", "g", "f", "r", "k"], connectsTo: "none" });
-  return { version: 1, setting: { name: plan.locationName, description: plan.description },
+  return { version: 1, revision: WORLD_KIT_REVISION, setting: { name: plan.locationName, description: plan.description },
     style: { perspective: "Shared three-quarter top-down view; front faces south, visible right side, no camera changes between blocks.",
       light: "Soft light from the upper left, consistent on every block; no baked cast shadow or ground plane.",
       scale: "16 pixels per terrain tile; a person is 32 by 48 pixels. Use the declared block dimensions and bottom-center ground anchor.",

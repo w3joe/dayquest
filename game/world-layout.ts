@@ -1,5 +1,5 @@
 import { buildWorldKit, FURNITURE_BLOCKS, furnitureBlock, type WorldBlock } from "../lib/world-kit";
-import { rankBlockSpots, blockFitsGround } from "./block-placement";
+import { rankBlockSpots, blockFitsGround, relaxedBlockContext, WorldPlacementError } from "./block-placement";
 import { sceneReachableTiles, type DayScene, type Tile, type WorldObject } from "../lib/day";
 import { actorById, actorSprite } from "../lib/actor-library";
 import type { WorldDesign } from "../pipeline/world-design";
@@ -108,8 +108,12 @@ export function buildWorldLayout(blueprint: SceneBlueprint, sprites: Record<stri
     // Search beyond the old slots so context can place required photo objects safely.
     for (let y = 11; y < WORLD_ROWS; y++) for (let x = 1; x < WORLD_COLS - 1; x++) spots.push([x * TILE + 8, y * TILE + 15]);
     const candidates = rankBlockSpots(block, ground, spots, anchors);
-    const placed = prop(item.id, item.name, item.library ?? "custom", candidates, item.description, item.library ? undefined : sprites[item.id], block);
-    if (!placed && !item.library) throw new Error(`No safe placement for photographed object ${item.id}`);
+    let placed = prop(item.id, item.name, item.library ?? "custom", candidates, item.description, item.library ? undefined : sprites[item.id], block);
+    if (!placed && !item.library) {
+      const relaxed = relaxedBlockContext(block);
+      placed = prop(item.id, item.name, "custom", rankBlockSpots(relaxed, ground, spots, anchors), item.description, sprites[item.id], relaxed);
+    }
+    if (!placed && !item.library) throw new WorldPlacementError(item.id);
   });
   const foodBox = (tile: Tile): WorldObject => ({ id: "__meal_placement", name: "Meal table", sprite: "food.png", x: tile.x * TILE + 8, y: tile.y * TILE + 16,
     width: 16, height: 10, collision: { x: tile.x * TILE, y: tile.y * TILE + 6, width: 16, height: 10 } });
