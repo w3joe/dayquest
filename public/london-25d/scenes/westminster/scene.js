@@ -49,7 +49,7 @@
     assets: ["palace", "big_ben", "portcullis", "london_eye", "boudica", "bus_stop", "catamaran", "pier", "shard", "statue", "tube_entrance",
       "tile_water", "tile_embankment", "tile_embankment_near", "tile_bridge", "tile_kerb_l", "tile_kerb_r",
       "tile_paving", "tile_asphalt", "tile_kerb", "tile_grass", "tile_flowers",
-      "tree", "hedge", "bench", "lamp", "bollard", "phone_box", "bin_grey", "bus"],
+      "tree", "hedge", "bench", "lamp", "bollard", "phone_box", "bin_grey", "bus", "npc_tourist", "npc_student", "npc_commuter", "npc_jogger", "npc_elder", "black_cab", "delivery_bike"],
     transit: [{ mode: "bus", route: "24", destination: "Hampstead Heath", title: "BUS 24 → HAMPSTEAD HEATH",
       caption: "Parliament Square → Tottenham Court Road · via Whitehall & Trafalgar Square", color: "#d8342c", frames: 260 }],
 
@@ -169,6 +169,18 @@
       const stopX = BX1 - 26;
       w.add("bus_stop", stopX, ROW_TOP * T + 26, { depth: 6, foot: [img.bus_stop.width / 2 - 3, 6], talk: TEXT.busStop, invented: true });
       w.exit(BX0 + 40, ROW_TOP * T + 4, BX1 - BX0 - 80, 14, { label: "BUS 24" });
+
+      // crowds on the bridge and the Queen's Walk, traffic on the Embankment (generic people, invented)
+      const qy = (ROW_NEAR_EDGE + 5) * T + 20;
+      w.npc("npc_tourist", { path: [[BX0 + 30, (ROW_NEAR_EDGE + 1) * T - 8], [BX0 + 30, (ROW_FAR_EDGE + 1) * T + 8]], speed: 0.45, pause: 80,
+        talk: "A tourist, phone out: \"Can you get Big Ben and the Eye in one shot from here? Almost!\"" });
+      w.npc("npc_student", { path: [[BX1 - 30, (ROW_FAR_EDGE + 1) * T + 8], [BX1 - 30, (ROW_NEAR_EDGE + 1) * T - 8]], speed: 0.6, delay: 150 });
+      w.npc("npc_commuter", { path: [[2 * T, qy], [BX0 - 2 * T, qy]], speed: 0.7 });
+      w.npc("npc_jogger", { path: [[BX1 + 2 * T, qy + 34], [(COLS - 2) * T, qy + 34]], speed: 1.2,
+        talk: "A jogger on the Queen's Walk: \"Best run in London. River the whole way.\"" });
+      w.npc("npc_elder", { path: [[6 * T, qy + 50], [12 * T, qy + 50]], speed: 0.25, pause: 160 });
+      w.traffic("black_cab", { y: ROW_FAR_ROAD * T + 26, speed: 1.5, gap: 260 });
+      w.traffic("delivery_bike", { y: (ROW_FAR_ROAD + 1) * T + 20, speed: -1.1, flip: true, gap: 420, offset: 500 });
       w.add("phone_box", BX1 - 6, ROW_TOP * T + 74, { depth: 12, talk: TEXT.phone, invented: true });
       for (const bx of [BX0 + 12, BX1 - 22]) w.add("bollard", bx, ROW_FAR_EDGE * T - 2, { invented: true });
       // trees along the top edge (towards Parliament Square and Whitehall Gardens)
