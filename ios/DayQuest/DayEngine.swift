@@ -22,6 +22,8 @@ final class DayEngine {
         var error: String?
     }
 
+    enum Phase { case idle, recording, building, done }
+
     private(set) var fit = FitState()
     private(set) var log: [GenerateEvent] = []
     private(set) var running = false
@@ -34,6 +36,18 @@ final class DayEngine {
     /// Minutes after midnight.
     var endMinutes: Int { didSet { UserDefaults.standard.set(endMinutes, forKey: "endMinutes"); endOverride = nil; scheduleReminders() } }
     var autoGenerate: Bool { didSet { UserDefaults.standard.set(autoGenerate, forKey: "autoGenerate") } }
+    /// Demo mode: Start replays the SPEC §3 London day instead of mixing in real fixes.
+    var demoMode: Bool { didSet { UserDefaults.standard.set(demoMode, forKey: "demoMode") } }
+    private(set) var recordingSince: Date? {
+        didSet { UserDefaults.standard.set(recordingSince, forKey: "recordingSince") }
+    }
+
+    var phase: Phase {
+        if running || failure != nil { return .building }
+        if generatedId != nil { return .done }
+        if recordingSince != nil || recorder.isRecording || !store.stops.isEmpty { return .recording }
+        return .idle
+    }
 
     init() {
         let defaults = UserDefaults.standard
@@ -41,7 +55,10 @@ final class DayEngine {
         playerName = defaults.string(forKey: "playerName") ?? "LUCAS"
         endMinutes = defaults.object(forKey: "endMinutes") as? Int ?? 21 * 60
         autoGenerate = defaults.object(forKey: "autoGenerate") as? Bool ?? true
+        demoMode = defaults.object(forKey: "demoMode") as? Bool ?? true
+        recordingSince = defaults.object(forKey: "recordingSince") as? Date
         recorder = LocationRecorder(store: store)
+        recorder.acceptsPoints = { [weak self] in !(self?.demoMode ?? false) }
         recorder.onPoint = { [weak self] in self?.checkEndOfDay() }
         fit.uploadURL = store.day.fitURL
         Task { await loadSprite() }
@@ -123,7 +140,6 @@ final class DayEngine {
                 if event.step == "error" { failure = event.label }
                 if event.step == "done", let id = event.dayId {
                     store.markGenerated(id)
-                    presentedDayId = id
                     notifyReady(id)
                 }
             }
@@ -132,7 +148,21 @@ final class DayEngine {
         }
     }
 
+    func startRecording() {
+        recordingSince = Date()
+        recorder.isRecording = true
+        if !recorder.hasAlways { recorder.requestAlways() }
+        if demoMode { Task { await store.seedDemo(animated: true) } }
+    }
+
+    func dismissFailure() {
+        failure = nil
+        log = []
+    }
+
     func clearResult() {
+        recordingSince = nil
+        recorder.isRecording = false
         store.reset()
         fit = FitState()
         endOverride = nil

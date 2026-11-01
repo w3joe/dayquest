@@ -12,14 +12,14 @@ struct RootView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button { showSettings = true } label: { Image(systemName: "gearshape.fill") }
+                        Button { showSettings = true } label: { Image(systemName: "gearshape.fill").foregroundStyle(Theme.ink) }
                     }
                 }
                 .navigationDestination(item: $engine.presentedDayId) { id in
                     DayResultView(id: id)
                 }
         }
-        .tint(Theme.green)
+        .tint(Theme.hot)
         .sheet(isPresented: $showSettings) { SettingsView() }
         .onAppear { engine.requestNotifications() }
     }

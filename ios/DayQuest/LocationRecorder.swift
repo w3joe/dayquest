@@ -10,6 +10,8 @@ final class LocationRecorder: NSObject, CLLocationManagerDelegate {
     private let store: TraceStore
     /// Called after every new point so the end-of-day check runs even while backgrounded.
     var onPoint: (() -> Void)?
+    /// False while the demo trace is playing, so real fixes don't pull the map off London.
+    var acceptsPoints: () -> Bool = { true }
 
     private(set) var authorization: CLAuthorizationStatus
     private(set) var lastError: String?
@@ -79,6 +81,7 @@ final class LocationRecorder: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard acceptsPoints() else { onPoint?(); return }
         let source: TracePoint.Source = detailed ? .live : .significant
         for location in locations where location.horizontalAccuracy >= 0 && location.horizontalAccuracy < 500 {
             if let last = store.points.last, last.source != .visit,
@@ -90,7 +93,7 @@ final class LocationRecorder: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didVisit visit: CLVisit) {
-        guard visit.arrivalDate != .distantPast else { return }
+        guard acceptsPoints(), visit.arrivalDate != .distantPast else { return }
         let departure = visit.departureDate == .distantFuture ? nil : visit.departureDate
         store.append(TracePoint(lat: visit.coordinate.latitude, lng: visit.coordinate.longitude, at: visit.arrivalDate,
                                 departure: departure, accuracy: visit.horizontalAccuracy, source: .visit))

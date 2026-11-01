@@ -15,6 +15,11 @@ struct SettingsView: View {
                 } header: { Text("Server") } footer: {
                     Text("The DayQuest web app. On a phone, use your Mac's LAN address (npm run dev -- -H 0.0.0.0) or the deployed URL.")
                 }
+                Section {
+                    Toggle("Demo mode (replay the London day)", isOn: $engine.demoMode)
+                } footer: {
+                    Text("Start replays the SPEC §3 Saturday onto today, and real location fixes are ignored so they don't pull the map away. Turn off to record your real day.")
+                }
                 Section("Player") {
                     TextField("Name", text: $engine.playerName).textInputAutocapitalization(.characters)
                 }
