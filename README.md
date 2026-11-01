@@ -1,102 +1,163 @@
-# DayQuest (working name)
+<div align="center">
 
-**See your partner's day, not just hear about it.** DayQuest turns a day of location history, photos, workouts and an outfit fit check into three playable, retro pixel-art scenes (inspired by GBA-era top-down RPGs) that you share with one link. Between scenes, a pixel animation shows the real London transport taken: red bus, tube line and all.
+<h1>✦ DayQuest</h1>
 
-> Built in 4 hours at the OpenAI hackathon. Full design: [SPEC.md](SPEC.md).
+<p><strong>A day worth visiting.</strong></p>
 
-## Try it
+<p>Turn the places you went, the things you ate, and the outfit you wore<br />into a little pixel world for someone you love to explore.</p>
 
-- **Live app:** _TODO: Vercel link_ → start at `/` to create a day, or open a shared `/day/<id>` link
-- Arrow keys to walk · Space to read / advance · walk onto the path at the edge of the map to travel to the next highlight
+<p><a href="https://dayquest-pi.vercel.app/"><strong>Try DayQuest ↗</strong></a> · <a href="https://dayquest-pi.vercel.app/demo">Explore the demo</a></p>
 
-## What we built today
+<p>
+  <a href="#why-dayquest">Why we built it</a> ·
+  <a href="#the-experience">The experience</a> ·
+  <a href="#how-we-built-it">How it works</a> ·
+  <a href="#run-it-locally">Run locally</a>
+</p>
 
-- _TODO: fill in at feature freeze_
-- Pipeline: day data → LLM picks 3 highlights (tourist spot, meal, park) + nearby landmarks → reference photos → `gpt-image-2.5` → pixel post-process → `day.json`
-- Game: Shadwell-style Canvas 2D scenes with manifest-driven landmarks, depth sorting, textboxes and keyboard/touch controls
-- Today screen: location history sync, photo uploads (fit check, lunch), health import, transport detection
-- Fit check → back-facing player sprite
-- Transport loading animations (bus / tube line)
-- Shareable `/day/<id>` links
+<img src="docs/images/today.png" alt="DayQuest's updated pastel interface with a pixel cat logo, Try me and Demo tabs, and Fit, Food, Place and More photo galleries" width="100%" />
 
-## Use of Codex
+<p><sub>The updated Try me screen: a little home for the things that made your day.</sub></p>
 
-_TODO: one concrete example — prompt, what Codex produced, screenshot of the diff._
+</div>
 
-## Setup
+## Why DayQuest?
 
-Run checks in GitHub manually, then deploy using your existing Vercel login with `npm run deploy:vercel`. See [deployment instructions](docs/DEPLOYMENT.md). Pushes do not trigger deployments. The assigned production address is `https://dayquest-pi.vercel.app`.
+“How was your day?” is a small question with a lot behind it. For long-distance partners, a few messages and photos can leave out the feeling of being there: the street you wandered down, the little lunch spot, the ordinary moments you would have shared.
+
+**DayQuest makes those moments a place you can visit.** Upload your outfit, a place, and your lunch; turn them into a personal pixel neighbourhood; then send a link. Someone you love can walk your character around, explore the scenery, and discover the details of your day at their own pace.
+
+The idea began as a four-hour OpenAI hackathon project: make everyday life feel a little more present, even from far away.
+
+## The experience
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><img src="docs/images/photos.png" alt="The Demo tab's filled photo galleries, showing sample outfit, food, place and extra images with personal notes" /></td>
+    <td width="50%" valign="top"><img src="docs/images/world.png" alt="The playable world viewer with sample pixel shopfronts, a walking character and touch controls" /></td>
+  </tr>
+  <tr>
+    <td><strong>01 / Your day, in little pieces</strong><br />Photo galleries and short notes. This example comes from the Demo tab.</td>
+    <td><strong>02 / A place to visit</strong><br />Walk, discover and share. The world shown here uses offline sample artwork.</td>
+  </tr>
+</table>
+
+1. **Start with your fit.** Open **Try me** and add a full-body front photo to generate your pixel character. Preview it before setting off.
+2. **Collect the details.** Add photos to **Food**, **Place** and **More**, with a short note for each. Pick several at once, drag them in, or use the camera button on your phone. The first Place and Food photos guide the scenery and meal.
+3. **Create your world.** Follow the generation log as the scene takes shape. Completed sprites are saved, so a refresh or retry can continue the build.
+4. **Invite someone in.** Share the `/day/<id>` link. The viewer opens without an account, with keyboard and touch controls for exploring and interacting.
+
+**Controls:** Arrow keys / WASD to walk · Space / Enter for actions and travel · Escape to cancel. Touch buttons are available below the world.
+
+The **Demo** tab shows a filled example day with sample images, captions, a London route over OpenStreetMap, transport chips and walking stats. Try me also accepts a Google Timeline JSON or GPX file and shows the number of imported location points and their date range. A sound toggle lets you switch the interface's little audio cues on or off.
+
+> **Current scope:** The connected creation flow builds one neighbourhood using your fit and the first Food and Place photo. Additional photos and notes are saved in the draft; location-history imports currently show a local summary and are not passed to generation. The Demo tab's route, journeys and walking stats are sample data. The renderer supports connected locations, travel and saved interactions through the development previews below. All screenshots were captured locally without paid generation calls.
+
+## How we built it
+
+The core is a small pipeline: understand the photos, generate the artwork, then assemble a world the browser can play.
+
+```mermaid
+flowchart LR
+    A[Outfit photo] --> B[Pixel character]
+    C[Place + lunch photos] --> D[Structured scene plan]
+    B --> E[Generate matching sprites]
+    D --> E
+    E --> F[Pixel processing + world layout]
+    F --> G[day.json + PNG assets]
+    G --> H[Playable, shareable world]
+```
+
+- **The app:** Next.js App Router, React and TypeScript power the responsive pastel interface, multi-photo galleries, captions, character previews and shared-day pages. Larger photos are resized in the browser; uploads are decoded, oriented and stripped of metadata on the server. Drafts survive refreshes in the same browser tab.
+- **The scene planner:** OpenAI photo analysis returns a validated inventory of three buildings or scenic elements, props and optional food. The plan distinguishes observed details from supporting scenery and avoids inventing named places or visits.
+- **The artwork:** OpenAI image editing uses your photos and a shared pixel-art style to create transparent building sprites, food, custom props and a directional walking sheet. Sharp fits the results to game dimensions and preserves crisp pixels. Shared ground textures and street furniture fill out the scene.
+- **The game:** A custom Canvas 2D renderer, developed from the repository's Shadwell prototype, handles sprite depth, collision, movement, dialogue and interactions. It loads a validated `day.json` manifest and PNGs; playing a published world requires no model calls.
+- **The build jobs:** Generation advances through checkpointed steps, with up to three independent sprite requests at once. Each successful asset is saved separately, so retries reuse completed work. Vercel Blob stores published worlds in production; local development can use the filesystem.
+
+Interactions are composed from validated instructions, generic effects and the scene's own generated assets. Your character, meal and photographed subjects keep their generated artwork during interactions. Connected itineraries add boarding points and bus, Tube or walking transitions. Browser-local progress lets a visitor return to the same published world.
+
+## Run it locally
+
+Use **Node.js 22+** and npm; CI uses Node 26.
 
 ```bash
 git clone https://github.com/w3joe/dayquest.git
 cd dayquest
-npm install
-cp .env.example .env.local   # add OPENAI_API_KEY, BLOB_READ_WRITE_TOKEN
-npm run dev                  # http://localhost:3000
+npm ci
+cp .env.example .env.local
+npm run dev
 ```
 
-### Integration status
+Open [localhost:3000](http://localhost:3000) for **Try me**, or [/demo](http://localhost:3000/demo) for the filled example. Browsing the interface, demo and offline previews requires no API credentials; creating your character or world does.
 
-The integration branch connects Today, fit-check, B’s generation stream and the playable three-chapter viewer using Shadwell’s Canvas 2D implementation approach. The demo page and generation replay have been removed. Run `npm run typecheck`, `npm test`, and `npm run build` to check it.
+### Explore a sample world
 
-- The Today screen animates the template location history, pixelates photo previews, matches EXIF times to stops, and displays the fixture health/transport data. Health import and location sync are demo animations, not integrations with a device.
-- JPEG, PNG and WebP uploads are limited to 4 MB each. Uploads are decoded, oriented and stripped of metadata on the server. Without Blob credentials, development uploads are stored in ignored `.data/` and served by `/api/assets/`; production requires Blob.
-- Fit-check generation needs `OPENAI_API_KEY`. `OPENAI_IMAGE_MODEL` defaults to `gpt-image-2.5-flare`. Missing credentials return an error; a preview thumbnail is never presented as a generated character.
-- `BLOB_BASE_URL` is the public Blob store base URL for generated `days/<id>/day.json` manifests. Unavailable days show a readable recovery page; the retired demo route shows a not-found page.
-- `/generating` validates the draft and streams B’s generation events. The viewer uses Shadwell’s rendering approach with shared map layouts, sprite depth sorting, small collision footprints, food icons, bus/tube transitions and an end-card Share action. See [integration status](docs/INTEGRATION-STATUS.md) for verified behavior and remaining gates.
-
-The retained internal demo fixtures use placeholder landmark/player artwork and are not exposed as a playable demo page. They are not evidence of live generation. To deploy after A/B integration, import the repository into Vercel, set the server environment variables from `.env.example`, connect a public Blob store, and check uploads, character generation and a shared day in a fresh browser. Do not commit uploaded personal photos or `.env.local`.
-
-The connected generation route is B’s implementation: `POST /api/generate-day` reads `data/input.json` and uploaded photos, streams progress, and publishes the manifest.
-
-## Team
-
-| Name | Role |
-|---|---|
-| _TODO_ | Game + transit animations |
-| _TODO_ | Pipeline + generating log |
-| _TODO_ | Today screen (ingest), character, deploy |
-
-Contact: _TODO_
-
-## Credits
-
-- Ground textures and trees: existing generated Shadwell artwork in this repository. Static water/transit sprites retain A’s integration assets.
-- Rendering/art approach: the original Canvas 2D `shadwell-25d` prototype in this repository; shared style in `shadwell-25d/assets/style.json`.
-- Landmark reference images: Wikipedia / Wikimedia Commons
-
-### Art and local preview
-
-`npm run dev` and `npm run build` first run `scripts/build-game-art.mjs`, deriving game textures from Shadwell’s processed artwork. The offline Shadwell prompt jobs and live image API share one style prefix. Internal demo fixtures remain available for development checks.
-
-For other-device development use `npm run dev -- --hostname 0.0.0.0` and add the device-facing hostname/IP to `DAYQUEST_DEV_ORIGINS` (no scheme or port). Live worlds need `PIPELINE_IMAGES=live`, optionally `PIPELINE_TEXT=live`, an OpenAI API key and the Blob settings from `.env.example`. Mock pipeline modes are explicitly labelled as placeholder artwork.
-
-### Photo-to-world flow
-
-The main page's **Today's fit**, **Lunch break**, and **Somewhere special** photos now lead to one explorable neighbourhood when you select **Create My World**. The accepted fit-check character supplies the reference for a directional walking sheet. The location photo supplies a scene inventory and three building sprites, while the lunch photo supplies a food pickup. Shared Shadwell ground textures and street furniture complete the layout, with collision and depth sorting. Location-history and health demo data are not evidence for this scene.
-
-This flow uses live OpenAI calls and requires `OPENAI_API_KEY`, available API credits, and access to the configured `OPENAI_TEXT_MODEL` and `OPENAI_IMAGE_MODEL`. It does not use the legacy `/api/generate-day` mock-mode switches. Exhausted credits or a failed sprite produce an actionable retry message; they never silently replace your artwork with placeholders. Production also requires the Blob settings in `.env.example`.
-
-`POST /api/world-jobs` accepts the ready main-page draft and returns progress immediately. Repeated requests advance one bounded step at a time: photo analysis, a batch of up to three independent sprites generated in parallel, or final publication. Each successful sprite is saved and checkpointed as it completes, including when another sprite in its batch fails; retry with the same draft plus `retry: true` to continue from the remaining assets. The job identity includes the photo uploads, accepted character, session, and configured models, so completed sprites are reused for the same inputs. Refreshing the generation page resumes that job rather than starting its finished assets again. A changed photo or model creates a new job.
-
-For an **offline renderer preview using existing sample artwork**, run:
+With the development server running, run this in another terminal:
 
 ```bash
 npx tsx scripts/preview-world.mts
 ```
 
-Then visit `http://localhost:3000/day/world-preview` with the development server running. The preview uses existing Shadwell buildings and character frames plus a demo lunch icon, labels them as sample artwork, and writes only ignored `public/days/world-preview/` files. It makes no paid API calls and does not demonstrate photo analysis or live generation.
+Visit [the world preview](http://localhost:3000/day/world-preview). It reuses bundled sample artwork and makes no paid API calls.
 
-### Connected locations and transport
+| Preview | Generate the fixture | Open locally |
+| --- | --- | --- |
+| Connected places and transport | `npm run preview:transport` | [/day/transport-preview](http://localhost:3000/day/transport-preview) |
+| Item actions and saved outcomes | `npm run preview:interactions` | [/day/interaction-preview](http://localhost:3000/day/interaction-preview) |
 
-The transport layer accepts completed location scenes and explicit journeys independently of the location-entry implementation. [Transport integration](docs/TRANSPORT-INTEGRATION.md) defines scene IDs, departure/arrival points, route legs and the `composeWorldItinerary` handoff. Existing single-location worlds remain supported.
+These are development fixtures, separate from the frontend's `/demo` tab. The old playable `/day/demo` route is retired.
 
-Run `npm run preview:transport`, then open `http://localhost:3000/day/transport-preview` while the development server is running. This offline fixture has four sample locations linked by bus, a Tube journey with a line change, and a walk. Walk to the departure point and use Space/Enter or the touch action button to confirm boarding. Travel can be skipped to arrival, and refreshing resumes at a safe scene checkpoint. Only the last location has a finish/share exit.
+### Generate from your own photos
 
-Bus-stop and station sprites are pre-generated and shared across journeys. Builds validate the committed PNGs locally; runtime travel never calls an image service. Exact ImageGen prompts are recorded in `scripts/transport-art-prompts.json`.
+Set `OPENAI_API_KEY` in `.env.local`, with API credits and access to the configured models. Restart the server after changing environment variables.
 
-### Generated item interactions
+| Variable | Purpose |
+| --- | --- |
+| `OPENAI_API_KEY` | Required for character, scene and artwork generation. Keep it server-side. |
+| `OPENAI_TEXT_MODEL` | Scene and interaction planning; defaults to `gpt-5.4-mini`. |
+| `OPENAI_IMAGE_MODEL` | Character and sprite generation; defaults to `gpt-image-2.5-flare`. |
+| `BLOB_READ_WRITE_TOKEN` | Public Vercel Blob storage; required in production. |
+| `BLOB_BASE_URL` | The same store's public base URL; required in production. |
 
-World scenes can carry contextual action sequences composed from shared generic effects and their own dynamically generated assets. Characters, buildings, meals and distinctive photo objects retain their generated artwork; fixed food and character poses are confined to offline samples. Live pickup uses the scene's generated meal sprite. [Interaction integration](docs/INTERACTION-INTEGRATION.md) describes asset delivery, scene handoff, sequence instructions and saved outcomes. Run `npm run assets:check` when adding artwork.
+Choose JPEG, PNG or WebP photos. Larger images are compressed before upload; each uploaded file must fit within **4 MB**. Food, Place and More support up to 12 photos each, with a 30-photo limit in the shared draft, and notes up to 140 characters. Fit stays a single photo.
 
-Run `npm run preview:interactions` and visit `http://localhost:3000/day/interaction-preview` with the development server running. This offline fixture uses supplied artwork to demonstrate choosing actions, approaching an item, temporary effects, Lucas's photo/wave/point poses, carrying a prop, cancellation and progress across travel. It makes no API calls.
+Start at `/`, add your fit, wait for the character preview, then choose **Create my world**. Without Blob configuration, development stores uploads and checkpoints in ignored `.data/` and worlds in ignored `public/days/<id>/` folders.
+
+The main flow uses `/api/world-jobs` and makes live model calls. The `PIPELINE_TEXT` and `PIPELINE_IMAGES` switches in `.env.example` apply to the older `/api/generate-day` pipeline. They do not turn the main photo-to-world flow into an offline mode.
+
+### Checks and deployment
+
+```bash
+npm run typecheck
+npm test
+npm run build
+```
+
+Development and production builds also prepare the shared game art and validate interaction assets locally.
+
+Deployment is manual. Follow the [deployment guide](docs/DEPLOYMENT.md) for the existing Vercel project, environment setup and `npm run deploy:vercel`. That command deploys committed `origin/main`; pushes do not trigger deployments.
+
+## A little further into the code
+
+| Start here | What you'll find |
+| --- | --- |
+| [`components/today/`](components/today/) | App shell, photo galleries, camera controls, sound, demo and character preview |
+| [`app/demo/`](app/demo/) · [`lib/location-history.ts`](lib/location-history.ts) | Sample day and local Google Timeline / GPX parsing |
+| [`app/api/world-jobs/`](app/api/world-jobs/) · [`lib/server/world-jobs.ts`](lib/server/world-jobs.ts) | Live generation requests, retries and checkpoints |
+| [`pipeline/`](pipeline/) | Photo analysis, sprite jobs, pixel processing and publishing |
+| [`game/`](game/) | Canvas renderer, world layout, journeys and interactions |
+| [`lib/day.ts`](lib/day.ts) | The shared world manifest and its validation |
+| [`docs/TRANSPORT-INTEGRATION.md`](docs/TRANSPORT-INTEGRATION.md) | Connecting scenes and travel legs |
+| [`docs/INTERACTION-INTEGRATION.md`](docs/INTERACTION-INTEGRATION.md) | Asset catalogue and contextual actions |
+| [`docs/GAME-PROGRESS.md`](docs/GAME-PROGRESS.md) | Saved progress and published revisions |
+| [`SPEC.md`](SPEC.md) | Original hackathon concept and design history |
+
+## Credits
+
+The visual style and Canvas rendering approach grew out of the original [`shadwell-25d`](shadwell-25d/) prototype. Shared textures, trees and street furniture reuse its processed artwork; character, landmark and food prompts share its [art direction](shadwell-25d/assets/style.json). The legacy landmark pipeline uses Wikipedia / Wikimedia Commons reference images.
+
+The Demo tab uses OpenStreetMap tiles and attribution. The interface pairs Pixelify Sans, DM Sans and DM Mono with the repository's pixel illustrations.
+
+<div align="center">
+  <sub>Made of the little things. ✦</sub>
+</div>
