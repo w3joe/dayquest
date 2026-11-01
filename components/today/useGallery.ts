@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_UPLOADS, MAX_UPLOADS_PER_KIND } from "../../lib/draft";
 import { sfx } from "../../lib/sound";
 import { ACCEPTED_TYPES, MAX_PHOTO_BYTES, matchPhoto, preparePhoto, preview } from "./photo-tools";
+import { DEMO_MODE } from "../../lib/demo";
 
 export type GalleryKind = "lunch" | "landmark" | "extra";
 export const GALLERY_KINDS: GalleryKind[] = ["lunch", "landmark", "extra"];
@@ -46,6 +47,14 @@ export function useGallery(sessionId: string) {
       const thumbnail = await preview(file).catch(() => undefined);
       if (!current()) return;
       patch(id, { preview: thumbnail, matching });
+      if (DEMO_MODE) {
+        // Hardcoded demo: the photo stays in this browser; the pixel preview stands in for the upload.
+        if (!thumbnail) throw new Error("We couldn't read that photo.");
+        files.current.delete(id);
+        patch(id, { url: thumbnail, busy: false });
+        sfx.success();
+        return;
+      }
       const form = new FormData(); form.set("photo", file); form.set("kind", kind); form.set("sessionId", sessionId);
       const response = await fetch("/api/upload", { method: "POST", body: form, signal: controller.signal });
       const result = await response.json();
