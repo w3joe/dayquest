@@ -49,7 +49,7 @@ export async function loadStoredAsset(url: string): Promise<Buffer | null> {
     if (url.startsWith("/")) return await readFile(path.join(process.cwd(), "public", path.normalize(url).replace(/^(\.\.[/\\])+/, "")));
     const parsed = new URL(url);
     const blobHost = process.env.BLOB_BASE_URL ? new URL(process.env.BLOB_BASE_URL).host : null;
-    if (parsed.protocol !== "https:" || (parsed.host !== blobHost && !parsed.host.endsWith(".public.blob.vercel-storage.com"))) return null;
+    if (parsed.protocol !== "https:" || parsed.host !== blobHost || parsed.username || parsed.password) return null;
     const response = await fetch(parsed, { redirect: "error", signal: AbortSignal.timeout(15000) });
     if (!response.ok) return null;
     const bytes = Buffer.from(await response.arrayBuffer());

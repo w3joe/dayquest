@@ -1,8 +1,10 @@
 import OpenAI, { toFile } from "openai";
 import sharp from "sharp";
 import { RequestError } from "./errors";
+import { ISOLATED_OBJECT } from "../art-style";
+import { safeOpenAIError } from "./openai-errors";
 
-export const CHARACTER_PROMPT = "Game Boy Advance era pixel art, 3/4 top-down view, clean dark outlines, limited bright palette, soft top-left lighting, single isolated object centred on a fully transparent background, no ground, no text, no UI. A single chibi character seen directly from BEHIND (back view, face not visible), full body, standing, matching this person's clothing, colours, hairstyle and hair colour, and skin tone exactly. Neutral pose, arms at sides. Leave clear transparent space around the complete character including their shoes.";
+export const CHARACTER_PROMPT = `${ISOLATED_OBJECT} A single chibi character seen directly from BEHIND (back view, face not visible), full body, standing, matching this person's clothing, colours, hairstyle and hair colour, and skin tone exactly. Neutral pose, arms at sides. Leave clear transparent space around the complete character including their shoes.`;
 
 export async function pixelateCharacter(bytes: Buffer): Promise<Buffer> {
   const source = sharp(bytes, { limitInputPixels: 20_000_000 });
@@ -21,7 +23,9 @@ export async function pixelateCharacter(bytes: Buffer): Promise<Buffer> {
     .toColourspace("srgb").ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   for (let i = 3; i < data.length; i += info.channels) data[i] = data[i] < 128 ? 0 : 255;
   return sharp(data, { raw: { width: 32, height: 48, channels: 4 } })
-    .png({ palette: true, colours: 32, dither: 0 }).toBuffer();
+    // PNG supports 1/2/4/8-bit palettes. In this sharp build, asking for 32
+    // rounds up to 8 bits (256 colours); 16 keeps the output within our ≤32 cap.
+    .png({ palette: true, colours: 16, dither: 0 }).toBuffer();
 }
 
 export async function generateCharacter(front: Buffer, back?: Buffer): Promise<Buffer> {
@@ -47,9 +51,11 @@ export async function generateCharacter(front: Buffer, back?: Buffer): Promise<B
     return await pixelateCharacter(Buffer.from(encoded, "base64"));
   } catch (error) {
     if (error instanceof RequestError) throw error;
-    if (error instanceof OpenAI.APIError && (error.status === 401 || error.status === 403 || error.status === 404)) {
-      throw new RequestError("The image model is unavailable for this server. Check OPENAI_API_KEY and OPENAI_IMAGE_MODEL.", 503);
+    if (error instanceof OpenAI.APIError) {
+      const safe = (value: unknown) => typeof value === "string" && /^[a-zA-Z0-9_.-]{1,100}$/.test(value) ? value : undefined;
+      // Provider bodies may include photos/prompts; log only diagnostic identifiers.
+      console.error("Fit-check image service failed", { status: error.status, code: safe(error.code), parameter: safe(error.param), requestId: safe(error.requestID), type: safe(error.name) });
     }
-    throw new RequestError("Character generation is unavailable right now. Please retry.", 502);
+    throw safeOpenAIError(error, "Character generation");
   }
 }

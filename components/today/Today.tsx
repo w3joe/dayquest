@@ -12,7 +12,7 @@ type Kind = Extract<UploadKind, "fit" | "lunch" | "landmark">;
 const quests: { kind: Kind; name: string; hint: string; icon: string }[] = [
   { kind: "fit", name: "Today's fit", hint: "Full body · front view · required", icon: "♟" },
   { kind: "lunch", name: "Lunch break", hint: "Your bowl, plate, or little treat", icon: "♨" },
-  { kind: "landmark", name: "Somewhere special", hint: "A view worth remembering · optional", icon: "♜" },
+  { kind: "landmark", name: "Somewhere special", hint: "Buildings and details for your world · optional", icon: "♜" },
 ];
 
 async function preview(file: File): Promise<string> {
@@ -36,13 +36,7 @@ async function matchPhoto(file: File): Promise<string> {
     const metadata = await parse(file, ["DateTimeOriginal", "CreateDate"]);
     const time = metadata?.DateTimeOriginal ?? metadata?.CreateDate;
     if (!(time instanceof Date) || Number.isNaN(time.getTime())) return "No photo time found · add to this day";
-    // EXIF camera dates are wall-clock values, not UTC timestamps.
-    const minute = time.getHours() * 60 + time.getMinutes();
-    const nearest = day.locations.reduce((best, stop) => {
-      const difference = (t: string) => { const [h, m] = t.split(":").map(Number); return Math.abs(h * 60 + m - minute); };
-      return difference(stop.t) < difference(best.t) ? stop : best;
-    });
-    return `Matched to ${nearest.t} · ${nearest.label}`;
+    return `Photo time · ${time.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
   } catch { return "No photo time found · add to this day"; }
 }
 
@@ -79,6 +73,7 @@ export default function Today() {
   const [spriteError, setSpriteError] = useState("");
   const [storageError, setStorageError] = useState("");
   const [health, setHealth] = useState<"idle" | "syncing" | "done">("idle");
+  const [today, setToday] = useState<Date>();
   const files = useRef<Partial<Record<Kind, File>>>({});
   const operations = useRef<Partial<Record<Kind, number>>>({});
   const generation = useRef(0);
@@ -93,13 +88,14 @@ export default function Today() {
   const requests = useRef(new Set<AbortController>());
   const healthTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
+    setToday(new Date());
     try {
       const draft = parseStoredDraft(sessionStorage.getItem(DRAFT_STORAGE_KEY));
       if (draft) {
         setSessionId(draft.sessionId);
         const uploads = draft.uploads.filter(p => quests.some(quest => quest.kind === p.kind));
         uploadedUrls.current = Object.fromEntries(uploads.map(p => [p.kind, p.url]));
-        setPhotos(Object.fromEntries(uploads.map(p => [p.kind, { url: p.url, preview: p.url, matching: "Saved to today's day" }])));
+        setPhotos(Object.fromEntries(uploads.map(p => [p.kind, { url: p.url, preview: p.url, matching: "Saved for your world" }])));
         if (draft.spriteUrl) setSpriteUrl(draft.spriteUrl);
         else if (draft.uploads.some(p => p.kind === "fit")) setSpriteError("Your character was not saved. Retry or add your front photo again.");
         return;
@@ -186,7 +182,7 @@ export default function Today() {
     try {
       const [thumbnail, matching] = await Promise.all([preview(file), matchPhoto(file)]);
       if (!mounted.current || operations.current[kind] !== attempt) return;
-      update(kind, { preview: thumbnail, matching, manualMatch: matching.startsWith("No photo time") });
+      update(kind, { preview: thumbnail, matching, manualMatch: false });
       const form = new FormData(); form.set("photo", file); form.set("kind", kind); form.set("sessionId", sessionId);
       const response = await fetch("/api/upload", { method: "POST", body: form, signal: controller.signal });
       const result = await response.json();
@@ -243,22 +239,22 @@ export default function Today() {
   const workout = day.workouts[0];
   return <main className="dq-shell">
     <header className="dq-header"><a href="/" className="dq-wordmark"><span className="dq-brand-icon">✦</span> dayquest<span className="dq-wordmark-dot">.</span></a><span className="dq-header-note">A DAY WORTH VISITING</span></header>
-    <div className="dq-hero"><div><p className="dq-eyebrow">{day.user.name}'S DAY / LONDON CHAPTER</p><h1>Ordinary day.<br/><span>Extraordinary little world.</span></h1><p className="dq-intro">The places you went. The things you ate. The outfit you wore.<br className="dq-desktop-break"/> Gather today’s little moments, and give someone a place to visit.</p></div><div className="dq-date-card"><span>SATURDAY</span><strong>07</strong><span>NOVEMBER 2026</span><div>✦ SAVE THE LITTLE THINGS</div></div></div>
+    <div className="dq-hero"><div><p className="dq-eyebrow">YOUR PHOTOS / YOUR LITTLE WORLD</p><h1>Ordinary day.<br/><span>Extraordinary little world.</span></h1><p className="dq-intro">The places you went. The things you ate. The outfit you wore.<br className="dq-desktop-break"/> Gather today’s little moments, and give someone a place to visit.</p></div><div className="dq-date-card"><span>{(today?.toLocaleDateString("en-GB", { weekday: "long" }) ?? "Today").toUpperCase()}</span><strong>{today ? String(today.getDate()).padStart(2, "0") : "—"}</strong><span>{(today?.toLocaleDateString("en-GB", { month: "long", year: "numeric" }) ?? "Your day").toUpperCase()}</span><div>✦ SAVE THE LITTLE THINGS</div></div></div>
     <div className="dq-content"><LocationSync/>
-    <section className="dq-panel" aria-labelledby="photos-title"><div className="dq-section-heading"><div><span className="dq-eyebrow">02 / THE LITTLE MOMENTS</span><h2 id="photos-title">What did today look like?</h2></div><span className="dq-counter">{uploaded} / {quests.length} COLLECTED</span></div><p className="dq-section-copy">Start with your fit. Add a few memories. We’ll turn them into pixels.</p>
+    <section className="dq-panel" aria-labelledby="photos-title"><div className="dq-section-heading"><div><span className="dq-eyebrow">02 / THE LITTLE MOMENTS</span><h2 id="photos-title">What did today look like?</h2></div><span className="dq-counter">{uploaded} / {quests.length} COLLECTED</span></div><p className="dq-section-copy">Start with your fit. Add a place and your lunch. We’ll build the buildings, little details, and a walking character for your world.</p>
       <div className="dq-photo-grid">{quests.map(quest => { const photo = photos[quest.kind]; return <div className={`dq-photo-card ${photo?.url ? "is-uploaded" : ""} ${quest.kind === "fit" ? "dq-photo-required" : ""}`} key={quest.kind}>
         <label className="dq-upload-zone" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void upload(quest.kind, event.dataTransfer.files[0]); }}>
           <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" aria-label={`Upload ${quest.name}`} disabled={!sessionId} onChange={event => { void upload(quest.kind, event.target.files?.[0]); event.target.value = ""; }}/>
           <span className="dq-upload-check" aria-label={photo?.url ? "Uploaded" : "Not uploaded"}>{photo?.url ? "✓" : ""}</span>
           {photo?.preview ? <img src={photo.preview} alt={`${quest.name} pixel preview`} className="dq-photo-preview"/> : <span className="dq-photo-icon" aria-hidden="true">{quest.icon}</span>}
           <span className="dq-photo-action">{photo?.busy ? "SAVING…" : photo?.preview ? "REPLACE PHOTO +" : "ADD PHOTO +"}</span>
-        </label><div className="dq-photo-info"><h3>{quest.name}</h3><p>{quest.hint}</p>{photo?.matching && <p className="dq-photo-match">{photo.matching}</p>}{photo?.manualMatch && <label className="dq-stop-picker">Choose a stop (optional)<select aria-label={`Match ${quest.name} to a stop`} defaultValue="" onChange={event => update(quest.kind, { matching: event.target.value ? `Matched to ${event.target.value}` : "No photo time found · add to this day" })}><option value="">Leave unmatched</option>{day.locations.map(stop => <option key={`${stop.t}-${stop.label}`} value={`${stop.t} · ${stop.label}`}>{stop.t} · {stop.label}</option>)}</select></label>}{photo?.error && <><p className="dq-error" role="alert">{photo.error}</p>{photo.pending && <div><button type="button" className="dq-small-button" onClick={() => void upload(quest.kind, pendingFiles.current[quest.kind])}>Retry photo</button>{" "}<button type="button" className="dq-small-button" onClick={() => discardReplacement(quest.kind)}>{photo.url ? "Keep previous photo" : "Discard photo"}</button></div>}</>}</div>
+        </label><div className="dq-photo-info"><h3>{quest.name}</h3><p>{quest.hint}</p>{photo?.matching && <p className="dq-photo-match">{photo.matching}</p>}{photo?.error && <><p className="dq-error" role="alert">{photo.error}</p>{photo.pending && <div><button type="button" className="dq-small-button" onClick={() => void upload(quest.kind, pendingFiles.current[quest.kind])}>Retry photo</button>{" "}<button type="button" className="dq-small-button" onClick={() => discardReplacement(quest.kind)}>{photo.url ? "Keep previous photo" : "Discard photo"}</button></div>}</>}</div>
       </div>; })}</div>
       {spriteUrl ? <SpritePreview url={spriteUrl} onStatusChange={setSpriteVerification} onRegenerate={() => void makeSprite()} disabled={spriteBusy || uploading || pendingChanges} retained={pendingChanges} /> : <div className="dq-sprite-status" aria-live="polite"><span className="dq-character-placeholder" aria-hidden="true">♟</span><div><strong>{spriteBusy ? "Stitching your outfit into pixels…" : "Every adventure starts with you."}</strong><span>{spriteError || "Add a front fit photo to create your character."}</span></div>{spriteError && <button type="button" className="dq-small-button" disabled={spriteBusy || pendingFitChanges} onClick={() => void makeSprite()}>Retry character</button>}</div>}
     </section>
     <div className="dq-bottom-grid"><section className="dq-panel dq-health" aria-labelledby="health-title"><span className="dq-eyebrow">03 / A LITTLE MOVEMENT</span><h2 id="health-title">Good for the soul.</h2><p className="dq-section-copy">A walk through the park belongs in your story, too.</p>{health === "done" ? <div className="dq-walk-stats"><span className="dq-walk-icon">♧</span><div><strong>AFTERNOON WALK</strong><p>{workout.distanceKm} KM <span>·</span> {workout.durationMin} MIN <span>·</span> {workout.steps.toLocaleString("en-GB")} STEPS</p></div><span>✓</span></div> : <button type="button" className="dq-health-button" disabled={health === "syncing"} onClick={() => { setHealth("syncing"); healthTimer.current = setTimeout(() => setHealth("done"), 1500); }}><span>♥</span> {health === "syncing" ? "SYNCING YOUR WALK…" : "IMPORT FROM HEALTH"}<span>+</span></button>}<p className="dq-footnote">DEMO IMPORT · SAMPLE WALK DATA</p></section>
     <section className="dq-panel dq-transport" aria-labelledby="transport-title"><span className="dq-eyebrow">04 / BETWEEN THE MOMENTS</span><h2 id="transport-title">How you got there.</h2><div className="dq-transport-list">{day.transport.map((leg, i) => <div className="dq-transport-row" key={i}><span className={`dq-line-chip ${leg.mode === "bus" ? "dq-bus" : leg.line === "Bakerloo" ? "dq-bakerloo" : "dq-central"}`}>{leg.mode === "bus" ? `BUS ${leg.route}` : leg.line}</span><span>{leg.from}<span className="dq-route-arrow"> → </span>{leg.to}</span></div>)}</div><p className="dq-footnote">AUTO-DETECTED FROM DEMO LOCATION HISTORY</p></section></div>
-    <section className="dq-finish"><div><span className="dq-eyebrow">ALL THE LITTLE PIECES, ONE LITTLE WORLD.</span><h2>Ready to call it a day?</h2><p>{spriteBusy ? "Your character is being created. This can take a minute." : !photos.fit?.url ? "Add your fit check above to begin your adventure." : uploading ? "Just saving your latest memories…" : pendingChanges ? "Retry or discard your unsaved photo changes above." : spriteReady ? "Three places. One adventure. Someone to share it with." : spriteUrl ? "Your character image must load successfully before you set off. Check the preview above." : "Your character needs to be ready before you set off."}</p>{storageError && <p className="dq-error" role="alert">{storageError}</p>}</div><button type="button" className="dq-end-button" disabled={!canFinish} onClick={finishDay}>END MY DAY <span>→</span></button></section>
-    </div><footer className="dq-footer"><span>MADE OF THE LITTLE THINGS.</span><span>DAYQUEST / LONDON, 2026</span></footer>
+    <section className="dq-finish"><div><span className="dq-eyebrow">ALL THE LITTLE PIECES, ONE LITTLE WORLD.</span><h2>Ready to call it a day?</h2><p>{spriteBusy ? "Your character is being created. This can take a minute." : !photos.fit?.url ? "Add your fit check above to begin your adventure." : uploading ? "Just saving your latest memories…" : pendingChanges ? "Retry or discard your unsaved photo changes above." : spriteReady ? "Your photos are ready. Next: create an explorable neighbourhood with your walking character." : spriteUrl ? "Your character image must load successfully before you set off. Check the preview above." : "Your character needs to be ready before you set off."}</p>{storageError && <p className="dq-error" role="alert">{storageError}</p>}</div><button type="button" className="dq-end-button" disabled={!canFinish} onClick={finishDay}>CREATE MY WORLD <span>→</span></button></section>
+    </div><footer className="dq-footer"><span>MADE OF THE LITTLE THINGS.</span><span>DAYQUEST / A PLACE OF YOUR OWN</span></footer>
   </main>;
 }

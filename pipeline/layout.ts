@@ -1,15 +1,11 @@
-import type { DayScene, TransitLeg } from "@/lib/day";
+import type { TransitLeg } from "@/lib/day";
 import type { DayInput } from "./types";
 
 /**
  * Tile positions per base map. A owns the maps; these are the §4.2 defaults and the
  * only place to change them. 20×15 tiles; spawn at the bottom so the first move is "up".
  */
-export const BASE_LAYOUT: Record<DayScene["base"], { spawn: { x: number; y: number }; exit: { x: number; y: number }; food?: { x: number; y: number } }> = {
-  city: { spawn: { x: 10, y: 13 }, exit: { x: 19, y: 7 } },
-  street: { spawn: { x: 10, y: 13 }, exit: { x: 19, y: 7 }, food: { x: 9, y: 8 } },
-  park: { spawn: { x: 10, y: 13 }, exit: { x: 19, y: 7 } },
-};
+export { BASE_LAYOUT } from "@/game/maps";
 
 /** §7 TfL line colours. */
 export const TFL_COLOURS: Record<string, string> = {

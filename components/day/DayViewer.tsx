@@ -10,7 +10,7 @@ function PlayerPreview({ url, name }: { url: string; name: string }) {
   const [failed, setFailed] = useState(false);
   return <div className={styles.player}>{failed ? <span>Character preview unavailable</span> :
     // The sprite is already pixel processed; preserve its exact pixels.
-    <img src={url} width={64} height={96} alt={`${name}'s back-facing character`} onError={() => setFailed(true)} />}</div>;
+    <img src={url} width={64} height={96} alt={name === "You" ? "Your character" : `${name}'s character`} onError={() => setFailed(true)} />}</div>;
 }
 
 export function DayViewer({ manifest, manifestUrl }: { manifest: DayManifest; manifestUrl: string }) {
@@ -35,15 +35,15 @@ export function DayViewer({ manifest, manifestUrl }: { manifest: DayManifest; ma
     <p className={styles.shareStatus} aria-live="polite">{shareState === "copied" ? "Day link copied to clipboard." : ""}</p>
     {shareState === "fallback" && <label className={styles.copyLabel}>Copy this day link<input readOnly value={shareUrl} onFocus={(event) => event.target.select()} aria-label="Day share link" /></label>}
     <section className={styles.intro}>
-      <div><p className={styles.kicker}>A LITTLE WINDOW INTO THEIR DAY</p><h1>{manifest.player.name}&apos;s day</h1><p className={styles.date}>{manifest.date} · LONDON</p></div>
+      <div><p className={styles.kicker}>A LITTLE WINDOW INTO THEIR DAY</p><h1>{manifest.player.name === "You" ? "Your day" : `${manifest.player.name}'s day`}</h1><p className={styles.date}>{manifest.date}</p></div>
       <PlayerPreview url={resolveDayAsset(manifest.player.sprite, manifestUrl)} name={manifest.player.name} />
     </section>
-    <GameMount manifest={manifest} manifestUrl={manifestUrl} />
+    <GameMount manifest={manifest} manifestUrl={manifestUrl} onShare={share} />
     <section className={styles.itinerary} aria-labelledby="itinerary-title">
-      <div className={styles.sectionHeading}><h2 id="itinerary-title">Today&apos;s places</h2><span>3 CHAPTERS</span></div>
-      <ol className={styles.scenes}>{manifest.scenes.map((scene, index) => <li key={scene.kind}>
+      <div className={styles.sectionHeading}><h2 id="itinerary-title">Today&apos;s places</h2><span>{manifest.scenes.length} {manifest.scenes.length === 1 ? "PLACE TO EXPLORE" : "CHAPTERS"}</span></div>
+      <ol className={styles.scenes}>{manifest.scenes.map((scene, index) => <li key={`${scene.kind}-${index}`}>
         <span className={styles.sceneNumber}>0{index + 1}</span><p className={styles.kicker}>{scene.time} · {scene.kind.toUpperCase()}</p><h3>{scene.title}</h3>
-        <p>{scene.landmarks.map((landmark) => landmark.name).join(" · ")}</p>
+        <p>{scene.world ? scene.world.objects.filter((object) => object.id.startsWith("building_")).map((object) => object.name).join(" · ") : scene.landmarks.map((landmark) => landmark.name).join(" · ")}</p>
       </li>)}</ol>
     </section>
     <footer className={styles.footer}><span>Every day becomes a place you can visit.</span><Link href="/">Create your day →</Link></footer>
