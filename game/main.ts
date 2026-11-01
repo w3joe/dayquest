@@ -1,4 +1,4 @@
-import { resolveDayAsset, type DayManifest, type TransitLeg } from "@/lib/day";
+import { resolveDayAsset, type DayManifest, type DayScene, type InteractEffect, type TransitLeg, type WorldObject } from "@/lib/day";
 import { worldCollision } from "./world-layout";
 import { BASE_MAPS, FRAMES, MAP_H, MAP_W, TILE, VIEW_H, VIEW_W, groundBlocked, hash, placeLandmark } from "./maps";
 
@@ -6,7 +6,8 @@ import { BASE_MAPS, FRAMES, MAP_H, MAP_W, TILE, VIEW_H, VIEW_W, groundBlocked, h
 export type GameHandle = { destroy: () => void };
 type Direction = "up" | "down" | "left" | "right";
 type Talk = { text: string; icon?: string };
-type Sprite = { image: HTMLImageElement; x: number; feet: number; width?: number; height?: number; shadow?: number; player?: boolean };
+type Sprite = { image: HTMLImageElement; x: number; feet: number; width?: number; height?: number; shadow?: number; player?: boolean; home?: number; roam?: number; phase?: number };
+type Effect = { kind: InteractEffect; x: number; y: number; at: number };
 const DIR: Record<Direction, [number, number]> = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const KEY: Record<string, Direction> = { ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right" };
 const PAPER = "#f6f1df", INK = "#1f1a2e";
@@ -53,13 +54,15 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
   let x = 0, y = 0, facing: Direction = "up", moving = false, elapsed = 0, chapterAt = 0;
   let dialogue: (Talk & { shown: number; remaining: string[] }) | undefined;
   let blocked = new Set<string>(), talks = new Map<string, Talk>(), sprites: Sprite[] = [];
+  let effects: Effect[] = [];
+  const lampsOn = new Set<string>(), spoken = new Map<string, number>();
   let transit: { leg: TransitLeg; change?: string; duration: number }[] = [], transitIndex = 0, transitAt = 0;
   let shareNote = "", destroyed = false;
   const keys = new Set<Direction>();
 
   function enterChapter() {
     const scene = manifest.scenes[index];
-    blocked = new Set(); talks = new Map(); sprites = []; dialogue = undefined;
+    blocked = new Set(); talks = new Map(); sprites = []; dialogue = undefined; effects = []; lampsOn.clear(); spoken.clear();
     viewWidth = scene.world ? 480 : VIEW_W; viewHeight = scene.world ? 320 : VIEW_H;
     canvas.width = viewWidth; canvas.height = viewHeight;
     resize();
@@ -67,7 +70,8 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     mode = "highlight"; chapterAt = elapsed;
     if (scene.world) {
       for (const object of scene.world.objects) {
-        sprites.push({ image: asset(object.sprite), x: object.x, feet: object.y, width: object.width, height: object.height, shadow: Math.min(80, object.width * .65) });
+        sprites.push({ image: asset(object.sprite), x: object.x, feet: object.y, width: object.width, height: object.height, shadow: Math.min(80, object.width * .65),
+          home: object.x, roam: object.role === "npc" ? object.roam ?? 0 : 0, phase: object.id.length * 1.7 });
       }
     } else {
     for (let row = 0; row < MAP_H; row++) for (let col = 0; col < MAP_W; col++) {
@@ -122,8 +126,23 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
       }
       const nearest = world.objects.filter(object => object.text && Math.hypot(object.x - x, object.y - y) < Math.max(34, object.width / 2 + 10) && (object.x - x) * dx + (object.y - y) * dy > -6)
         .sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0];
-      if (nearest?.text) startTalk({ text: nearest.text });
+      if (nearest) useObject(nearest);
     }
+  }
+  /** NPCs speak their lines in rotation; interactables run one of a small closed list of effects the renderer draws itself. */
+  function useObject(object: WorldObject) {
+    if (object.role === "npc") {
+      const lines = [object.text!, ...(object.lines ?? [])], turn = spoken.get(object.id) ?? 0;
+      spoken.set(object.id, turn + 1);
+      effects.push({ kind: "wave", x: object.x, y: object.y - object.height, at: elapsed });
+      startTalk({ text: `${object.name}: ${lines[turn % lines.length]}` });
+      return;
+    }
+    if (object.role === "interactable" && object.effect) {
+      if (object.effect === "toggle_lamp") { if (lampsOn.has(object.id)) lampsOn.delete(object.id); else lampsOn.add(object.id); }
+      else effects.push({ kind: object.effect, x: object.x, y: object.y - object.height * .55, at: elapsed });
+    }
+    if (object.text) startTalk({ text: object.text });
   }
   function startTalk(talk: Talk) {
     const isWorld = Boolean(manifest.scenes[index].world);
@@ -237,6 +256,32 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
       ctx.drawImage(walkSheet, frame * 32, row * 48, 32, 48, Math.round(px - 16), Math.round(py - 48), 32, 48);
     } else ctx.drawImage(playerImage, Math.round(px - 16), Math.round(py - 48), 32, 48);
   }
+  /** Small pixel flourishes. Lamps stay lit until used again; everything else lasts about a second and a half. */
+  function drawEffects(world: NonNullable<DayScene["world"]>) {
+    for (const object of world.objects) {
+      if (!lampsOn.has(object.id)) continue;
+      const glow = .30 + Math.sin(elapsed / 300) * .04, cx = object.x, cy = object.y - object.height + 8;
+      ctx.fillStyle = `rgba(255,214,120,${glow})`; ctx.beginPath(); ctx.arc(cx, cy, 34, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,238,170,.55)"; ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill();
+    }
+    effects = effects.filter(effect => elapsed - effect.at < 1500);
+    for (const effect of effects) {
+      const t = (elapsed - effect.at) / 1500, fade = 1 - t;
+      if (effect.kind === "ring" || effect.kind === "press_button") {
+        ctx.strokeStyle = effect.kind === "ring" ? `rgba(246,241,223,${fade})` : `rgba(255,236,120,${fade})`; ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(effect.x, effect.y, 6 + t * 30 + i * 8, 0, Math.PI * 2); ctx.stroke(); }
+      } else if (effect.kind === "shake_leaves") {
+        for (let i = 0; i < 16; i++) {
+          const fall = Math.min(1, t * 1.5 + (i % 5) * .05), px = effect.x + Math.sin(i * 2.3 + t * 6) * (12 + i), py = effect.y - 34 + fall * 52;
+          ctx.fillStyle = ["#d9822b", "#b5452f", "#e0b33a", "#8f9a3a"][i % 4]; ctx.globalAlpha = fade; ctx.fillRect(Math.round(px), Math.round(py), 3, 3);
+        }
+        ctx.globalAlpha = 1;
+      } else {
+        // sit, pet, feed, wave: hearts drifting up.
+        for (let i = 0; i < 3; i++) text("♥", effect.x - 10 + i * 10, effect.y - 6 - t * 28 - i * 5, 8, `rgba(224,92,120,${fade})`, "center");
+      }
+    }
+  }
   function drawWorld() {
     const scene = manifest.scenes[index], world = scene.world!;
     const cameraX = Math.round(Math.max(0, Math.min(world.width * TILE - viewWidth, x - viewWidth / 2)));
@@ -260,12 +305,14 @@ export async function createGame(parent: HTMLElement, manifest: DayManifest, man
     }
     for (const sprite of sprites) if (sprite.shadow) shadow(sprite.x, sprite.feet, sprite.shadow);
     shadow(x, y, 15);
+    for (const sprite of sprites) if (sprite.roam) sprite.x = Math.round((sprite.home ?? sprite.x) + Math.sin(elapsed / 1400 + (sprite.phase ?? 0)) * sprite.roam);
     const entities: Sprite[] = [...sprites, { image: playerImage, x, feet: y, player: true }];
     for (const sprite of entities.sort((a, b) => a.feet - b.feet)) {
       if (sprite.player) { drawPlayer(sprite.x, sprite.feet); continue; }
       const width = sprite.width ?? sprite.image.width, height = sprite.height ?? sprite.image.height;
       ctx.drawImage(sprite.image, Math.round(sprite.x - width / 2), Math.round(sprite.feet - height), width, height);
     }
+    drawEffects(world);
     const exitX = scene.exit.x * TILE + 8, exitY = scene.exit.y * TILE + 8;
     ctx.fillStyle = "#274c3b"; ctx.fillRect(exitX - 31, exitY - 27, 36, 18);
     text("FINISH →", exitX - 13, exitY - 22, 6, PAPER, "center");

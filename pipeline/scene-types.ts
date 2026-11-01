@@ -1,3 +1,5 @@
+import type { WorldDesign } from "./world-design";
+
 /** Photo-grounded inventory; scene geometry is constructed deterministically in code. */
 export type SceneBlueprint = {
   title: string;
@@ -9,6 +11,8 @@ export type SceneBlueprint = {
   props: { id: string; name: string; description: string; library?: string }[];
   food?: { name: string; description: string; text: string };
   source: "photo" | "fit-only";
+  /** NPCs and interactables chosen by the design step (agents or the hand-written fallback). */
+  design?: WorldDesign;
 };
 
 /** User-authored context only: do not pass the demo location history here. */

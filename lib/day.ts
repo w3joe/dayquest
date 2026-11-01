@@ -1,5 +1,10 @@
 export type Tile = { x: number; y: number };
 export type Landmark = { name: string; sprite: string; footprint: "S" | "M" | "L"; slot: number; text: string };
+/** Closed list: the game interprets these itself, so a generated day can never ship runnable code. */
+export const INTERACT_EFFECTS = ["ring", "press_button", "toggle_lamp", "sit", "shake_leaves", "pet", "feed", "wave"] as const;
+export type InteractEffect = (typeof INTERACT_EFFECTS)[number];
+export const MAX_NPC_LINES = 5;
+export const MAX_ROAM_PX = 24;
 export type WorldObject = {
   id: string;
   name: string;
@@ -12,6 +17,14 @@ export type WorldObject = {
   /** Absolute world-pixel rectangle, independent of the visible sprite bounds. */
   collision?: { x: number; y: number; width: number; height: number };
   text?: string;
+  /** A small character: `text` is its first line, `lines` the rest, spoken in rotation. */
+  role?: "npc" | "interactable";
+  /** Interactables only: what happens when the player uses them. */
+  effect?: InteractEffect;
+  /** NPCs only: extra lines after `text`. */
+  lines?: string[];
+  /** NPCs only: sideways wander radius in world pixels. */
+  roam?: number;
 };
 export type SceneWorld = {
   /** Ground dimensions in tiles; each string is one row of g/f/p/c/r/k/w tiles. */
@@ -89,6 +102,15 @@ function tile(value: unknown, width = 20, height = 15): value is Tile {
 function integer(value: unknown, min: number, max: number): value is number {
   return Number.isInteger(value) && (value as number) >= min && (value as number) <= max;
 }
+/** NPC / interactable fields: closed effect list, bounded dialogue, and text required where the player reads something. */
+function validActor(item: Record<string, unknown>): boolean {
+  if (item.role === undefined) return item.effect === undefined && item.lines === undefined && item.roam === undefined;
+  if (item.role !== "npc" && item.role !== "interactable") return false;
+  if (!text(item.text)) return false;
+  if (item.role === "interactable") return item.lines === undefined && item.roam === undefined && (INTERACT_EFFECTS as readonly string[]).includes(String(item.effect));
+  return item.effect === undefined && (item.roam === undefined || integer(item.roam, 0, MAX_ROAM_PX)) &&
+    (item.lines === undefined || (Array.isArray(item.lines) && item.lines.length <= MAX_NPC_LINES && item.lines.every(text)));
+}
 function validWorld(value: unknown): value is SceneWorld {
   if (!object(value) || !integer(value.width, 20, 128) || !integer(value.height, 15, 128) ||
     !Array.isArray(value.ground) || value.ground.length !== value.height ||
@@ -101,7 +123,7 @@ function validWorld(value: unknown): value is SceneWorld {
       !text(item.name) || !asset(item.sprite) || !integer(item.x, 0, width) || !integer(item.y, 0, height) ||
       !integer(item.width, 1, width) || !integer(item.height, 1, height) ||
       item.x - item.width / 2 < 0 || item.x + item.width / 2 > width || item.y - item.height < 0 ||
-      (item.text !== undefined && !text(item.text))) return false;
+      (item.text !== undefined && !text(item.text)) || !validActor(item)) return false;
     ids.add(item.id);
     if (item.collision !== undefined) {
       const box = item.collision;

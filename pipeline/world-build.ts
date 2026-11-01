@@ -5,6 +5,7 @@ import { buildSceneAssetJobs, generateSceneAsset } from "./scene-assets";
 import type { ImageGenerator } from "./imagegen";
 import type { DayStore } from "./publish";
 import type { SceneBlueprint, ScenePlanInput } from "./scene-types";
+import { resolveDesign, type Designer } from "./world-design";
 import type { GenerateEvent, UploadKind } from "./types";
 
 export type WorldCheckpoint = {
@@ -23,6 +24,8 @@ export type WorldBuildDependencies = {
   plan(input: ScenePlanInput): Promise<SceneBlueprint>;
   images: ImageGenerator;
   store: DayStore;
+  /** Optional agent that proposes NPCs and interactables; the hand-written fallback is used when absent or rejected. */
+  designer?: Designer;
   styleReferences?: Buffer[];
 };
 
@@ -57,8 +60,10 @@ export async function advanceWorldBuild(input: WorldBuildInput, checkpoint: Worl
   checkpoint: WorldCheckpoint; event: GenerateEvent; total: number; manifest?: DayManifest;
 }> {
   if (!checkpoint.blueprint) {
-    const blueprint = await deps.plan({ landmark: input.uploads.landmark, lunch: input.uploads.lunch,
+    const planned = await deps.plan({ landmark: input.uploads.landmark, lunch: input.uploads.lunch,
       context: { name: input.name, date: input.date } });
+    const { design } = await resolveDesign(planned, deps.designer);
+    const blueprint = { ...planned, design };
     const jobs = buildSceneAssetJobs(blueprint, input);
     return { checkpoint: { ...checkpoint, blueprint }, total: jobs.length,
       event: { step: "landmarks", label: `Scene planned: ${blueprint.title}. ${jobs.length} sprites to create.` } };

@@ -57,6 +57,15 @@ export function buildSceneAssetJobs(blueprint: SceneBlueprint, sources: SceneAss
       process: (raw) => processSprite(raw, 32, 48),
     });
   }
+  // Designed characters and interactables come from the committed library; only ones it lacks are generated for this day.
+  for (const actor of [...(blueprint.design?.interactables ?? []), ...(blueprint.design?.npcs ?? [])].filter((candidate) => !candidate.library)) {
+    jobs.push({
+      id: `actor_${actor.id}`, file: `actor_${actor.id}.png`, kind: "landmark", name: actor.name,
+      prompt: `${ISOLATED_OBJECT} A small friendly game sprite for a cosy walkable neighbourhood: ${actor.description}. Three-quarter top-down view, clear outline, warm colours, a single character or object only.`,
+      references: styles,
+      process: (raw) => processSprite(raw, 32, 48),
+    });
+  }
   if (blueprint.food) {
     jobs.push({
       id: "food", file: "food.png", kind: "food", name: blueprint.food.name,
