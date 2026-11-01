@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { RequestError } from "@/lib/server/errors";
 import { parseDayManifest, type DayManifest, type DayScene } from "@/lib/day";
 import { planWithLLM, templatePlan } from "./highlights";
 import { foodPrompt, landmarkPrompt, mapLimit, mockImageGenerator, openAIImageGenerator, playerPrompt, type ImageGenerator, type ImageRequest } from "./imagegen";
@@ -29,6 +30,9 @@ export type PipelineOptions = {
  *   PIPELINE_IMAGES=live  real gpt-image calls + Wikipedia references
  */
 export function modeFromEnv(): Pick<PipelineOptions, "livePlan" | "images" | "references"> {
+  if ((process.env.PIPELINE_IMAGES === "live" || process.env.PIPELINE_TEXT === "live") && !process.env.OPENAI_API_KEY) {
+    throw new RequestError("Live world generation needs OPENAI_API_KEY. Configure the server, or explicitly use mock pipeline modes for placeholder artwork.", 503);
+  }
   const liveImages = process.env.PIPELINE_IMAGES === "live" && Boolean(process.env.OPENAI_API_KEY);
   return {
     livePlan: process.env.PIPELINE_TEXT === "live" && Boolean(process.env.OPENAI_API_KEY),
@@ -48,6 +52,7 @@ type Job = ImageRequest & { file: string; targets: { file: string; target: Pixel
 /** Runs §3 steps 1–6, emitting §6.1 events. Resolves with the validated, published manifest. */
 export async function runGenerateDay(opts: PipelineOptions, emit: (event: GenerateEvent) => void): Promise<DayManifest> {
   const { id, input, store, images, uploads = {} } = opts;
+  if (!images.live) emit({ step: "highlights", label: "DEMO ART MODE · USING PLACEHOLDER WORLD ARTWORK" });
 
   // 1–2. Highlights + landmarks
   let plan: DayPlan;
@@ -102,7 +107,7 @@ export async function runGenerateDay(opts: PipelineOptions, emit: (event: Genera
     }
     emit({ step: "image", label: `PAINTING ${job.kind === "player" ? "YOUR CHARACTER" : upper(job.name)}…${note}`, thumb });
   });
-  if (opts.player) await store.put("player.png", await pixelate(opts.player, "player"), "image/png");
+  if (opts.player) await store.put("player.png", opts.player, "image/png");
   emit({ step: "pixelate", label: `PIXELATING… ${jobs.length} SPRITES ✓` });
 
   // 6. Manifest

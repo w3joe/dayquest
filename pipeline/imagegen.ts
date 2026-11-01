@@ -1,8 +1,9 @@
 import OpenAI, { toFile } from "openai";
 import sharp from "sharp";
+import { ISOLATED_OBJECT } from "@/lib/art-style";
 
 /** Identical on every call; this is what keeps scenes consistent (§5.3). */
-export const STYLE_PREFIX = "Game Boy Advance era pixel art, 3/4 top-down view, clean dark outlines, limited bright palette, soft top-left lighting, single isolated object centred on a fully transparent background, no ground, no text, no UI.";
+export const STYLE_PREFIX = ISOLATED_OBJECT;
 
 const SIZE_WORDS = { S: "small", M: "medium", L: "large" } as const;
 
