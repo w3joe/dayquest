@@ -2,7 +2,7 @@ import * as Phaser from "phaser";
 import { Direction, type GridEngine } from "grid-engine";
 import type { Subscription } from "rxjs";
 import type { DayManifest } from "@/lib/day";
-import { BASE_MAPS, FRAMES, MAP_H, MAP_W, TILE, VIEW_W, groundBlocked, placeLandmark, tileAt } from "../maps";
+import { BASE_MAPS, FRAMES, MAP_H, MAP_W, TILE, VIEW_W, groundBlocked, hash, placeLandmark, tileAt } from "../maps";
 import { FONT, TextBox } from "../ui/TextBox";
 import { foodKey, landmarkKey } from "./BootScene";
 
@@ -46,7 +46,7 @@ export class HighlightScene extends Phaser.Scene {
       const row: number[] = [];
       for (let x = 0; x < MAP_W; x++) {
         const c = tileAt(scene.base, x, y);
-        row.push(c === "_" ? -1 : c === "w" ? FRAMES.water : c === "p" ? FRAMES.path : FRAMES.grass);
+        row.push(c === "_" ? -1 : c === "w" ? FRAMES.water : c === "p" ? (scene.base === "street" ? FRAMES.cobble : FRAMES.path) : hash(x, y) % 9 === 0 ? FRAMES.flowers : FRAMES.grass);
         if (groundBlocked(scene.base, x, y)) blocked.add(`${x},${y}`);
       }
       data.push(row);
@@ -56,8 +56,8 @@ export class HighlightScene extends Phaser.Scene {
 
     for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
       if (tileAt(scene.base, x, y) === "t") {
-        this.add.image(x * TILE, y * TILE, "puny", FRAMES.grass).setOrigin(0).setDepth(-5);
-        this.add.image(x * TILE + 8, (y + 1) * TILE, "puny", FRAMES.tree).setOrigin(0.5, 1).setDepth((y + 1) * TILE);
+        this.add.image(x * TILE, y * TILE, "tiles", FRAMES.grass).setOrigin(0).setDepth(-5);
+        this.add.image(x * TILE + 8, (y + 1) * TILE, "tree").setOrigin(0.5, 1).setDepth((y + 1) * TILE);
       }
     }
 
@@ -83,13 +83,13 @@ export class HighlightScene extends Phaser.Scene {
     }
 
     const map = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
-    const tileset = map.addTilesetImage("puny", "puny", TILE, TILE, 0, 0)!;
+    const tileset = map.addTilesetImage("tiles", "tiles", TILE, TILE, 0, 0)!;
     const layer = map.createLayer(0, tileset, 0, 0)!.setDepth(-8);
     layer.forEachTile((tile) => {
       tile.properties = blocked.has(`${tile.x},${tile.y}`) ? { ge_collide: true } : {};
     });
 
-    this.carrier = this.add.sprite(0, 0, "puny", FRAMES.grass).setVisible(false);
+    this.carrier = this.add.sprite(0, 0, "tiles", FRAMES.grass).setVisible(false);
     this.gridEngine.create(map, {
       characters: [{ id: "player", sprite: this.carrier, startPosition: scene.spawn, speed: 4, facingDirection: Direction.UP }],
     });

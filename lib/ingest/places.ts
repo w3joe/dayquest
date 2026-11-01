@@ -2,6 +2,8 @@ import { fetchJson } from "./http";
 import { haversineM } from "./time";
 import type { HighlightKind, Lookups, NearbyLandmark, PlaceInfo, Stop, TransportLeg } from "./types";
 
+let overpassFailures = 0;
+let overpassDownUntil = 0;
 const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
 
 type Tags = Record<string, string>;
@@ -16,7 +18,9 @@ export function classifyTags(t: Tags): PlaceInfo["kind"] {
 function pick(elements: { tags?: Tags; lat?: number; lon?: number; center?: { lat: number; lon: number } }[], lat: number, lng: number): PlaceInfo | undefined {
   const ranked = elements.filter((e) => e.tags?.name).map((e) => {
     const c = e.center ?? { lat: e.lat ?? lat, lon: e.lon ?? lng };
-    return { tags: e.tags!, d: haversineM({ lat, lng }, { lat: c.lat, lng: c.lon }), kind: classifyTags(e.tags!) };
+    const kind = classifyTags(e.tags!);
+    // Areas returned by is_in contain the point, so a park you are standing in is distance 0 however large it is.
+    return { tags: e.tags!, d: kind === "park" && e.center === undefined && e.lat === undefined ? 0 : haversineM({ lat, lng }, { lat: c.lat, lng: c.lon }), kind };
   }).filter((e) => e.kind !== "other").sort((a, b) => a.d - b.d);
   const best = ranked[0];
   return best && { name: best.tags.name, kind: best.kind, detail: best.tags.cuisine?.replace(/;/g, ", ").replace(/_/g, " ") };
@@ -24,15 +28,21 @@ function pick(elements: { tags?: Tags; lat?: number; lon?: number; center?: { la
 
 /** OSM place at a point: Overpass (two mirrors, with backoff) first, then Nominatim reverse as a fallback. */
 async function osmPlace(lat: number, lng: number): Promise<PlaceInfo | undefined> {
-  const q = `[out:json][timeout:15];(nwr(around:70,${lat},${lng})["amenity"~"restaurant|cafe|fast_food|food_court|pub|bar|ice_cream|place_of_worship"]["name"];nwr(around:150,${lat},${lng})["leisure"~"park|garden|nature_reserve|common"]["name"];nwr(around:120,${lat},${lng})["tourism"~"attraction|museum|gallery|viewpoint|zoo"]["name"];nwr(around:120,${lat},${lng})["historic"]["name"];);out center 40;`;
+  const q = `[out:json][timeout:15];(nwr(around:70,${lat},${lng})["amenity"~"restaurant|cafe|fast_food|food_court|pub|bar|ice_cream|place_of_worship"]["name"];is_in(${lat},${lng})->.a;area.a["leisure"~"park|garden|nature_reserve|common"]["name"];nwr(around:120,${lat},${lng})["tourism"~"attraction|museum|gallery|viewpoint|zoo"]["name"];nwr(around:120,${lat},${lng})["historic"]["name"];);out center 40;`;
+  if (Date.now() < overpassDownUntil) return nominatimPlace(lat, lng);
   for (const endpoint of OVERPASS) {
     try {
-      const data = await fetchJson<{ elements: Parameters<typeof pick>[0] }>(endpoint, { method: "POST", body: new URLSearchParams({ data: q }), headers: { "content-type": "application/x-www-form-urlencoded" }, retries: 1, timeoutMs: 20000 });
-      const found = pick(data.elements, lat, lng);
-      if (found) return found;
-      return undefined;
+      const data = await fetchJson<{ elements: Parameters<typeof pick>[0] }>(endpoint, { method: "POST", body: new URLSearchParams({ data: q }), headers: { "content-type": "application/x-www-form-urlencoded" }, retries: 0, timeoutMs: 12000 });
+      overpassFailures = 0;
+      return pick(data.elements, lat, lng);
     } catch { /* try the next mirror */ }
   }
+  // Both mirrors failed: stop hammering a struggling public service for a minute.
+  if (++overpassFailures >= 2) overpassDownUntil = Date.now() + 60_000;
+  return nominatimPlace(lat, lng);
+}
+
+async function nominatimPlace(lat: number, lng: number): Promise<PlaceInfo | undefined> {
   try {
     const r = await fetchJson<{ name?: string; category?: string; type?: string; extratags?: Tags }>(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&zoom=18&format=jsonv2&extratags=1`);
     const kind = classifyTags({ [r.category ?? ""]: r.type ?? "", ...(r.extratags ?? {}) });

@@ -6,7 +6,7 @@ import { FONT } from "../ui/TextBox";
 export const landmarkKey = (scene: number, slot: number) => `s${scene}_l${slot}`;
 export const foodKey = (scene: number) => `s${scene}_food`;
 
-/** Loads the day's art (relative to day.json), the Puny World atlas and the static transit art. */
+/** Loads the day's art (relative to day.json), the generated tile atlas and the static transit art. */
 export class BootScene extends Phaser.Scene {
   constructor() {
     super("Boot");
@@ -22,7 +22,8 @@ export class BootScene extends Phaser.Scene {
     });
     this.load.on("loaderror", (file: Phaser.Loader.File) => text.setText(`MISSING ${file.key}`));
 
-    this.load.spritesheet("puny", "/tiles/punyworld-overworld.png", { frameWidth: TILE, frameHeight: TILE });
+    this.load.spritesheet("tiles", "/tiles/dq-atlas.png", { frameWidth: TILE, frameHeight: TILE });
+    this.load.image("tree", "/tiles/dq/tree.png");
     this.load.image("player", resolveDayAsset(manifest.player.sprite, manifestUrl));
     manifest.scenes.forEach((scene, i) => {
       if (scene.skyline) this.load.image(`s${i}_skyline`, resolveDayAsset(scene.skyline, manifestUrl));

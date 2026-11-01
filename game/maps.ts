@@ -6,9 +6,11 @@ export const MAP_H = 15;
 export const VIEW_W = MAP_W * TILE;
 export const VIEW_H = MAP_H * TILE;
 
-/** Frame indices into public/tiles/punyworld-overworld.png (27 columns of 16 px). */
-export const FRAMES = { grass: 0, path: 38, water: 280, tree: 197 } as const;
-export const ATLAS_COLUMNS = 27;
+/** Frame indices into public/tiles/dq-atlas.png (one row of generated 16 px tiles, see scripts/build-atlas.mjs). */
+export const FRAMES = { grass: 0, flowers: 1, path: 2, cobble: 3, water: 4, hedge: 5 } as const;
+
+/** Deterministic scatter so flower tiles do not change between visits. */
+export const hash = (x: number, y: number) => ((x * 73856093) ^ (y * 19349663)) >>> 0;
 
 /**
  * Ground legend: `.` grass, `p` path, `w` water, `t` tree (blocks), `_` sky (not drawn, blocks).

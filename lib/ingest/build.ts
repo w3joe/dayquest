@@ -39,8 +39,9 @@ export async function assemble(src: { timeline: ParsedTimeline; health: HealthWo
   if (!visits.length) throw new Error(`No visits of at least ${MIN_VISIT_MIN} minutes on ${date}.`);
   type Internal = Stop & { startIso: string };
   const stops: Internal[] = [];
+  const placeFor = new Map(await Promise.all(visits.map(async (v) => [v, v.name ? undefined : await lookups.place(v.lat, v.lng)] as const)));
   for (const v of visits) {
-    const label = v.name ?? (await lookups.place(v.lat, v.lng))?.name ?? (await lookups.label(v.lat, v.lng)) ?? `Stop at ${localParts(v.start, tz).time}`;
+    const label = v.name ?? placeFor.get(v)?.name ?? (await lookups.label(v.lat, v.lng)) ?? `Stop at ${localParts(v.start, tz).time}`;
     stops.push({ t: localParts(v.start, tz).time, lat: v.lat, lng: v.lng, label, dwellMin: minutesBetween(v.start, v.end), source: "timeline", startIso: v.start });
   }
 
