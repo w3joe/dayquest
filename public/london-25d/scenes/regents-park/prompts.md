@@ -14,7 +14,7 @@ Tile ending:
 
 > This is a single seamless repeating ground texture tile viewed straight down (orthographic, no perspective), filling the entire square image edge to edge, designed on a 16x16 grid of big pixels so it tiles seamlessly on all four sides. No border, no objects, no text. Square 1024x1024.
 
-## Calls (13)
+## Calls (15)
 
 ### tile_gravel (2026-11-01 14-46-23)
 
@@ -92,6 +92,18 @@ Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. 
 
 ```text
 Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. A park fountain, front view from slightly above: a low round pale stone basin full of blue water; in the middle a rock carrying a dark green-black weathered bronze statue group: a bearded sea god with a scaly fish tail, kneeling and blowing a long spiral conch shell pointed at the sky, a thin jet of white water rising from the conch; two smaller bronze sea nymphs in long flowing robes with fish tails sitting on the rock at his feet. Square 1024x1024. Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.
+```
+
+### bank_stones (2026-11-01 15-44-46)
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. A short irregular row of rounded grey and sandy lakeside stones and pebbles with tufts of grass between them, seen from slightly above. Wide landscape 1536x1024. Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.
+```
+
+### reeds (2026-11-01 15-44-47)
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. A clump of tall green lakeside reeds and bulrushes with brown seed heads, a few flat stones at the base. Square 1024x1024. Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.
 ```
 
 ## Notes

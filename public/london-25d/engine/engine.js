@@ -167,10 +167,11 @@
       // a hazy row of city rooftops standing on the line y, across the whole map
       // depth: a hazy far skyline (only roofs and spires show) behind a continuous terrace that meets the ground at y
       skyline(y, o = {}) {
-        const far = img.skyline_far || img.skyline, row = img.terrace_strip;
-        const roof = row ? y - row.height + 24 : y;
+        // setback: the terrace stands on its own pavement this far behind the frontage line, so it reads as the next street
+        const far = img.skyline_far || img.skyline, row = img.terrace_strip, by = y - (o.setback ?? 0);
+        const roof = row ? by - row.height + 24 : by;
         w.backdrops.push({ im: far, x: 0, y: roof + 40 - far.height, p: o.parallax ?? 0.3, invented: !!o.invented, repeatX: true });
-        if (row) w.backdrops.push({ im: row, x: 0, y: y - row.height, p: 0, invented: !!o.invented, repeatX: true, ground: true });
+        if (row) w.backdrops.push({ im: row, x: 0, y: by - row.height, p: 0, invented: !!o.invented, repeatX: true, ground: true });
       },
     };
     def.build(api);
@@ -300,6 +301,8 @@
     bannerEl.hidden = false;
     bannerTimer = 90;
     exitCooldown = 30;
+    // remember what this scene looks like for the clip preview (once the banner has gone)
+    if (def.order != null) setTimeout(() => { if (world && world.def === def && mode === "play") snapshots[def.order - 1] = canvas.toDataURL(); }, 1700);
     const url = new URL(location.href);
     url.searchParams.set("scene", def.id);
     history.replaceState(null, "", url);
@@ -372,6 +375,32 @@
   invBtn.addEventListener("click", (ev) => { ev.stopPropagation(); toggleInvented(); invBtn.blur(); });
   document.getElementById("btn-menu").addEventListener("click", (ev) => { ev.stopPropagation(); showPicker(); ev.target.blur(); });
   document.getElementById("end-again").addEventListener("click", () => enter(chain()[0]));
+
+  // ---------- mock "share as video clip": a short render bar, then a looping preview of the day ----------
+  const snapshots = []; // one canvas snapshot per scene, taken shortly after entering it
+  const clipEl = document.getElementById("clip"), toastEl = document.getElementById("toast");
+  let clipTimer = 0;
+  function toast(text) { toastEl.textContent = text; toastEl.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (toastEl.hidden = true), 1400); }
+  document.getElementById("end-clip").addEventListener("click", () => {
+    const render = document.getElementById("clip-render"), ready = document.getElementById("clip-ready"), bar = document.getElementById("clip-bar");
+    clipEl.hidden = false; render.hidden = false; ready.hidden = true; bar.style.width = "0";
+    const t0 = performance.now();
+    const tick = () => {
+      const p = Math.min(1, (performance.now() - t0) / 2000);
+      bar.style.width = `${p * 100}%`;
+      if (p < 1) return requestAnimationFrame(tick);
+      render.hidden = true; ready.hidden = false;
+      const shots = snapshots.filter(Boolean), frames = shots.length ? shots : [canvas.toDataURL()];
+      let i = 0;
+      const img = document.getElementById("clip-frame");
+      img.src = frames[0];
+      clearInterval(clipTimer);
+      clipTimer = setInterval(() => { i = (i + 1) % frames.length; img.src = frames[i]; }, 900);
+    };
+    requestAnimationFrame(tick);
+  });
+  for (const b of clipEl.querySelectorAll("[data-toast]")) b.addEventListener("click", () => toast(b.dataset.toast));
+  document.getElementById("clip-close").addEventListener("click", () => { clipEl.hidden = true; clearInterval(clipTimer); });
   document.getElementById("end-menu").addEventListener("click", showPicker);
 
   // ---------- transit between scenes ----------

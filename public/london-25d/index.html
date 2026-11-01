@@ -36,9 +36,23 @@
   <div class="card">
     <h1>That was the day</h1>
     <p class="sub">Westminster &middot; Kanada-Ya &middot; Regent's Park</p>
+    <div class="row"><button id="end-clip" type="button">&#9654; Share as video clip</button></div>
     <div class="row"><button id="end-again" type="button">Play again</button><button id="end-menu" type="button">Scenes</button></div>
   </div>
 </div>
+
+<div id="clip" hidden>
+  <div class="card">
+    <div id="clip-render"><p>Rendering your day&hellip;</p><div class="bar"><span id="clip-bar"></span></div></div>
+    <div id="clip-ready" hidden>
+      <img id="clip-frame" alt="Clip preview">
+      <p class="clip-name">lucas-day.mp4 &middot; 0:30</p>
+      <div class="row"><button type="button" data-toast="Copied!">Copy link</button><button type="button" data-toast="Saved!">Save</button><button type="button" data-toast="Shared!">Post</button></div>
+      <button type="button" id="clip-close" class="link">Close</button>
+    </div>
+  </div>
+</div>
+<div id="toast" hidden></div>
 
 <div id="touch" hidden>
   <div id="dpad">

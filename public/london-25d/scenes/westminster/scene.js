@@ -54,7 +54,7 @@
       caption: "Parliament Square → Tottenham Court Road · via Whitehall & Trafalgar Square", color: "#d8342c", frames: 260 }],
 
     ground(c, r) {
-      if (r < ROW_TOP) return null;
+      if (r < ROW_TOP - 2) return null;   // back pavement behind the Square
       const bridge = { tile: "tile_bridge", ox: BRIDGE_C };
       if (r >= ROW_FAR_EDGE && r <= ROW_NEAR_EDGE) {
         if (onBridge(c)) return bridge;
@@ -96,7 +96,7 @@
       // ---- skyline: the Shard is really behind the viewer here (it's east, in Southwark); the spec puts it on the skyline
       w.backdrop("shard", 850, ROW_TOP * T - img.shard.height + 6, { parallax: 0.3, invented: true });
       // city rooftops beyond the far bank, so the landmarks stand in front of a street, not bare sky (generic, invented)
-      w.skyline(ROW_TOP * T + 4, { parallax: 0.12, invented: true });
+      w.skyline(ROW_TOP * T + 4, { parallax: 0.12, invented: true, setback: 2 * T });
 
       // ---- river walls: the water half of each edge tile is not walkable
       w.block(0, farEdgeY + 19, BX0, T - 19);

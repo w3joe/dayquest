@@ -48,7 +48,7 @@
     ],
 
     ground(c, r) {
-      if (r < ROW_BASE) return null;
+      if (r < ROW_BASE - 2) return null;   // two rows of back pavement behind the frontages
       if (r === ROW_KERB_TOP) return "tile_kerb";
       if (r > ROW_KERB_TOP && r < ROW_KERB_BOTTOM) return "tile_asphalt";
       if (r === ROW_KERB_BOTTOM) return { tile: "tile_kerb", flipY: true };
@@ -57,7 +57,7 @@
 
     build(w) {
       // rooftops of the streets behind the south-side frontages (generic, invented)
-      w.skyline(BASE + 4, { parallax: 0.12, invented: true });
+      w.skyline(BASE + 4, { parallax: 0.12, invented: true, setback: 2 * T });
       const { img, W } = w;
       const front = (name, x, o = {}) => w.add(name, x, BASE, { depth: 30, shadow: "base", foot: [0, img[name].width], ...o });
 

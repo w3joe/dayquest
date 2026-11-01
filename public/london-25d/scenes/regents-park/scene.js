@@ -43,10 +43,10 @@
     sky: "#2a9d5c",
     spawn: { x: (WALK_C0 + 2) * T, y: FENCE_R * T - 80, dir: "up" }, // just inside the gates
     own: ["jubilee_gates", "triton", "bandstand", "swan", "rowing_boat", "willow", "deckchair", "noticeboard",
-      "tile_lake_edge", "tile_lake_edge_v", "tile_lake_corner", "tile_water", "tile_gravel", "tile_roses"],
+      "tile_lake_edge", "tile_lake_edge_v", "tile_lake_corner", "tile_water", "tile_gravel", "tile_roses", "reeds", "bank_stones"],
     assets: ["tile_grass", "tile_paving", "tile_gravel", "tile_roses", "tile_water", "tile_lake_edge", "tile_lake_edge_v", "tile_lake_corner",
       "jubilee_gates", "triton", "bandstand", "swan", "rowing_boat", "willow", "deckchair", "noticeboard",
-      "tree", "hedge", "bench", "lamp", "bin_grey", "npc_tourist", "npc_commuter", "npc_jogger", "npc_parent", "npc_elder", "npc_dogwalker", "npc_student", "npc_busker"],
+      "tree", "hedge", "bench", "lamp", "bin_grey", "npc_tourist", "npc_commuter", "npc_jogger", "npc_parent", "npc_elder", "npc_dogwalker", "npc_student", "npc_busker", "reeds", "bank_stones"],
 
     ground(c, r) {
       if (c < LAKE_C && r < LAKE_R) return { tile: "tile_water", solid: true };
@@ -157,6 +157,16 @@
       w.talk(nb.x + nb.w / 2, nb.y, TEXT.stats);
       w.add("bin_grey", 33 * T + 6, PATH_R0 * T - 4, { invented: true });
       w.exit(W - 28, PATH_R0 * T, 28, 2 * T, { label: "HOME" });
+
+      // soften the lake's straight banks with reeds and stones along both edges (invented detail)
+      for (let r = 1; r < LAKE_R; r += 2) {
+        const name = r % 4 === 1 ? "reeds" : "bank_stones";
+        w.add(name, LAKE_C * T + 8 - img[name].width / 2, (r + 1) * T - 2, { solid: false, shadow: "none", invented: true });
+      }
+      for (let c = 0; c < LAKE_C; c += 2) {
+        const name = c % 4 === 0 ? "bank_stones" : "reeds";
+        w.add(name, c * T + 4, LAKE_R * T + 14, { solid: false, shadow: "none", invented: true });
+      }
 
       // park visitors (generic people, invented): a jogger lapping the walk, dog walkers and a slow stroll
       const py = PATH_R0 * T + 22;
