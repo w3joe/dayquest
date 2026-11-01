@@ -12,8 +12,10 @@
   "dependencies": {
     "@vercel/blob": "^2.8.2",
     "exifr": "^7.1.3",
+    "grid-engine": "^2.53.0",
     "next": "^16.4.3",
     "openai": "^7.47.0",
+    "phaser": "~4.0.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "sharp": "^0.35.5"

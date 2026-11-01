@@ -1,0 +1,55 @@
+{
+  "id": "demo",
+  "date": "2026-11-07",
+  "player": { "name": "LUCAS", "sprite": "player.png" },
+  "scenes": [
+    {
+      "kind": "tourist",
+      "title": "Touring Westminster",
+      "time": "10:00",
+      "base": "city",
+      "skyline": "skyline.png",
+      "spawn": { "x": 10, "y": 13 },
+      "exit": { "x": 19, "y": 11 },
+      "landmarks": [
+        { "name": "Elizabeth Tower and Houses of Parliament", "sprite": "s0_l0.png", "footprint": "L", "slot": 0, "text": "Walked past Big Ben and the Houses of Parliament. Took a photo of the tower from Westminster Bridge." },
+        { "name": "London Eye", "sprite": "s0_l1.png", "footprint": "L", "slot": 1, "text": "Rode the London Eye. Clear view all the way across the city." },
+        { "name": "Red phone box", "sprite": "s0_l2.png", "footprint": "S", "slot": 2, "text": "Stopped at a red phone box on the way to the bus stop." }
+      ]
+    },
+    {
+      "kind": "meal",
+      "title": "Ramen lunch",
+      "time": "12:40",
+      "base": "street",
+      "spawn": { "x": 10, "y": 13 },
+      "exit": { "x": 19, "y": 11 },
+      "landmarks": [
+        { "name": "Kanada-Ya", "sprite": "s1_l0.png", "footprint": "M", "slot": 0, "text": "Lunch at Kanada-Ya on St Giles High Street." },
+        { "name": "Centre Point", "sprite": "s1_l1.png", "footprint": "L", "slot": 1, "text": "Centre Point towers over the corner of the street." },
+        { "name": "Side shop", "sprite": "s1_l2.png", "footprint": "S", "slot": 2, "text": "A small shop with a noren curtain next to the ramen place." }
+      ],
+      "food": { "sprite": "s1_food.png", "tile": { "x": 4, "y": 8 }, "text": "Had tonkotsu ramen and gyoza at Kanada-Ya." }
+    },
+    {
+      "kind": "park",
+      "title": "Walk in Regent's Park",
+      "time": "14:15",
+      "base": "park",
+      "spawn": { "x": 10, "y": 13 },
+      "exit": { "x": 19, "y": 11 },
+      "landmarks": [
+        { "name": "Queen Mary's Rose Garden gates", "sprite": "s2_l0.png", "footprint": "M", "slot": 0, "text": "Walked through the gates into Queen Mary's Gardens. 3.8 km, 75 min, 5,200 steps." },
+        { "name": "Triton Fountain", "sprite": "s2_l1.png", "footprint": "M", "slot": 1, "text": "Sat by the Triton Fountain for a while." },
+        { "name": "Boating lake and bandstand", "sprite": "s2_l2.png", "footprint": "L", "slot": 2, "text": "Finished at the boating lake, past the swans and the bandstand." }
+      ]
+    }
+  ],
+  "transit": [
+    { "legs": [{ "mode": "bus", "route": "24", "destination": "Hampstead Heath", "from": "Parliament Square", "to": "Tottenham Court Road" }] },
+    { "legs": [
+      { "mode": "tube", "line": "Central", "color": "#E32017", "stations": ["Tottenham Court Road", "Oxford Circus"] },
+      { "mode": "tube", "line": "Bakerloo", "color": "#B36305", "stations": ["Oxford Circus", "Regent's Park"] }
+    ] }
+  ]
+}
