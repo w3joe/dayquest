@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>DayQuest London 2.5D</title>
+<link rel="stylesheet" href="engine/style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <button id="btn-menu" type="button">Scenes</button>
+  <button id="toggle-invented" type="button" aria-pressed="false">Invented: off</button>
+</div>
+<div id="legend" hidden><span class="swatch"></span>Blue outline = invented (not in the reference photos)</div>
+<div id="banner" hidden></div>
+
+<div id="dialogue" hidden>
+  <img id="dialogue-icon" alt="" hidden>
+  <p id="dialogue-text"></p>
+  <span id="dialogue-next">&#9660;</span>
+</div>
+
+<div id="title" hidden>
+  <div class="card">
+    <h1>A Saturday in London</h1>
+    <p class="sub">three places, one day, all pixels</p>
+    <div id="scene-list"></div>
+    <p class="keys">Move: arrows / WASD &middot; Run: Shift &middot; Talk: Space / Enter &middot; Invented: I &middot; Scenes: Esc</p>
+  </div>
+</div>
+
+<div id="transit" hidden></div>
+<div id="end" hidden>
+  <div class="card">
+    <h1>That was the day</h1>
+    <p class="sub">Westminster &middot; Kanada-Ya &middot; Regent's Park</p>
+    <div class="row"><button id="end-again" type="button">Play again</button><button id="end-menu" type="button">Scenes</button></div>
+  </div>
+</div>
+
+<div id="touch" hidden>
+  <div id="dpad">
+    <button data-key="up" class="up" aria-label="Up">&#9650;</button>
+    <button data-key="left" class="left" aria-label="Left">&#9664;</button>
+    <button data-key="right" class="right" aria-label="Right">&#9654;</button>
+    <button data-key="down" class="down" aria-label="Down">&#9660;</button>
+  </div>
+  <button id="btn-a" data-key="a" aria-label="A">A</button>
+</div>
+
+<script src="engine/engine.js"></script>
+<script src="scenes/westminster/scene.js"></script>
+<script src="scenes/kanada-ya/scene.js"></script>
+<script src="scenes/regents-park/scene.js"></script>
+<script src="scenes/shadwell/scene.js"></script>
+</body>
+</html>

@@ -7,6 +7,7 @@ import { DRAFT_STORAGE_KEY, isReadyDraft, parseStoredDraft, type UploadKind } fr
 import { discardPhotoUpload, startPhotoUpload, type Photo } from "../../lib/photo-upload";
 import SpritePreview, { type SpriteVerification } from "./SpritePreview";
 import { browserId } from "../../lib/browser-id";
+import { DEMO_FIT_DELAY_MS, DEMO_MODE, DEMO_PHOTOS, DEMO_SPRITE_URL } from "../../lib/demo";
 
 type Kind = Extract<UploadKind, "fit" | "lunch" | "landmark">;
 const quests: { kind: Kind; name: string; hint: string; icon: string }[] = [
@@ -122,7 +123,24 @@ export default function Today() {
   function update(kind: Kind, value: Partial<Photo>) {
     if (mounted.current) setPhotos(current => ({ ...current, [kind]: { ...current[kind], ...value } }));
   }
+  // Demo: the fit check is a scripted pause that returns the prebuilt walking character.
+  function makeDemoSprite() {
+    setSpriteBusy(true); setSpriteError(""); setSpriteUrl(undefined);
+    const attempt = ++generation.current;
+    setTimeout(() => {
+      if (!mounted.current || attempt !== generation.current) return;
+      setSpriteUrl(DEMO_SPRITE_URL); setSpriteBusy(false);
+    }, DEMO_FIT_DELAY_MS);
+  }
+  function fillDemoDay() {
+    const matching = { fit: "Photo time · 09:40", lunch: "Photo time · 12:52 · Kanada-Ya", landmark: "Photo time · 10:41 · Westminster" };
+    setPhotos(Object.fromEntries(quests.map(q => [q.kind, { url: DEMO_PHOTOS[q.kind], preview: DEMO_PHOTOS[q.kind], matching: matching[q.kind] }])));
+    for (const q of quests) uploadedUrls.current[q.kind] = DEMO_PHOTOS[q.kind];
+    if (health === "idle") { setHealth("syncing"); healthTimer.current = setTimeout(() => setHealth("done"), 1500); }
+    makeDemoSprite();
+  }
   async function makeSprite() {
+    if (DEMO_MODE) { makeDemoSprite(); return; }
     if (!mounted.current || pendingFits.current.size || pendingFiles.current.fit || generationRunning.current || !uploadedUrls.current.fit) return;
     generationRequested.current = false;
     generationRunning.current = true;
@@ -163,6 +181,14 @@ export default function Today() {
     if (!file || !sessionId) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { update(kind, { error: "Choose a JPEG, PNG, or WebP photo." }); return; }
     if (file.size > 4 * 1024 * 1024) { update(kind, { error: "Choose an image smaller than 4 MB." }); return; }
+    if (DEMO_MODE) {
+      // Demo: the photo stays in this browser; only a pixel preview is shown.
+      const [thumbnail, matching] = await Promise.all([preview(file), matchPhoto(file)]);
+      uploadedUrls.current[kind] = thumbnail;
+      update(kind, { url: thumbnail, preview: thumbnail, matching, busy: false, error: undefined });
+      if (kind === "fit") makeDemoSprite();
+      return;
+    }
     const isFit = kind === "fit";
     const attempt = (operations.current[kind] ?? 0) + 1; operations.current[kind] = attempt;
     uploadControllers.current[kind]?.abort();
@@ -222,6 +248,7 @@ export default function Today() {
   const canFinish = !!photos.fit?.url && spriteReady && !pendingChanges && !uploading && !spriteBusy && !storageError;
   function finishDay() {
     if (!canFinish || Object.keys(pendingFiles.current).length || generationRunning.current) return;
+    if (DEMO_MODE) { router.push("/generating"); return; }
     const draft = {
       sessionId,
       uploads: Object.entries(uploadedUrls.current).map(([kind, url]) => ({ kind, url })),
@@ -242,6 +269,7 @@ export default function Today() {
     <div className="dq-hero"><div><p className="dq-eyebrow">YOUR PHOTOS / YOUR LITTLE WORLD</p><h1>Ordinary day.<br/><span>Extraordinary little world.</span></h1><p className="dq-intro">The places you went. The things you ate. The outfit you wore.<br className="dq-desktop-break"/> Gather today’s little moments, and give someone a place to visit.</p></div><div className="dq-date-card"><span>{(today?.toLocaleDateString("en-GB", { weekday: "long" }) ?? "Today").toUpperCase()}</span><strong>{today ? String(today.getDate()).padStart(2, "0") : "—"}</strong><span>{(today?.toLocaleDateString("en-GB", { month: "long", year: "numeric" }) ?? "Your day").toUpperCase()}</span><div>✦ SAVE THE LITTLE THINGS</div></div></div>
     <div className="dq-content"><LocationSync/>
     <section className="dq-panel" aria-labelledby="photos-title"><div className="dq-section-heading"><div><span className="dq-eyebrow">02 / THE LITTLE MOMENTS</span><h2 id="photos-title">What did today look like?</h2></div><span className="dq-counter">{uploaded} / {quests.length} COLLECTED</span></div><p className="dq-section-copy">Start with your fit. Add a place and your lunch. We’ll build the buildings, little details, and a walking character for your world.</p>
+      {DEMO_MODE && <p><button type="button" className="dq-small-button" onClick={fillDemoDay} disabled={spriteBusy}>✦ USE THE DEMO DAY</button> <span className="dq-footnote">Fills Shawn’s fit, lunch and Westminster photos. Nothing is uploaded.</span></p>}
       <div className="dq-photo-grid">{quests.map(quest => { const photo = photos[quest.kind]; return <div className={`dq-photo-card ${photo?.url ? "is-uploaded" : ""} ${quest.kind === "fit" ? "dq-photo-required" : ""}`} key={quest.kind}>
         <label className="dq-upload-zone" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void upload(quest.kind, event.dataTransfer.files[0]); }}>
           <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" aria-label={`Upload ${quest.name}`} disabled={!sessionId} onChange={event => { void upload(quest.kind, event.target.files?.[0]); event.target.value = ""; }}/>

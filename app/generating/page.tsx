@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { GenerateEvent } from "@/pipeline/types";
 import type { WorldJob } from "@/lib/world-job";
 import { DRAFT_STORAGE_KEY, isReadyDraft, parseStoredDraft } from "@/lib/draft";
+import { DEMO_DAY, DEMO_EVENTS, DEMO_MODE } from "@/lib/demo";
 import styles from "./generating.module.css";
 
 type Status = "running" | "done" | "error" | "no-draft";
@@ -25,6 +26,23 @@ export default function GeneratingPage() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const controller = new AbortController();
     setError(""); setStatus("running");
+    if (DEMO_MODE) {
+      // Demo: replay a fixed log over the prebuilt sprites; nothing is generated or fetched.
+      const sprites = DEMO_EVENTS.filter((e) => e.thumb).length;
+      let i = 0, saved = 0;
+      setEvents([]); setProgress({ completed: 0, total: sprites });
+      const next = () => {
+        if (cancelled) return;
+        const { delay, ...event } = DEMO_EVENTS[i++];
+        if (event.thumb) saved++;
+        setEvents((current) => [...current, event]);
+        setProgress({ completed: saved, total: sprites });
+        if (i < DEMO_EVENTS.length) timer = setTimeout(next, delay);
+        else { setStatus("done"); timer = setTimeout(() => !cancelled && router.push(`/day/${DEMO_DAY.id}`), 1100); }
+      };
+      timer = setTimeout(next, 300);
+      return () => { cancelled = true; if (timer) clearTimeout(timer); };
+    }
     async function poll(retry: boolean) {
       const draft = parseStoredDraft(sessionStorage.getItem(DRAFT_STORAGE_KEY));
       if (!isReadyDraft(draft)) { setStatus("no-draft"); return; }

@@ -1,0 +1,520 @@
+// DayQuest 2.5D engine — vanilla canvas, y-sorted sprites, footprint collisions.
+// Scenes register themselves with DQ.scene({...}); see README.md for the scene API.
+(() => {
+  "use strict";
+
+  const T = 32;
+  const BASE_W = 480;
+  const BASE_H = 320;
+  const FW = 32, FH = 48;
+  const DIR_ROW = { down: 0, left: 1, right: 2, up: 3 };
+  const HIT = { w: 14, h: 6 };
+  const SHARED = ["shawn", "bus", "tube_train", "nelson"];
+
+  const scenes = [];
+  const DQ = (window.DQ = { T, scenes, scene: (def) => scenes.push(def) });
+
+  // ---------- assets ----------
+  const cache = {};
+  function assetPath(scene, name) {
+    if (scene && (scene.own || []).includes(name)) return `scenes/${scene.dir || scene.id}/assets/${name}.png`;
+    return `shared/assets/${name}.png`;
+  }
+  function load(path) {
+    if (cache[path]) return cache[path];
+    const src = (window.ASSET_DATA && window.ASSET_DATA[path]) || path;
+    const once = (url) => new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = url;
+    });
+    // one retry: a busy dev server occasionally drops a request
+    cache[path] = once(src).catch(() => once(src + (src.startsWith("data:") ? "" : "?retry")))
+      .catch(() => { throw new Error("missing asset " + path); });
+    return cache[path];
+  }
+
+  // recolour the red doors/front of the tube train for another line
+  function tint(im, hex) {
+    const c = document.createElement("canvas");
+    c.width = im.width; c.height = im.height;
+    const g = c.getContext("2d");
+    g.drawImage(im, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height);
+    const tr = parseInt(hex.slice(1, 3), 16), tg = parseInt(hex.slice(3, 5), 16), tb = parseInt(hex.slice(5, 7), 16);
+    for (let i = 0; i < d.data.length; i += 4) {
+      const r = d.data[i], gg = d.data[i + 1], b = d.data[i + 2];
+      if (d.data[i + 3] && r > 120 && r > gg * 1.8 && r > b * 1.8) {
+        const k = r / 220;
+        d.data[i] = Math.min(255, tr * k); d.data[i + 1] = Math.min(255, tg * k); d.data[i + 2] = Math.min(255, tb * k);
+      }
+    }
+    g.putImageData(d, 0, 0);
+    return c;
+  }
+
+  // ---------- canvas ----------
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  let viewW = BASE_W, viewH = BASE_H, scale = 1;
+  function resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    scale = Math.max(1, Math.floor(Math.min(w / BASE_W, h / BASE_H)));
+    viewW = Math.ceil(w / scale);
+    viewH = Math.ceil(h / scale);
+    if (world) { viewW = Math.min(world.W, viewW); viewH = Math.min(world.H, viewH); }
+    canvas.width = viewW;
+    canvas.height = viewH;
+    canvas.style.width = viewW * scale + "px";
+    canvas.style.height = viewH * scale + "px";
+    ctx.imageSmoothingEnabled = false;
+  }
+  window.addEventListener("resize", resize);
+
+  // ---------- world ----------
+  let world = null; // the running scene instance
+  const player = { x: 0, y: 0, dir: "up", anim: 0, still: 0, moving: false };
+
+  async function buildScene(def) {
+    const names = new Set([...SHARED, ...(def.assets || [])]);
+    const img = {};
+    await Promise.all([...names].map(async (n) => (img[n] = await load(assetPath(def, n)))));
+    const w = {
+      def, img, W: def.cols * T, H: def.rows * T,
+      entities: [], talk: [], blocks: [], invented: [], exits: [], movers: [], backdrops: [],
+      solid: new Uint8Array(def.cols * def.rows),
+    };
+    // builder API handed to scene.build()
+    const api = {
+      T, img, W: w.W, H: w.H,
+      // add a sprite; (x, baseY) = left edge and the ground line it stands on
+      add(name, x, baseY, o = {}) {
+        const im = img[name];
+        if (!im) throw new Error(`${def.id}: asset ${name} not listed in assets`);
+        const e = { name, im, x: Math.round(x), y: Math.round(baseY), w: im.width, h: im.height,
+          invented: !!o.invented, shadow: o.shadow ?? "ellipse", flip: !!o.flip, z: o.z ?? 0 };
+        const depth = o.depth ?? Math.min(12, Math.round(im.height * 0.3));
+        const [fx, fw] = o.foot ?? [Math.round(im.width * 0.1), Math.round(im.width * 0.8)];
+        e.box = o.solid === false ? null : { x: e.x + fx, y: e.y - depth, w: fw, h: depth };
+        if (o.talk) w.talk.push({ x: e.x + e.w / 2, y: e.y, text: o.talk, icon: o.icon });
+        w.entities.push(e);
+        return e;
+      },
+      // a point of interest: stand near (x, y) facing it and press A
+      talk(x, y, text, o = {}) { w.talk.push({ x, y, text, icon: o.icon }); },
+      block(x, y, bw, bh) { w.blocks.push({ x, y, w: bw, h: bh }); },
+      invented(x, y, iw, ih) { w.invented.push({ x, y, w: iw, h: ih }); },
+      // stepping into this rect leaves the scene
+      exit(x, y, ew, eh, o = {}) { w.exits.push({ x, y, w: ew, h: eh, label: o.label || "EXIT" }); },
+      // stepping into this rect switches straight to another scene (e.g. a shop interior), no transit
+      door(x, y, dw, dh, o) { w.exits.push({ x, y, w: dw, h: dh, label: o.label || "", door: { to: o.to, at: o.at } }); },
+      // something that moves on its own: update(m, frame) changes m.x / m.y / m.flip
+      mover(name, o) {
+        const m = { name, im: img[name], x: o.x, y: o.y, flip: !!o.flip, invented: !!o.invented,
+          update: o.update, shadow: o.shadow ?? "none", z: o.z ?? 0, visible: true };
+        w.movers.push(m);
+        return m;
+      },
+      // drawn behind everything, before the ground; parallax 0 = fixed to the world, 1 = fixed to the screen
+      backdrop(name, x, y, o = {}) { w.backdrops.push({ im: img[name], x, y, p: o.parallax ?? 0.3, invented: !!o.invented }); },
+    };
+    def.build(api);
+    // ground
+    const g = document.createElement("canvas");
+    g.width = w.W; g.height = w.H;
+    const gc = g.getContext("2d");
+    gc.imageSmoothingEnabled = false;
+    for (let r = 0; r < def.rows; r++) {
+      for (let c = 0; c < def.cols; c++) {
+        let t = def.ground(c, r);
+        if (!t) continue;
+        if (typeof t === "string") t = { tile: t };
+        if (t.solid) w.solid[r * def.cols + c] = 1;
+        const im = img[t.tile];
+        if (!im) throw new Error(`${def.id}: tile ${t.tile} not listed in assets`);
+        const x = c * T, y = r * T;
+        gc.save();
+        if (t.flipY) { gc.translate(x, y + T); gc.scale(1, -1); } else gc.translate(x, y);
+        // textures bigger than a tile cover several cells; draw the matching part
+        const nx = im.width / T, ny = im.height / T;
+        const sx = (((c - (t.ox || 0)) % nx) + nx) % nx, sy = (((r - (t.oy || 0)) % ny) + ny) % ny;
+        gc.drawImage(im, sx * T, (t.flipY ? ny - 1 - sy : sy) * T, T, T, 0, 0, T, T);
+        gc.restore();
+      }
+    }
+    w.ground = g;
+    w.train = { tube: tint(img.tube_train, "#B36305") };
+    return w;
+  }
+
+  function collides(px, py) {
+    const l = px - HIT.w / 2, r = px + HIT.w / 2, t = py - HIT.h, b = py;
+    const top = world.def.walkTop ?? 0;
+    if (l < 4 || r > world.W - 4 || t < top || b > world.H - 4) return true;
+    const c0 = Math.floor(l / T), c1 = Math.floor((r - 1) / T), r0 = Math.floor(t / T), r1 = Math.floor((b - 1) / T);
+    for (let rr = r0; rr <= r1; rr++) for (let cc = c0; cc <= c1; cc++) if (world.solid[rr * world.def.cols + cc]) return true;
+    const hit = (k) => k && r > k.x && l < k.x + k.w && b > k.y && t < k.y + k.h;
+    for (const e of world.entities) if (hit(e.box)) return true;
+    for (const k of world.blocks) if (hit(k)) return true;
+    return false;
+  }
+
+  // ---------- input ----------
+  const keys = new Set();
+  const KEYMAP = {
+    ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down",
+    ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right",
+    ShiftLeft: "run", ShiftRight: "run", Space: "a", Enter: "a", KeyZ: "a",
+  };
+  window.addEventListener("keydown", (ev) => {
+    if (ev.code === "KeyI") { toggleInvented(); return; }
+    if (ev.code === "Escape") { showPicker(); return; }
+    const k = KEYMAP[ev.code];
+    if (!k) return;
+    ev.preventDefault();
+    if (k === "a" && !ev.repeat) pressA();
+    keys.add(k);
+  });
+  window.addEventListener("keyup", (ev) => { const k = KEYMAP[ev.code]; if (k) keys.delete(k); });
+  window.addEventListener("blur", () => keys.clear());
+
+  const touchEl = document.getElementById("touch");
+  if ("ontouchstart" in window || navigator.maxTouchPoints > 0) touchEl.hidden = false;
+  for (const b of touchEl.querySelectorAll("button")) {
+    const k = b.dataset.key;
+    const on = (ev) => { ev.preventDefault(); b.classList.add("on"); if (k === "a") pressA(); else keys.add(k); };
+    const off = (ev) => { ev.preventDefault(); b.classList.remove("on"); keys.delete(k); };
+    b.addEventListener("pointerdown", on);
+    b.addEventListener("pointerup", off);
+    b.addEventListener("pointercancel", off);
+    b.addEventListener("pointerleave", off);
+  }
+
+  // ---------- UI: picker, banner, dialogue, overlay ----------
+  const pickerEl = document.getElementById("title");
+  const pickerList = document.getElementById("scene-list");
+  const bannerEl = document.getElementById("banner");
+  const dlg = document.getElementById("dialogue");
+  const dlgText = document.getElementById("dialogue-text");
+  const dlgIcon = document.getElementById("dialogue-icon");
+  const dlgNext = document.getElementById("dialogue-next");
+  const invBtn = document.getElementById("toggle-invented");
+  const legend = document.getElementById("legend");
+  const transitEl = document.getElementById("transit");
+  const endEl = document.getElementById("end");
+  let mode = "picker"; // picker | play | transit | end
+  let dialogue = null;
+  let showInvented = false;
+  let bannerTimer = 0;
+  let exitCooldown = 0; // frames after entering a scene before exits/doors fire again
+
+  function chain() { return scenes.filter((s) => s.order != null).sort((a, b) => a.order - b.order); }
+
+  function renderPicker() {
+    pickerList.innerHTML = "";
+    const play = document.createElement("button");
+    play.className = "primary";
+    play.textContent = "▶ Play the day";
+    play.onclick = () => enter(chain()[0]);
+    pickerList.append(play);
+    for (const s of [...chain(), ...scenes.filter((x) => x.order == null && !x.hidden)]) {
+      const b = document.createElement("button");
+      b.innerHTML = `<span>${s.time || "Bonus"}</span>${s.title}`;
+      b.onclick = () => enter(s);
+      pickerList.append(b);
+    }
+  }
+  function showPicker() {
+    mode = "picker";
+    dialogue = null; dlg.hidden = true; transitEl.hidden = true; endEl.hidden = true;
+    pickerEl.hidden = false;
+    pickerList.querySelector("button")?.focus();
+  }
+
+  async function enter(def, at) {
+    pickerEl.hidden = true; endEl.hidden = true;
+    world = await buildScene(def);
+    const sp = at || def.spawn;
+    player.x = sp.x; player.y = sp.y; player.dir = sp.dir || "up"; player.still = 0;
+    resize();
+    mode = "play";
+    bannerEl.textContent = def.card || def.title;
+    bannerEl.hidden = false;
+    bannerTimer = 90;
+    exitCooldown = 30;
+    const url = new URL(location.href);
+    url.searchParams.set("scene", def.id);
+    history.replaceState(null, "", url);
+  }
+
+  function nearbyTalk() {
+    const ahead = { up: [0, -14], down: [0, 14], left: [-14, -4], right: [14, -4] }[player.dir];
+    const fx = player.x + ahead[0], fy = player.y + ahead[1];
+    let best = null, bestD = 30;
+    for (const s of world.talk) {
+      const d = Math.hypot(s.x - fx, (s.y - fy) * 1.4);
+      if (d < bestD) { best = s; bestD = d; }
+    }
+    return best;
+  }
+
+  function pressA() {
+    if (mode === "transit") { transit.skip = true; return; }
+    if (mode !== "play") return;
+    if (dialogue) {
+      if (dialogue.shown < dialogue.text.length) dialogue.shown = dialogue.text.length;
+      else { dialogue = null; dlg.hidden = true; }
+      return;
+    }
+    const s = nearbyTalk();
+    if (s) {
+      // keep numbers with their units on one line ("96 m", "3.8 km")
+      dialogue = { text: s.text.replace(/(\d) (?=(m|km|ft|kg|tonnes?|minutes?|min|steps|%)\b)/g, "$1\u00a0"), shown: 0 };
+      dlgIcon.hidden = !s.icon;
+      if (s.icon) dlgIcon.src = world.img[s.icon].src;
+      dlg.hidden = false;
+      player.still = 0;
+    }
+  }
+
+  function toggleInvented() {
+    showInvented = !showInvented;
+    invBtn.setAttribute("aria-pressed", String(showInvented));
+    invBtn.textContent = "Invented: " + (showInvented ? "on" : "off");
+    legend.hidden = !showInvented;
+  }
+  invBtn.addEventListener("click", (ev) => { ev.stopPropagation(); toggleInvented(); invBtn.blur(); });
+  document.getElementById("btn-menu").addEventListener("click", (ev) => { ev.stopPropagation(); showPicker(); ev.target.blur(); });
+  document.getElementById("end-again").addEventListener("click", () => enter(chain()[0]));
+  document.getElementById("end-menu").addEventListener("click", showPicker);
+
+  // ---------- transit between scenes ----------
+  let transit = null;
+  function startTransit(def) {
+    const order = chain();
+    const i = order.indexOf(def);
+    const next = order[i + 1];
+    if (!next) { mode = "end"; bannerEl.hidden = true; endEl.hidden = false; return; }
+    mode = "transit";
+    bannerEl.hidden = true; bannerTimer = 0;
+    transit = { legs: def.transit || [], leg: 0, t: 0, next, skip: false };
+    transitEl.hidden = false;
+  }
+  function updateTransit() {
+    const tr = transit;
+    const leg = tr.legs[tr.leg];
+    tr.t++;
+    if (!leg || tr.t > (leg.frames || 240) || tr.skip) {
+      tr.leg++; tr.t = 0; tr.skip = false;
+      if (tr.leg >= tr.legs.length) { transitEl.hidden = true; enter(tr.next); }
+    }
+  }
+  function drawTransit() {
+    const tr = transit, leg = tr.legs[tr.leg];
+    if (!leg) return;
+    const w = viewW, h = viewH;
+    const p = Math.min(1, tr.t / (leg.frames || 240));
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    if (leg.mode === "bus") {
+      ctx.fillStyle = "#9fd3ff"; ctx.fillRect(0, 0, w, h);
+      // Nelson's Column slides past behind the bus
+      const n = world.img.nelson;
+      ctx.drawImage(n, Math.round(w * 0.9 - p * (w * 0.9 + n.width)), Math.round(h * 0.62 - n.height));
+      ctx.fillStyle = "#c9b38a"; ctx.fillRect(0, Math.round(h * 0.62), w, 8);
+      ctx.fillStyle = "#454c5c"; ctx.fillRect(0, Math.round(h * 0.62) + 8, w, h);
+      ctx.fillStyle = "#f2c94c";
+      for (let x = -((tr.t * 3) % 40); x < w; x += 40) ctx.fillRect(x, Math.round(h * 0.74), 20, 2);
+      const b = world.img.bus, bx = Math.round(w / 2 - b.width / 2), by = Math.round(h * 0.72 - b.height + (tr.t % 20 < 10 ? 0 : 1));
+      ctx.drawImage(b, bx, by);
+      // destination blind
+      ctx.fillStyle = "#111"; ctx.fillRect(bx + b.width - 62, by + 6, 52, 9);
+      ctx.fillStyle = "#ffd23f"; ctx.font = "bold 7px monospace";
+      ctx.fillText(`${leg.route} ${leg.destination}`.toUpperCase().slice(0, 14), bx + b.width - 60, by + 13);
+    } else {
+      ctx.fillStyle = "#2a2430"; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = "#3a3340";
+      for (let x = -((tr.t * 6) % 64); x < w; x += 64) ctx.fillRect(x, Math.round(h * 0.3), 30, Math.round(h * 0.3));
+      const im = leg.line === "Bakerloo" ? world.train.tube : world.img.tube_train;
+      const tx = Math.round(-im.width + p * (w + im.width * 2) * 0.75);
+      ctx.drawImage(im, tx, Math.round(h * 0.62 - im.height));
+      ctx.drawImage(im, tx - im.width + 2, Math.round(h * 0.62 - im.height));
+      ctx.fillStyle = "#5b5148"; ctx.fillRect(0, Math.round(h * 0.62), w, h);
+    }
+    // caption
+    ctx.fillStyle = "rgba(251,247,236,.95)";
+    ctx.fillRect(8, 8, w - 16, 34);
+    ctx.fillStyle = leg.color || "#d8342c";
+    ctx.fillRect(8, 8, 6, 34);
+    ctx.fillStyle = "#221c28";
+    ctx.font = "bold 10px monospace";
+    ctx.fillText(leg.title || "", 20, 22);
+    ctx.font = "9px monospace";
+    ctx.fillText(leg.caption || "", 20, 35);
+  }
+
+  // ---------- update ----------
+  let frameNo = 0;
+  function update() {
+    frameNo++;
+    if (mode === "transit") { updateTransit(); return; }
+    if (mode !== "play") return;
+    if (bannerTimer > 0 && --bannerTimer === 0) bannerEl.hidden = true;
+    if (exitCooldown > 0) exitCooldown--;
+    if (dialogue) {
+      dialogue.shown = Math.min(dialogue.text.length, dialogue.shown + 1.5);
+      dlgText.textContent = dialogue.text.slice(0, Math.floor(dialogue.shown));
+      dlgNext.style.visibility = dialogue.shown >= dialogue.text.length ? "visible" : "hidden";
+    }
+    for (const m of world.movers) m.update && m.update(m, frameNo);
+
+    let dx = 0, dy = 0;
+    if (!dialogue) {
+      if (keys.has("left")) dx -= 1;
+      if (keys.has("right")) dx += 1;
+      if (keys.has("up")) dy -= 1;
+      if (keys.has("down")) dy += 1;
+    }
+    player.moving = dx !== 0 || dy !== 0;
+    if (player.moving) {
+      if (dx !== 0 && dy === 0) player.dir = dx < 0 ? "left" : "right";
+      else if (dy !== 0 && dx === 0) player.dir = dy < 0 ? "up" : "down";
+      else if (!((dx < 0 && player.dir === "left") || (dx > 0 && player.dir === "right") || (dy < 0 && player.dir === "up") || (dy > 0 && player.dir === "down"))) {
+        player.dir = dy < 0 ? "up" : "down";
+      }
+      const run = keys.has("run");
+      const sp = (run ? 2.6 : 1.4) / (dx && dy ? Math.SQRT2 : 1);
+      const nx = player.x + dx * sp, ny = player.y + dy * sp;
+      if (!collides(nx, player.y)) player.x = nx;
+      if (!collides(player.x, ny)) player.y = ny;
+      player.anim += run ? 0.2 : 0.12;
+      player.still = 0;
+      if (exitCooldown <= 0) for (const e of world.exits) {
+        if (player.x > e.x && player.x < e.x + e.w && player.y > e.y && player.y < e.y + e.h) {
+          keys.clear();
+          if (e.door) enter(scenes.find((s) => s.id === e.door.to), e.door.at);
+          else startTransit(world.def);
+          return;
+        }
+      }
+    } else {
+      player.anim = 0;
+      player.still++;
+    }
+  }
+
+  // ---------- draw ----------
+  const cam = { x: 0, y: 0 };
+  function drawShadow(cx, by, w) {
+    ctx.fillStyle = "rgba(20, 16, 40, 0.24)";
+    ctx.beginPath();
+    ctx.ellipse(Math.round(cx + 2), Math.round(by - 1), Math.max(4, w / 2), Math.max(2, w / 6), 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  function drawSprite(im, x, y, flip) {
+    if (!flip) { ctx.drawImage(im, x, y); return; }
+    ctx.save(); ctx.translate(x + im.width, y); ctx.scale(-1, 1); ctx.drawImage(im, 0, 0); ctx.restore();
+  }
+
+  function draw() {
+    if (mode === "transit") { drawTransit(); return; }
+    if (!world) return;
+    const d = world.def;
+    cam.x = Math.round(Math.max(0, Math.min(world.W - viewW, player.x - viewW / 2)));
+    cam.y = Math.round(Math.max(0, Math.min(world.H - viewH, player.y - 24 - viewH / 2)));
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = d.sky || "#14121a";
+    ctx.fillRect(0, 0, viewW, viewH);
+    for (const b of world.backdrops) ctx.drawImage(b.im, Math.round(b.x - cam.x * (1 - b.p)), Math.round(b.y - cam.y));
+    ctx.drawImage(world.ground, cam.x, cam.y, viewW, viewH, 0, 0, viewW, viewH);
+    ctx.translate(-cam.x, -cam.y);
+
+    for (const e of world.entities) {
+      if (e.shadow === "ellipse") drawShadow(e.x + e.w / 2, e.y, e.w * 0.8);
+      else if (e.shadow === "base") { ctx.fillStyle = "rgba(20, 16, 40, 0.22)"; ctx.fillRect(e.x + 3, e.y - 2, e.w, 7); }
+    }
+    for (const m of world.movers) if (m.visible && m.shadow === "ellipse") drawShadow(m.x + m.im.width / 2, m.y, m.im.width * 0.8);
+    drawShadow(player.x, player.y, 18);
+
+    const list = [];
+    for (const e of world.entities) list.push({ y: e.y + e.z, e });
+    for (const m of world.movers) if (m.visible) list.push({ y: m.y + m.z, m });
+    list.push({ y: player.y, player: true });
+    list.sort((a, b) => a.y - b.y);
+    for (const it of list) {
+      if (it.player) drawPlayer();
+      else if (it.m) drawSprite(it.m.im, Math.round(it.m.x), Math.round(it.m.y - it.m.im.height), it.m.flip);
+      else drawSprite(it.e.im, it.e.x, it.e.y - it.e.h, it.e.flip);
+    }
+
+    if (showInvented) drawInvented();
+
+    // exit markers
+    for (const e of world.exits) {
+      if (!e.label) continue;
+      const bob = Math.floor(frameNo / 20) % 2;
+      ctx.fillStyle = "#221c28";
+      ctx.font = "bold 9px monospace";
+      const tw = ctx.measureText(e.label).width;
+      const bx = Math.round(e.x + e.w / 2 - tw / 2 - 4), by = Math.round(e.y - 14 - bob);
+      ctx.fillRect(bx - 1, by - 1, tw + 10, 13);
+      ctx.fillStyle = "#ffd23f"; ctx.fillRect(bx, by, tw + 8, 11);
+      ctx.fillStyle = "#221c28"; ctx.fillText(e.label, bx + 4, by + 9);
+    }
+
+    const s = !dialogue && nearbyTalk();
+    if (s) {
+      const bx = Math.round(player.x) - 6, by = Math.round(player.y) - FH - 8;
+      ctx.fillStyle = "#221c28"; ctx.fillRect(bx - 1, by - 1, 14, 12);
+      ctx.fillStyle = "#fbf7ec"; ctx.fillRect(bx, by, 12, 10);
+      ctx.fillStyle = "#d8342c"; ctx.font = "bold 9px monospace"; ctx.fillText("A", bx + 3, by + 8);
+    }
+  }
+
+  function drawPlayer() {
+    let col, row;
+    if (!player.moving && player.still > 120 && !dialogue) { row = 4; col = 0; }
+    else { row = DIR_ROW[player.dir]; col = player.moving ? [1, 0, 1, 2][Math.floor(player.anim) % 4] : 1; }
+    ctx.drawImage(world.img.shawn, col * FW, row * FH, FW, FH, Math.round(player.x - FW / 2), Math.round(player.y - FH + 1), FW, FH);
+  }
+
+  function drawInvented() {
+    ctx.strokeStyle = "#2f7cff";
+    ctx.lineWidth = 1;
+    ctx.fillStyle = "rgba(47, 124, 255, 0.10)";
+    for (const r of world.invented) { ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1); }
+    for (const e of world.entities) if (e.invented) ctx.strokeRect(e.x + 0.5, e.y - e.h + 0.5, e.w - 1, e.h - 1);
+    for (const m of world.movers) if (m.invented && m.visible) ctx.strokeRect(Math.round(m.x) + 0.5, Math.round(m.y - m.im.height) + 0.5, m.im.width - 1, m.im.height - 1);
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    for (const b of world.backdrops) if (b.invented) ctx.strokeRect(Math.round(b.x - cam.x * (1 - b.p)) + 0.5, Math.round(b.y - cam.y) + 0.5, b.im.width - 1, b.im.height - 1);
+    ctx.restore();
+  }
+
+  function frame() { update(); draw(); requestAnimationFrame(frame); }
+
+  // ---------- boot ----------
+  window.addEventListener("load", async () => {
+    renderPicker();
+    resize();
+    const q = new URLSearchParams(location.search);
+    const want = scenes.find((s) => s.id === q.get("scene"));
+    if (q.has("invented")) toggleInvented();
+    if (want && q.has("autostart")) {
+      const at = q.has("x") ? { x: +q.get("x"), y: +q.get("y"), dir: q.get("dir") || "up" } : null;
+      await enter(want, at);
+      // scripted test walk: ?walk=up:60,right:30,a  (direction:frames, "a" = press A, "wait:n" = idle)
+      for (const stepSpec of (q.get("walk") || "").split(",").filter(Boolean)) {
+        const [k, n] = stepSpec.split(":");
+        if (k === "a") { pressA(); for (let i = 0; i < 200; i++) update(); continue; }
+        if (k !== "wait") keys.add(k);
+        for (let i = 0; i < (+n || 1); i++) update();
+        keys.delete(k);
+      }
+    } else showPicker();
+    // test hook: step(n) advances the loop by hand (rAF is paused in hidden tabs)
+    DQ.test = { player, keys, pressA, toggleInvented, enter, get world() { return world; }, get mode() { return mode; },
+      step(n = 1) { for (let i = 0; i < n; i++) update(); draw(); } };
+    requestAnimationFrame(frame);
+  });
+})();
