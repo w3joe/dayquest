@@ -1,3 +1,4 @@
+import { blockArtContext, buildWorldKit, type WorldBlock } from "../lib/world-kit";
 import { ISOLATED_OBJECT } from "../lib/art-style";
 import type { ImageGenerator, ImageRequest } from "./imagegen";
 import { pixelateSceneSprite, pixelateWalkSheet } from "./pixelate";
@@ -9,6 +10,7 @@ import { RequestError } from "../lib/server/errors";
 export type SceneAssetJob = ImageRequest & {
   id: string;
   file: string;
+  block?: WorldBlock;
   process(raw: Buffer): Promise<Buffer>;
 };
 
@@ -84,7 +86,12 @@ export function buildSceneAssetJobs(blueprint: SceneBlueprint, sources: SceneAss
     references: [sources.player, ...(sources.uploads.fit ? [sources.uploads.fit] : [])],
     process: processWalk,
   });
-  return jobs;
+  const kit = blueprint.kit ?? buildWorldKit(blueprint);
+  return jobs.map(job => {
+    const block = kit.blocks.find(candidate => candidate.id === job.id);
+    if (!block) throw new Error(`Missing construction context for ${job.id}`);
+    return { ...job, block, prompt: `${job.prompt}\n${blockArtContext(kit, block)}` };
+  });
 }
 
 /** No fallback artwork: a failure remains retryable and keeps its actionable cause. */

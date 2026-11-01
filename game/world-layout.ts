@@ -1,3 +1,5 @@
+import { buildWorldKit, FURNITURE_BLOCKS, furnitureBlock, type WorldBlock } from "../lib/world-kit";
+import { rankBlockSpots, blockFitsGround } from "./block-placement";
 import { sceneReachableTiles, type DayScene, type Tile, type WorldObject } from "../lib/day";
 import { actorById, actorSprite } from "../lib/actor-library";
 import type { WorldDesign } from "../pipeline/world-design";
@@ -8,12 +10,7 @@ import { TEMPLATES, WORLD_COLS, WORLD_ROWS, defaultTemplateFor, type LayoutTempl
 
 export { WORLD_COLS, WORLD_ROWS };
 export const LIBRARY = "/tiles/dq/library/";
-const furniture: Record<string, { width: number; height: number; depth: number }> = {
-  tree: { width: 53, height: 60, depth: 9 }, lamp: { width: 15, height: 58, depth: 6 },
-  bollard: { width: 10, height: 20, depth: 5 }, cycle_stand: { width: 26, height: 28, depth: 8 },
-  aboard: { width: 21, height: 28, depth: 8 }, hedge: { width: 55, height: 20, depth: 9 },
-  bin_grey: { width: 18, height: 26, depth: 8 }, bin_purple: { width: 18, height: 26, depth: 8 }, car_blue: { width: 55, height: 34, depth: 12 }, car_red: { width: 59, height: 34, depth: 12 },
-};
+const furniture = FURNITURE_BLOCKS;
 
 /** The street's zones, kept for callers that predate templates. Prefer zonesFor(blueprint). */
 export const WORLD_ZONES = TEMPLATES.street.zones;
@@ -27,6 +24,8 @@ export const buildingAnchors = (blueprint: SceneBlueprint) =>
 /** Stable walkable composition built from the chosen location template. Asset generation never decides collision geometry. */
 export function buildWorldLayout(blueprint: SceneBlueprint, sprites: Record<string, string>) {
   const template = templateFor(blueprint);
+  const kit = blueprint.kit ?? buildWorldKit(blueprint);
+  const anchors = buildingAnchors(blueprint);
   const skeleton = Array.from({ length: WORLD_ROWS }, (_, y) => Array.from({ length: WORLD_COLS }, (_, x) => template.ground(x, y)).join(""));
   const composition: Composition = blueprint.composition ?? template.defaults;
   const ground = applyGround(skeleton, composition.ground);
@@ -37,12 +36,23 @@ export function buildWorldLayout(blueprint: SceneBlueprint, sprites: Record<stri
     return { id: building.id, name: building.name, text: building.description, sprite,
       x, y, width: 160, height: 128, collision: { x: x - 72, y: y - 25, width: 144, height: 25 } };
   });
-  // A water operation may surround a photographed building, but cannot flood its physical foundation.
+  const blockContexts: Record<string, WorldBlock> = Object.fromEntries(objects.map(object => [object.id, kit.blocks.find(block => block.id === object.id)!]));
+  // Give each building a compatible dry foundation, continuous with its entry path.
   for (const object of objects) {
     const box = object.collision!;
     for (let row = Math.floor(box.y / TILE); row <= Math.floor((box.y + box.height - 1) / TILE); row++) {
       const cells = ground[row].split("");
-      for (let col = Math.floor(box.x / TILE); col <= Math.floor((box.x + box.width - 1) / TILE); col++) if (cells[col] === "w") cells[col] = skeleton[row][col];
+      for (let col = Math.floor(box.x / TILE); col <= Math.floor((box.x + box.width - 1) / TILE); col++) cells[col] = "pc".includes(skeleton[row][col]) ? skeleton[row][col] : template.id === "plaza" ? "c" : "p";
+      ground[row] = cells.join("");
+    }
+  }
+  // Each south-facing building connects to the common promenade. These are
+  // engine-owned ground tiles, never separate pavement rectangles baked into PNGs.
+  for (const anchor of anchors) {
+    const col = Math.floor(anchor.front.x / TILE);
+    for (let row = 10; row <= 12; row++) {
+      const cells = ground[row].split("");
+      for (let x = col - 1; x <= col + 1; x++) cells[x] = template.id === "plaza" ? "c" : "p";
       ground[row] = cells.join("");
     }
   }
@@ -51,18 +61,24 @@ export function buildWorldLayout(blueprint: SceneBlueprint, sprites: Record<stri
   let foodTile = { ...template.foodTile };
   const wet = (px: number, py: number) => [py, py - 8].some((y) => world.ground[Math.floor(y / TILE)]?.[Math.floor(px / TILE)] === "w");
   /** Adds furniture at the first candidate spot that is dry, on the map and leaves the exit reachable. Returns whether it was placed. */
-  function prop(id: string, name: string, kind: string, spots: [number, number][], text?: string, sprite?: string): boolean {
-    const spec = sprite ? { width: 32, height: 48, depth: 8 } : furniture[kind] ?? { width: 32, height: 40, depth: 8 };
+  function prop(id: string, name: string, kind: string, spots: [number, number][], text?: string, sprite?: string, context?: WorldBlock): boolean {
+    const block = context ?? furnitureBlock(id, name, kind, id === "cafe_board" ? { area: "path_edge", purpose: "A sign beside the lunch route." } : undefined);
+    const spec = context ? { width: block.render.width, height: block.render.height, depth: block.footprint.depth } : sprite ? { width: 32, height: 48, depth: 8 } : furniture[kind] ?? { width: 32, height: 40, depth: 8 };
     for (const [x, y] of spots) {
-      if (x - spec.width / 2 < 0 || x + spec.width / 2 > WORLD_COLS * TILE || y - spec.height < 0 || y > WORLD_ROWS * TILE || wet(x, y)) continue;
+      if (x - spec.width / 2 < 0 || x + spec.width / 2 > WORLD_COLS * TILE || y - spec.height < 0 || y > WORLD_ROWS * TILE || wet(x, y) || !blockFitsGround(block, ground, x, y)) continue;
       const object: WorldObject = { id, name, sprite: sprite ?? `${LIBRARY}${kind}.png`, x, y, width: spec.width, height: spec.height,
         collision: { x: x - Math.floor(Math.min(spec.width - 4, 28) / 2), y: y - spec.depth, width: Math.min(spec.width - 4, 28), height: spec.depth }, text };
       const box = object.collision!;
+      // Leave each entrance's path clear, including from decorative props.
+      if (anchors.some(anchor => box.x < anchor.front.x + 16 && box.x + box.width > anchor.front.x - 16 && box.y < 208 && box.y + box.height > 160)) continue;
+      if (context && objects.some(other => other.collision && box.x < other.collision.x + other.collision.width + block.clearancePx && box.x + box.width + block.clearancePx > other.collision.x &&
+        box.y < other.collision.y + other.collision.height + block.clearancePx && box.y + box.height + block.clearancePx > other.collision.y)) continue;
       if (objects.some(other => other.collision && box.x < other.collision.x + other.collision.width && box.x + box.width > other.collision.x &&
         box.y < other.collision.y + other.collision.height && box.y + box.height > other.collision.y)) continue;
       const trial = { ...world, objects: [...objects, object] };
       if (worldCollision(trial, tileFeet(spawn).x, tileFeet(spawn).y) || worldCollision(trial, tileFeet(exit).x, tileFeet(exit).y) || !exitReachable(trial, spawn, exit)) continue;
       objects.push(object);
+      blockContexts[id] = block;
       return true;
     }
     return false;
@@ -75,7 +91,7 @@ export function buildWorldLayout(blueprint: SceneBlueprint, sprites: Record<stri
     prop("parked_car", "Parked car", "car_red", [template.fixed[0].slice(1) as [number, number]]);
     prop("bike_rack", "Cycle stand", "cycle_stand", [template.fixed[1].slice(1) as [number, number]]);
     prop("street_bin", "Recycling bin", "bin_grey", [template.fixed[2].slice(1) as [number, number]]);
-    prop("cafe_board", "A little lunch spot", "aboard", [template.fixed[3].slice(1) as [number, number]], blueprint.food?.text ?? "A good place to pause and watch the street.");
+    prop("cafe_board", "A little lunch spot", "aboard", [[274, 326], [274, 198]], blueprint.food?.text ?? "A good place to pause and watch the street.");
   } else {
     // Other templates have no road furniture; a small sign marks the lunch spot instead.
     const [fx, fy] = [template.foodTile.x * TILE + 8 - 26, template.foodTile.y * TILE + 30];
@@ -88,15 +104,11 @@ export function buildWorldLayout(blueprint: SceneBlueprint, sprites: Record<stri
     if (!item.library && !sprites[item.id]) throw new Error(`Missing sprite for ${item.id}`);
     // The slot for this prop first, then any other free slot, so one blocked spot never loses a photographed object.
     const spots = [template.propSlots[i], ...template.propSlots.filter((_, j) => j !== i)];
-    if (!item.library) {
-      // Required photographed objects get additional deterministic dry candidates, never substitute library artwork.
-      const extra: [number, number][] = [];
-      for (let y = 11; y < WORLD_ROWS; y++) for (let x = 1; x < WORLD_COLS - 1; x++) extra.push([x * TILE + 8, y * TILE + 15]);
-      const preferred = template.propSlots[i];
-      extra.sort((a, b) => Math.hypot(a[0] - preferred[0], a[1] - preferred[1]) - Math.hypot(b[0] - preferred[0], b[1] - preferred[1]));
-      spots.push(...extra);
-    }
-    const placed = prop(item.id, item.name, item.library ?? "custom", spots, item.description, sprites[item.id]);
+    const block = kit.blocks.find(candidate => candidate.id === item.id)!;
+    // Search beyond the old slots so context can place required photo objects safely.
+    for (let y = 11; y < WORLD_ROWS; y++) for (let x = 1; x < WORLD_COLS - 1; x++) spots.push([x * TILE + 8, y * TILE + 15]);
+    const candidates = rankBlockSpots(block, ground, spots, anchors);
+    const placed = prop(item.id, item.name, item.library ?? "custom", candidates, item.description, item.library ? undefined : sprites[item.id], block);
     if (!placed && !item.library) throw new Error(`No safe placement for photographed object ${item.id}`);
   });
   const foodBox = (tile: Tile): WorldObject => ({ id: "__meal_placement", name: "Meal table", sprite: "food.png", x: tile.x * TILE + 8, y: tile.y * TILE + 16,
@@ -119,7 +131,8 @@ export function buildWorldLayout(blueprint: SceneBlueprint, sprites: Record<stri
   const placementWorld = blueprint.food ? { ...world, objects: [...objects, foodBox(foodTile)] } : world;
   const placed = blueprint.design ? placeDesign(placementWorld, spawn, exit, blueprint.design, sprites, blueprint.food ? foodTile : undefined, buildingAnchors(blueprint), template.zones) : [];
   world.objects.push(...placed);
-  return { world, spawn, exit, foodTile };
+  for (const object of placed) blockContexts[object.id] = kit.blocks.find(block => block.id === `actor_${object.id}`)!;
+  return { world, spawn, exit, foodTile, blockContexts };
 }
 
 const STEP = 8;
@@ -198,7 +211,8 @@ export function placeDesign(world: NonNullable<DayScene["world"]>, spawn: Tile, 
         collision: { x: c.x - Math.floor(footW / 2), y: c.y - footD, width: footW, height: footD },
         ...(item.role === "interactable" ? { effect: (item as { effect: NonNullable<WorldObject["effect"]> }).effect } : { lines: (item as { lines: string[] }).lines, roam: (item as { roam: number }).roam }) };
       const trial = { ...draft, objects: [...draft.objects, object] };
-      if (exitReachable(trial, spawn, exit)) { chosen = object; break; }
+      const state = worldState(trial, spawn, exit);
+      if (state.exitReachable && state.actors.every(actor => actor.reachable)) { chosen = object; break; }
     }
     if (!chosen) continue; // better to omit one actor than to risk a stuck player
     if (chosen.role === "npc") chosen.roam = safeRoam(draft, chosen);

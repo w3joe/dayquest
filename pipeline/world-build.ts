@@ -1,3 +1,4 @@
+import { buildWorldKit, furnitureBlock } from "../lib/world-kit";
 import type { DayManifest } from "../lib/day";
 import { parseDayManifest } from "../lib/day";
 import { buildWorldLayout } from "../game/world-layout";
@@ -89,13 +90,14 @@ export async function advanceWorldBuild(input: WorldBuildInput, checkpoint: Worl
     const planned = await deps.plan({ landmark: input.uploads.landmark, lunch: input.uploads.lunch,
       ...(input.photos ? { photos: input.photos } : {}),
       context: { name: input.name, date: input.date, ...(input.environment?.notes ? { notes: input.environment.notes } : {}) } });
-    // Understand where this is: only the photographed building keeps the photo; the others are the place's real neighbours, drawn from text.
+    // Research may fill unobserved supporting slots; all photographed buildings retain their references.
     const located = await deps.locator?.(planned).catch(() => undefined);
     const base = applyLocation(planned, located);
     const run = await deps.director?.(buildWorldContext(base, { name: input.name, date: input.date }, { ...input.environment, ...(located ? { place: located.place } : {}) }), base).catch(() => undefined);
     const chosen = templateFor({ ground: base.ground, template: run?.template ?? base.template });
     const design = run?.design ?? fallbackDesign(chosen.grounds[0], chosen.zones);
-    const blueprint = { ...base, design, template: chosen.id, ...(run?.composition ? { composition: run.composition } : {}) };
+    const blueprint: SceneBlueprint = { ...base, design, template: chosen.id, ...(run?.composition ? { composition: run.composition } : {}) };
+    blueprint.kit = buildWorldKit(blueprint);
     const jobs = buildSceneAssetJobs(blueprint, input);
     return { checkpoint: { ...checkpoint, blueprint }, total: jobs.length,
       event: { step: "landmarks", label: `Scene planned: ${blueprint.title}. ${jobs.length} sprites to create. Added ${design.interactables.length} things to do and ${design.npcs.length} characters${design.source === "agent" ? ", designed for this place" : ""}.` } };
@@ -121,6 +123,20 @@ export async function advanceWorldBuild(input: WorldBuildInput, checkpoint: Worl
     return { checkpoint: { ...checkpoint, interactionPack }, total: jobs.length,
       event: { step: "landmarks", label: `${interactionPack.actions.length} contextual interactions planned and saved.` } };
   }
+  // Publish the reusable blocks and their actual assembly beside the playable day.
+  // This is deliberately written before day.json, so failed storage remains retryable.
+  const kit = blueprint.kit ?? buildWorldKit(blueprint);
+  const placed = layout.world.objects.map(object => {
+    const block = layout.blockContexts[object.id]
+      ?? furnitureBlock(object.id, object.name, object.sprite.split("/").pop()?.replace(/\.png$/, "") ?? "custom");
+    return { ...block, id: object.id, footprint: object.collision ? { width: object.collision.width, depth: object.collision.height } : block.footprint, render: { ...block.render, width: object.width, height: object.height }, sprite: object.sprite,
+      connections: block.connectsTo === "front_path" ? [{ kind: "path", x: object.x, y: object.y + 30, clearancePx: block.clearancePx }] : [],
+      placement: { x: object.x, y: object.y, ...(object.collision ? { collision: object.collision } : {}) } };
+  });
+  await deps.store.put("world-kit.json", Buffer.from(JSON.stringify({ ...kit, blocks: placed,
+    meal: blueprint.food ? { ...kit.blocks.find(block => block.id === "food"), sprite: checkpoint.assets.food, tile: layout.foodTile } : undefined,
+    character: { ...kit.blocks.find(block => block.id === "player_walk"), sprite: "player.png", walkSheet: checkpoint.assets.player_walk },
+  }, null, 2)), "application/json");
   // The accepted fit-check sprite remains the preview/canonical character.
   await deps.store.put("player.png", input.player, "image/png");
   const manifest: DayManifest = {

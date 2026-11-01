@@ -1,3 +1,4 @@
+import type { BlockUsage, WorldKit } from "../lib/world-kit";
 import type { Composition } from "../game/composition";
 import type { TemplateId } from "../game/layout-templates";
 import type { WorldDesign } from "./world-design";
@@ -10,8 +11,8 @@ export type SceneBlueprint = {
   description: string;
   time: string;
   ground: "street" | "park" | "plaza";
-  buildings: { id: string; name: string; description: string; observed: boolean }[];
-  props: { id: string; name: string; description: string; library?: string }[];
+  buildings: { id: string; name: string; description: string; observed: boolean; usage?: BlockUsage }[];
+  props: { id: string; name: string; description: string; library?: string; usage?: BlockUsage }[];
   food?: { name: string; description: string; text: string };
   source: "photo" | "fit-only";
   /** NPCs and interactables chosen by the design step (agents or the hand-written fallback). */
@@ -20,6 +21,8 @@ export type SceneBlueprint = {
   template?: TemplateId;
   /** Scenery chosen by the world builder from the kit; when absent the template's default applies. */
   composition?: Composition;
+  /** Persisted construction context shared by artists, composer and exported blocks. */
+  kit?: WorldKit;
 };
 
 /** User-authored context only: do not pass the demo location history here. */

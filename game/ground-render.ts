@@ -28,6 +28,21 @@ export function renderGround(world: World, picture: (url: string) => HTMLImageEl
     const ch = at(c, r)!;
     // "Flowers" are plain lawn with a few tiny blooms painted on, so beds read as flowers rather than a different material.
     g.drawImage(picture(ch === "w" ? "/tiles/dq/water.png" : `/tiles/dq/library/${MATERIAL[ch === "f" ? "g" : ch] ?? "pavement"}.png`), c * TILE, r * TILE, TILE, TILE);
+    // The legacy "cobble" PNG is a red brick checker. A world-space stone
+    // pattern uses the pavement's warm palette and joins across tile boundaries.
+    if (ch === "c") {
+      const px = c * TILE, py = r * TILE;
+      g.fillStyle = "#aaa58f"; g.fillRect(px, py, TILE, TILE);
+      for (let row = 0; row < 4; row++) {
+        const offset = row % 2 ? -4 : 0;
+        for (let sx = offset; sx < TILE; sx += 8) {
+          const left = Math.max(0, sx), right = Math.min(TILE, sx + 7);
+          if (right <= left) continue;
+          g.fillStyle = "#c8c2ab"; g.fillRect(px + left, py + row * 4, right - left, 3);
+          g.fillStyle = "#d5cfb8"; g.fillRect(px + left, py + row * 4, right - left, 1);
+        }
+      }
+    }
     if (ch === "f") for (let i = 0; i < 3; i++) {
       const h = Math.abs(Math.sin((c * 12.9898 + r * 78.233 + i * 37.719) * 43758.5453)), k = h * 1000 % 1;
       g.fillStyle = ["#fff6d8", "#ffd84a", "#ff8fb3", "#c9a4ff"][Math.floor(k * 4)];

@@ -41,7 +41,7 @@ export function publicWorldJob(state: WorldJob): WorldJob {
 
 export function worldJobId(draft: ReadyDraft, catalogFingerprint = loadInteractionCatalog().fingerprint): string {
   const uploads = [...draft.uploads].sort((a, b) => a.kind.localeCompare(b.kind));
-  return createHash("sha256").update(JSON.stringify({ version: 3, catalogFingerprint, session: draft.sessionId, uploads, player: draft.spriteUrl,
+  return createHash("sha256").update(JSON.stringify({ version: 4, catalogFingerprint, session: draft.sessionId, uploads, player: draft.spriteUrl,
     worldDesign: process.env.WORLD_DESIGN_AGENTS === "live" ? "agents" : "template",
     imageModel: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2.5-flare", textModel: process.env.OPENAI_TEXT_MODEL || "gpt-5.4-mini" })).digest("hex").slice(0, 32);
 }
@@ -101,7 +101,7 @@ async function processWorldStep(state: JobState, draft: ReadyDraft, lease: strin
     const input = { id: state.id, date: state.date, name: "You", uploads, player, photos,
       ...(notes ? { environment: { notes } } : {}) };
     const { catalog, fingerprint } = loadInteractionCatalog();
-    if (worldJobId(draft, fingerprint) !== state.id) throw new RequestError("The interaction catalogue changed while this world was being created. Return to Today to start the updated world.", 409);
+    if (worldJobId(draft, fingerprint) !== state.id) throw new RequestError("World generation settings changed while this world was being created. Return to Today to start the updated world.", 409);
     const experimental = process.env.WORLD_DESIGN_AGENTS === "live";
     const deps = { plan: (input: Parameters<typeof planScene>[0]) => planScene(input, new OpenAI({ timeout: 60_000, maxRetries: 0 })),
       images: openAIImageGenerator(new OpenAI({ timeout: 110_000, maxRetries: 0 })), store: storeForDay(state.id), styleReferences,
