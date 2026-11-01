@@ -14,7 +14,7 @@ Tile ending:
 
 > This is a single seamless repeating ground texture tile viewed straight down (orthographic, no perspective), filling the entire square image edge to edge, designed on a 16x16 grid of big pixels so it tiles seamlessly on all four sides. No border, no objects, no text. Square 1024x1024.
 
-## Calls (23)
+## Calls (26)
 
 ### ramen_bowl (2026-11-01 14-49-22)
 
@@ -152,6 +152,24 @@ Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. 
 
 ```text
 Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. A wide rectangular dark-stained wooden plank restaurant table seen from above at a steep angle; the table top is completely empty. Landscape 1536x1024. Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.
+```
+
+### logo_badge (2026-11-01 15-55-07)
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. A round red wall sign with a simple smiling face wearing a white headband in the middle, cream border ring, mounted on a wall, seen from the front. No text. Square 1024x1024. Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.
+```
+
+### chef (2026-11-01 15-55-07)
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. A chibi ramen chef seen from the front, waist up, standing behind a counter: white chef jacket, black bandana headband, holding a ladle over a steaming pot, friendly smile. Square 1024x1024. Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.
+```
+
+### menu_board (2026-11-01 15-55-07)
+
+```text
+Original pixel-art game asset for a 2010s handheld (DS-era) style top-down RPG. Steep top-down 3/4 view (camera high, looking down at about 60 degrees, so we see the front face and a sliver of the top). Clean crisp chunky square pixels, flat colour shading with 2-3 tones per material, absolutely no dithering, no noise, no gradients, no anti-aliasing blur. Dark 1px outlines around shapes. Bright cheerful palette (teal-green grass, sandy paving, warm red-brown bricks). Light comes from the top-left. Entirely original design, not copied from or imitating any existing game, character or logo. A dark wooden restaurant wall menu board with cream hand-painted Japanese-style ramen menu lines and small pictures of ramen bowls, hung on a wall, seen from the front. No readable words. Landscape 1536x1024. Show ONE isolated object, centred, whole object visible with margin around it, on a perfectly flat solid pure magenta (#FF00FF) background. No cast shadow on the ground, no ground plane, no scenery, no border, no extra text or labels.
 ```
 
 ## Notes

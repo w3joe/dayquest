@@ -135,8 +135,8 @@
   });
 
   // ---------------- inside ----------------
-  const IC = 24, IR = 16;
-  const KB = 8 * T;               // kitchen counter base line
+  const IC = 14, IR = 12;         // a small, packed room; the camera zooms in (zoom below)
+  const KB = 6 * T;               // kitchen counter base line
   const IN = {
     tonkotsu: "TONKOTSU (ORIGINAL) RAMEN\nCreamy 18-hour pork bone broth, a big slice of chashu belly, a jammy hanjuku egg and swirls of black garlic oil. This is the one.",
     shoyu: "A lighter bowl: clear golden broth, thin straight noodles, chashu and half an egg. Clean and salty.",
@@ -147,6 +147,10 @@
     friend: "\"Ramen for four and there's only two of us. No regrets.\"",
     kitchen: "The open kitchen: big pots of pork-bone broth simmering for 18 hours, and a fresh tray of noodles. \"Irasshaimase!\"",
     diners: "Two other diners, slurping loudly. That's good manners here.",
+    diners2: "Every seat is taken at lunchtime. The couple by the wall are on their second round of gyoza.",
+    chef: "The chef ladles broth from a pot that's been going since dawn. \"Irasshaimase!\"",
+    menu: "The menu board: tonkotsu, shoyu, spicy, black garlic... and extra noodles (kaedama) if you're still hungry.",
+    logo: "Kanada-Ya's round red badge: the smiling ramen master in his headband.",
     door: "Back out to St Giles High Street.",
   };
 
@@ -160,35 +164,61 @@
     rows: IR,
     walkTop: KB - 8,
     sky: "#2a1a14",
-    spawn: { x: 384, y: IR * T - 30, dir: "up" },
+    zoom: 1.25,
+    spawn: { x: IC * T / 2, y: IR * T - 30, dir: "up" },
     own: ["tile_wood", "tile_wall", "kitchen", "dining_table", "table30", "chair", "steel_cups", "condiment_pot",
-      "bowl_tonkotsu", "bowl_shoyu", "bowl_spicy", "bowl_rich", "ramen_icon", "icon_shoyu", "icon_spicy", "icon_rich", "friend", "diners", "long_table"],
+      "bowl_tonkotsu", "bowl_shoyu", "bowl_spicy", "bowl_rich", "ramen_icon", "icon_shoyu", "icon_spicy", "icon_rich", "friend", "diners", "long_table", "menu_board", "logo_badge", "chef"],
     assets: ["tile_wood", "tile_wall", "kitchen", "dining_table", "table30", "chair", "steel_cups", "condiment_pot",
-      "bowl_tonkotsu", "bowl_shoyu", "bowl_spicy", "bowl_rich", "ramen_icon", "icon_shoyu", "icon_spicy", "icon_rich", "friend", "diners", "long_table"],
+      "bowl_tonkotsu", "bowl_shoyu", "bowl_spicy", "bowl_rich", "ramen_icon", "icon_shoyu", "icon_spicy", "icon_rich", "friend", "diners", "long_table", "menu_board", "logo_badge", "chef"],
 
     ground(c, r) {
-      if (r < 5) return { tile: "tile_wall", solid: true };
+      if (r < 3) return { tile: "tile_wall", solid: true };
       return "tile_wood";
     },
 
     build(w) {
       const { img, W, H } = w;
       // brick back wall with the open kitchen counter in front of it (layout inferred)
-      w.invented(0, 0, W, 5 * T);
+      w.invented(0, 0, W, 3 * T);
       const k = w.add("kitchen", Math.round((W - img.kitchen.width) / 2), KB, { depth: 30, shadow: "base", invented: true, foot: [0, img.kitchen.width] });
       w.talk(k.x + k.w / 2, k.y + 4, IN.kitchen);
+      // the chef behind the counter, drawn over the kitchen wall but behind the counter top
+      const ch = w.add("chef", k.x + Math.round(k.w * 0.62), KB - 64, { solid: false, shadow: "none", invented: true, z: 65 });
+      w.talk(ch.x + ch.w / 2, KB + 4, IN.chef);
+      // steam rising off the broth pots
+      for (const sx of [k.x + Math.round(k.w * 0.22), k.x + Math.round(k.w * 0.36)]) {
+        const base = KB - 120;
+        w.mover("fx_steam", { x: sx, y: base, z: 200, invented: true, update(m, f) { m.y = base - ((f * 0.25 + sx) % 18); } });
+      }
+      // wall decor either side of the kitchen
+      // menu boards hang on the kitchen wall at either end, the round logo over the pass
+      const wallY = KB - 70, hang = { solid: false, shadow: "none", invented: true, z: 80 };
+      w.add("menu_board", 2, wallY, hang);
+      w.add("menu_board", W - 2 - img.menu_board.width, wallY, hang);
+      w.add("logo_badge", Math.round(W / 2 - img.logo_badge.width / 2), KB - 150, { solid: false, shadow: "none", z: 160 });
+      w.talk(2 + img.menu_board.width / 2, KB + 6, IN.menu);
+      w.talk(W / 2, KB + 6, IN.logo);
 
-      // other tables (invented layout and diners)
-      const others = [[40, 11 * T], [40, 14 * T + 8], [W - 40 - img.dining_table.width, 14 * T + 8]];
-      for (const [x, y] of others) w.add("dining_table", x, y, { depth: 24, invented: true });
-      // two other diners on the far side of a long table (its top hides their laps)
-      const lx = W - 24 - img.long_table.width, ly = 11 * T + 4;
-      const d = w.add("diners", lx + Math.round((img.long_table.width - img.diners.width) / 2), ly - img.long_table.height + 14, { depth: 6, invented: true, shadow: "none" });
-      w.add("long_table", lx, ly, { depth: 26, invented: true, foot: [4, img.long_table.width - 8] });
-      w.talk(d.x + d.w / 2, ly + 2, IN.diners);
+      // packed two-person tables along both walls, most with diners and bowls (invented layout and diners)
+      const dt = img.dining_table;
+      const sides = [[4, KB + 88, true], [4, KB + 172, true], [W - 4 - dt.width, KB + 88, true], [W - 4 - dt.width, KB + 172, false]];
+      sides.forEach(([x, y, busy], i) => {
+        if (busy) {
+          const dd = w.add("diners", x + Math.round((dt.width - img.diners.width) / 2), y - dt.height + 16, { depth: 6, invented: true, shadow: "none" });
+          w.talk(dd.x + dd.w / 2, y + 4, i ? IN.diners2 : IN.diners);
+        }
+        w.add("dining_table", x, y, { depth: 24, invented: true });
+        // bowls, cups and a pot on every table top
+        const top = y - dt.height;
+        const deco = [["bowl_rich", 12, 18], ["bowl_spicy", 40, 20], ["steel_cups", 30, 8], ["condiment_pot", 54, 8]];
+        for (const [n, ox, oy] of deco) {
+          const base = top + oy + img[n].height;
+          w.add(n, x + ox, base, { solid: false, shadow: "none", invented: true, z: y - base + 1 + oy / 100 });
+        }
+      });
 
       // the player's table 30, from the meal photo
-      const tx = Math.round((W - img.table30.width) / 2), ty = 12 * T + 8;
+      const tx = Math.round((W - img.table30.width) / 2), ty = KB + 112;
       const fr = w.add("friend", Math.round(W / 2 - img.friend.width / 2), ty - img.table30.height + 14, { depth: 8, z: -1 });
       const t30 = w.add("table30", tx, ty, { depth: 28, foot: [4, img.table30.width - 8] });
       w.talk(fr.x + fr.w / 2, fr.y, IN.friend, { action: "wave" });   // talk to the friend from behind their chair; Lucas waves

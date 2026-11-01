@@ -75,7 +75,8 @@
   let viewW = BASE_W, viewH = BASE_H, scale = 1;
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
-    scale = Math.max(1, Math.floor(Math.min(w / BASE_W, h / BASE_H)));
+    // a scene can zoom in (e.g. a small interior); still a whole-number scale so pixels stay crisp
+    scale = Math.max(1, Math.floor(Math.min(w / BASE_W, h / BASE_H) * (world?.def.zoom || 1)));
     viewW = Math.ceil(w / scale);
     viewH = Math.ceil(h / scale);
     canvas.width = viewW;
@@ -171,7 +172,7 @@
         const far = img.skyline_far || img.skyline, row = img.terrace_strip, by = y - (o.setback ?? 0);
         const roof = row ? by - row.height + 24 : by;
         w.backdrops.push({ im: far, x: 0, y: roof + 40 - far.height, p: o.parallax ?? 0.3, invented: !!o.invented, repeatX: true });
-        if (row) w.backdrops.push({ im: row, x: 0, y: by - row.height, p: 0, invented: !!o.invented, repeatX: true, ground: true });
+        if (row) w.backdrops.push({ im: row, x: 0, y: by - row.height, p: 0, invented: !!o.invented, repeatX: true, ground: true, gaps: o.gaps || [] });
       },
     };
     def.build(api);
@@ -334,7 +335,7 @@
       // benches and deckchairs seat the player, with or without a line to read
       const seat = nearbySeat();
       // a deckchair's seat is low and set back: sit into it rather than in front of it
-      if (seat) startAction("sit", { seat: { x: seat.x + seat.w / 2, y: seat.name === "deckchair" ? seat.y - 6 : seat.y + 2 } });
+      if (seat) startAction("sit", { seat: { x: seat.x + seat.w / 2, y: seat.y + 2, lift: seat.name === "deckchair" ? 7 : 0 } });
     }
     if (!s) return;
     if (s.text) {
@@ -357,7 +358,7 @@
   function startAction(name, s) {
     if (!world.img.actions && name !== "sit") return;
     player.act = { name, t: 0, prev: { x: player.x, y: player.y, dir: player.dir }, seat: s.seat, fx: s.fx, fxAt: s.fxAt, flashed: false };
-    if (s.seat) { player.x = s.seat.x; player.y = s.seat.y; player.dir = s.seat.dir || "down"; }
+    if (s.seat) { player.x = s.seat.x; player.y = s.seat.y; player.dir = s.seat.dir || "down"; player.act.lift = s.seat.lift || 0; }
     player.still = 0;
   }
   function standUp() {
@@ -585,7 +586,14 @@
       const bx = Math.round(b.x - cam.x * (1 - b.p)), by = Math.round(b.y - cam.y);
       if (!b.repeatX) { ctx.drawImage(b.im, bx, by); continue; }
       const iw = b.im.width;
+      if (b.gaps && b.gaps.length) {
+        // leave openings (world x ranges) where a road runs back between the houses
+        ctx.save(); ctx.beginPath(); ctx.rect(0, 0, viewW, viewH);
+        for (const [g0, g1] of b.gaps) ctx.rect(g1 - cam.x, 0, -(g1 - g0), viewH);
+        ctx.clip("evenodd");
+      }
       for (let x = ((bx % iw) + iw) % iw - iw; x < viewW; x += iw - 1) ctx.drawImage(b.im, x, by);
+      if (b.gaps && b.gaps.length) ctx.restore();
     }
     ctx.drawImage(world.ground, cam.x + MARGIN * T, cam.y + MARGIN * T, viewW, viewH, 0, 0, viewW, viewH);
     ctx.translate(-cam.x, -cam.y);
@@ -680,7 +688,7 @@
       const k = Math.floor(a.t / d.speed), seq = d.seq;
       const idx = d.loop ? seq[k % seq.length] : seq[Math.min(k, seq.length - 1)];
       const bob = d.bob && k >= seq.length ? Math.floor(a.t / 24) % 2 : 0;
-      ctx.drawImage(world.img.actions, idx * FW, d.row * FH, FW, FH, Math.round(player.x - FW / 2), Math.round(player.y - FH + 1 + bob), FW, FH);
+      ctx.drawImage(world.img.actions, idx * FW, d.row * FH, FW, FH, Math.round(player.x - FW / 2), Math.round(player.y - FH + 1 + bob - (a.lift || 0)), FW, FH);
       return;
     }
     if (!player.moving && player.still > 120 && !dialogue) { row = 4; col = 0; }
