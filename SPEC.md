@@ -16,9 +16,9 @@
 | Engine | Phaser 3 + [Grid Engine](https://github.com/Annoraaq/grid-engine). **Not** the pokeemerald decomp (1–2h toolchain, 16-colour palette limits, ROM = Nintendo IP, can't share publicly) |
 | Look | Emerald-inspired 3/4 top-down pixel art. Start Emerald-faithful, push to 2.5D (depth sort, shadows, parallax) if time |
 | Base tiles | [Puny World](https://opengameart.org/content/16x16-puny-world-tileset) (CC0) for ground/paths/trees. Only landmarks, food and the player are AI-generated |
-| Highlights | Exactly **3** per day: **touristy spot**, **meal**, **park**. Chosen by Codex/LLM from the raw day |
+| Highlights | Exactly **3** per day: **touristy spot**, **meal**, **park**. Chosen by Codex/LLM from the raw day. The demo uses the fixed template day in §2.1 |
 | Landmarks | LLM picks 3 memorable landmarks near each highlight → any reference photo (Wikipedia lead image is fine) → gpt-image-2.5 → pixel post-process → fixed footprint |
-| Player | One **front-facing** sprite generated from today's fit-check photo (clothes, skin, hair). No walk cycle — slide between tiles with a small bob |
+| Player | One **back-facing** sprite (third-person, we follow them from behind) generated from today's fit-check photo: clothes, hair, skin. No walk cycle — slide between tiles with a small bob |
 | Interaction | Free play: arrow keys to walk, Space/Enter near a landmark → textbox |
 | Text | Plain textbox, no game jokes. e.g. "Had tonkotsu ramen at Kanada-Ya." Meal textbox shows a small pixel food icon |
 | Transitions | Exit tile on scene edge → 2D pixel **transport loading animation** (red bus w/ route number, or tube train in line colour w/ station names) → next scene |
@@ -27,6 +27,31 @@
 | Live on stage | Environment pre-generated. Live: take fit-check photo → sprite generated → walks into the scene |
 | Video / Sora | No. Sora API is removed; no download-clip feature |
 | Out of scope | World journal (pitch slide only), accounts, feeds, real HealthKit/Strava, 3D, battle screens |
+
+## 2.1 Template day (the demo)
+
+A Saturday in London. This is what `data/input.json` hardcodes and what gets pre-generated into `public/days/demo/`.
+
+| # | Time | Scene | Base map | 3 landmarks (generated) | Textbox content |
+|---|---|---|---|---|---|
+| 1 | 10:00–12:00 | **Touring Westminster** | `city` (riverside: Thames along the top edge, Westminster Bridge crossing it) | Elizabeth Tower (Big Ben) + Houses of Parliament (L), London Eye (L, across the river), red phone box (S). **The Shard** sits on the parallax skyline behind, not walkable | Walked Westminster Bridge, rode the London Eye, photo of Big Ben |
+| 2 | 12:40–13:30 | **Ramen lunch** | `street` (narrow Soho/St Giles street) | Kanada-Ya ramen shopfront (M), Centre Point tower (L), red phone box or a noren-curtained side shop (S). **Food:** tonkotsu ramen bowl sprite sits on a small outdoor table by the door, and the same sprite appears in the textbox | "Had tonkotsu ramen at Kanada-Ya" + what was ordered |
+| 3 | 14:15–15:30 | **Walk in Regent's Park** | `park` (paths, flower beds, lake on one side) | Queen Mary's Rose Garden gates (M), Triton Fountain (M), boating lake with swans + bandstand (L) | Walk stats: distance, time, steps |
+
+**Transport between scenes (§7):**
+
+| Leg | Mode | Route | Animation |
+|---|---|---|---|
+| 1 → 2 | **Bus** | Route **24**, *Parliament Square* → *Tottenham Court Road Station* (via Whitehall, Trafalgar Square, Charing Cross Road), ~20 min | Red double-decker with "24 Hampstead Heath" on the blind, passing Nelson's Column |
+| 2 → 3 | **Tube** | Walk to Tottenham Court Road → **Central line** (red, `#E32017`) 1 stop to *Oxford Circus* → change → **Bakerloo line** (brown, `#B36305`) 1 stop to *Regent's Park*, ~15 min | Red train, "CHANGE AT OXFORD CIRCUS" card, brown train. If short on time, show the Bakerloo leg only |
+
+**Data still needed from the team** (everything else is hardcoded below):
+1. **Fit-check photo:** full body, head to shoes, plain background, good light. A back-view photo as well helps a lot, since the sprite is seen from behind.
+2. **Photos for each scene** (optional but makes it personal): Westminster/Eye, the ramen bowl from above, the park. Real or stand-ins; EXIF gets stripped.
+3. **Display name** for the textbox (e.g. `LUCAS`) and whose day it is (you or your partner).
+4. **Walk stats** for the park: distance, duration, steps (or we use the placeholders below).
+5. **What was ordered** at lunch (default: tonkotsu ramen + gyoza).
+6. **Confirm or swap** the restaurant (Kanada-Ya St Giles) and park (Regent's Park). Swapping means changing the coordinates and transport in §4.1.
 
 ## 3. Architecture
 
@@ -79,27 +104,40 @@ public/days/demo/          # pre-generated fallback day
 
 ```jsonc
 {
-  "user": { "name": "LUCAS", "fitCheckPhoto": "photos/fit.jpg" },
-  "date": "2026-11-01",
+  "user": { "name": "LUCAS", "fitCheckPhoto": "photos/fit.jpg", "fitCheckBackPhoto": "photos/fit_back.jpg" },
+  "date": "2026-11-07",
   "locations": [
-    { "t": "09:10", "lat": 51.5246, "lng": -0.1340, "label": "UCL" },
-    { "t": "10:30", "lat": 51.5033, "lng": -0.1196, "label": "London Eye" },
-    { "t": "12:45", "lat": 51.5149, "lng": -0.1263, "label": "Kanada-Ya, Covent Garden" },
-    { "t": "16:00", "lat": 51.5313, "lng": -0.1570, "label": "Regent's Park" }
+    { "t": "10:00", "lat": 51.5007, "lng": -0.1246, "label": "Elizabeth Tower / Parliament Square" },
+    { "t": "10:25", "lat": 51.5009, "lng": -0.1220, "label": "Westminster Bridge" },
+    { "t": "10:45", "lat": 51.5033, "lng": -0.1196, "label": "London Eye" },
+    { "t": "12:05", "lat": 51.5010, "lng": -0.1260, "label": "Parliament Square bus stop" },
+    { "t": "12:30", "lat": 51.5163, "lng": -0.1303, "label": "Tottenham Court Road Station" },
+    { "t": "12:40", "lat": 51.5157, "lng": -0.1281, "label": "Kanada-Ya, 64 St Giles High St" },
+    { "t": "13:40", "lat": 51.5165, "lng": -0.1310, "label": "Tottenham Court Road Station" },
+    { "t": "13:50", "lat": 51.5152, "lng": -0.1419, "label": "Oxford Circus Station" },
+    { "t": "14:00", "lat": 51.5234, "lng": -0.1466, "label": "Regent's Park Station" },
+    { "t": "14:15", "lat": 51.5268, "lng": -0.1530, "label": "Queen Mary's Gardens" },
+    { "t": "14:50", "lat": 51.5274, "lng": -0.1555, "label": "Triton Fountain" },
+    { "t": "15:20", "lat": 51.5262, "lng": -0.1590, "label": "Regent's Park Boating Lake" }
   ],
   "transport": [
-    { "from": "London Eye", "to": "Kanada-Ya, Covent Garden", "mode": "bus",  "route": "RV1" },
-    { "from": "Kanada-Ya, Covent Garden", "to": "Regent's Park", "mode": "tube", "line": "Bakerloo",
-      "stations": ["Charing Cross", "Piccadilly Circus", "Oxford Circus", "Regent's Park"] }
+    { "from": "Parliament Square", "to": "Tottenham Court Road Station", "mode": "bus", "route": "24",
+      "destination": "Hampstead Heath", "via": ["Whitehall", "Trafalgar Square", "Charing Cross Road"] },
+    { "from": "Tottenham Court Road", "to": "Oxford Circus", "mode": "tube", "line": "Central",
+      "stations": ["Tottenham Court Road", "Oxford Circus"] },
+    { "from": "Oxford Circus", "to": "Regent's Park", "mode": "tube", "line": "Bakerloo",
+      "stations": ["Oxford Circus", "Regent's Park"] }
   ],
   "photos": [
-    { "path": "photos/eye.jpg",   "t": "10:42", "note": "view from the pod" },
-    { "path": "photos/ramen.jpg", "t": "12:50", "note": "tonkotsu ramen" }
+    { "path": "photos/westminster.jpg", "t": "10:20", "note": "Big Ben from the bridge" },
+    { "path": "photos/eye.jpg",         "t": "11:10", "note": "view from the top of the Eye" },
+    { "path": "photos/ramen.jpg",       "t": "12:55", "note": "tonkotsu ramen and gyoza" },
+    { "path": "photos/park.jpg",        "t": "14:30", "note": "rose garden" }
   ],
   "workouts": [
-    { "t": "16:05", "type": "walk", "distanceKm": 4.1, "durationMin": 52 }
+    { "t": "14:15", "type": "walk", "distanceKm": 3.8, "durationMin": 75, "steps": 5200 }
   ],
-  "notes": "free text the user adds, e.g. 'DIML office is the glass building on the corner'"
+  "notes": "Saturday tourist day. Lunch order: tonkotsu ramen + gyoza."
 }
 ```
 
@@ -109,13 +147,14 @@ public/days/demo/          # pre-generated fallback day
 {
   "id": "k3x9q2",                         // unguessable, nanoid(10)
   "date": "2026-11-01",
-  "player": { "name": "LUCAS", "sprite": "player.png" },   // front-facing, 32x48 px
+  "player": { "name": "LUCAS", "sprite": "player.png" },   // back-facing, 32x48 px
   "scenes": [
     {
       "kind": "tourist" | "meal" | "park",
-      "title": "London Eye",
-      "time": "10:30",
-      "base": "city" | "plaza" | "park",   // which hand-made Puny World base map
+      "title": "Touring Westminster",
+      "time": "10:00",
+      "base": "city" | "street" | "park",  // which hand-made Puny World base map
+      "skyline": "shard.png",              // optional parallax backdrop (scene 1 only)
       "spawn": { "x": 10, "y": 13 },
       "exit":  { "x": 19, "y": 7 },        // last scene's exit -> end card
       "landmarks": [
@@ -127,13 +166,20 @@ public/days/demo/          # pre-generated fallback day
           "text": "Rode the London Eye. Clear view all the way to St Paul's."
         }
       ],
-      "food": { "sprite": "s1_food.png", "text": "Had tonkotsu ramen at Kanada-Ya." } // meal scene only
+      "food": {                            // meal scene only
+        "sprite": "s1_food.png",           // shown on a table in the world AND in the textbox
+        "tile": { "x": 9, "y": 8 },
+        "text": "Had tonkotsu ramen and gyoza at Kanada-Ya."
+      }
     }
   ],
   "transit": [                              // transit[i] plays between scenes[i] and scenes[i+1]
-    { "mode": "bus",  "route": "RV1", "from": "Waterloo", "to": "Covent Garden" },
-    { "mode": "tube", "line": "Bakerloo", "color": "#B36305",
-      "stations": ["Charing Cross", "Piccadilly Circus", "Oxford Circus", "Regent's Park"] }
+    { "legs": [
+      { "mode": "bus", "route": "24", "destination": "Hampstead Heath",
+        "from": "Parliament Square", "to": "Tottenham Court Road" } ] },
+    { "legs": [
+      { "mode": "tube", "line": "Central",  "color": "#E32017", "stations": ["Tottenham Court Road", "Oxford Circus"] },
+      { "mode": "tube", "line": "Bakerloo", "color": "#B36305", "stations": ["Oxford Circus", "Regent's Park"] } ] }
   ]
 }
 ```
@@ -164,7 +210,8 @@ For each landmark name: `GET https://en.wikipedia.org/api/rest_v1/page/summary/<
 |---|---|
 | Landmark | `A {footprint} building/object sprite of {name}, simplified and recognisable. {userNote}` |
 | Food icon | `A small item icon of {food}, viewed from slightly above.` |
-| Player (fit check) | `A single front-facing chibi trainer character, full body, standing, matching this person's clothing, colours, skin tone and hairstyle exactly. Neutral pose, arms at sides.` |
+| Player (fit check) | `A single chibi trainer character seen directly from BEHIND (back view, face not visible), full body, standing, matching this person's clothing, colours, hairstyle and hair colour, and skin tone exactly. Neutral pose, arms at sides.` Pass the front photo, plus the back photo if there is one |
+| Food (world + textbox) | Same as the food icon, generated once at 1024 and pixelated twice: 16×16 for the in-world table, 32×32 for the textbox |
 
 ### 5.4 Pixel post-process (`pixelate.ts`, sharp)
 1. Trim transparent edges.
@@ -178,10 +225,11 @@ Strip EXIF from every uploaded photo before storing (`sharp().rotate()` drops me
 ## 6. Game details (owner: A)
 
 - **Resolution:** 320×240 logical (20×15 tiles of 16 px), `zoom: 3`, `pixelArt: true`, `roundPixels: true`.
-- **Base maps:** 3 hand-made Puny World maps (city, plaza, park) built in code from 2D arrays or in Tiled. Each defines 3 **landmark slots** (top-left tile + max footprint), `spawn`, `exit`.
+- **Base maps:** 3 hand-made Puny World maps (city = Westminster riverside, street = St Giles, park = Regent's Park) built in code from 2D arrays or in Tiled. Each defines 3 **landmark slots** (top-left tile + max footprint), `spawn`, `exit`.
 - **Landmarks:** `this.load.image` at runtime from `day.json`; placed as sprites with origin bottom-centre at slot. Mark footprint tiles as colliders in Grid Engine.
 - **Depth sort (the 2.5D feel):** every frame `sprite.setDepth(sprite.y)` for player and landmarks so you walk *behind* tall buildings. Add an ellipse drop shadow under each landmark and the player.
-- **Player:** single front-facing frame. On `movementStarted`, a 2-px y bob tween; no directional frames.
+- **Player:** single back-facing frame (camera follows from behind, third person). On `movementStarted`, a 2-px y bob tween; no directional frames. Spawn at the bottom of each map so the first move is "up", into the scene.
+- **Food in the world:** the meal scene places the food sprite on a small table tile by the restaurant door; facing it + Space opens the meal textbox with the larger food icon.
 - **Textbox:** bottom 9-slice box, pixel font (Press Start 2P or similar), typewriter at ~40 chars/s, Space to advance. Opens when facing a landmark's footprint tile and pressing Space. Meal scene shows the food icon left of the text.
 - **Scene card:** on enter, a 1.5 s banner: `10:30 · LONDON EYE`.
 - **Exit tile:** a path tile at the map edge; stepping on it → fade out → `TransitScene` → next `HighlightScene`. After scene 3 → end card with **Share** button (copies `location.href`).
@@ -189,9 +237,9 @@ Strip EXIF from every uploaded photo before storing (`sharp().rotate()` drops me
 
 ## 7. Transport transitions (owner: C)
 
-`TransitScene` (~4 s, skippable with Space):
-- **Bus:** hand-made/once-generated red double-decker sprite drives left→right over a scrolling London skyline; route number on the blind (`RV1`); text `WATERLOO → COVENT GARDEN`.
-- **Tube:** tunnel background, train sprite tinted with the line colour, station name boards ticking past (`stations[]`), roundel with line name.
+`TransitScene` (~4 s per leg, skippable with Space) plays each entry in `transit[i].legs` in order:
+- **Bus (1 → 2):** red double-decker drives left→right over a scrolling skyline (Whitehall → Nelson's Column → Charing Cross Road). Blind reads `24 HAMPSTEAD HEATH`; caption `PARLIAMENT SQUARE → TOTTENHAM COURT ROAD`.
+- **Tube (2 → 3):** tunnel background, train sprite tinted with the line colour, roundel with the line name, station board ticking `stations[]`. Central (red) → a 1 s `CHANGE AT OXFORD CIRCUS` card → Bakerloo (brown).
 - Assets are **static and pre-made** (`public/transit/`), not generated per day — this must never fail live.
 
 TfL line colours: Bakerloo `#B36305`, Central `#E32017`, Circle `#FFD300`, District `#00782A`, Hammersmith & City `#F3A9BB`, Jubilee `#A0A5A9`, Metropolitan `#9B0056`, Northern `#000000`, Piccadilly `#003688`, Victoria `#0098D4`, Waterloo & City `#95CDBA`, Elizabeth `#6950A1`.
@@ -221,8 +269,8 @@ Keys (`OPENAI_API_KEY`, `BLOB_READ_WRITE_TOKEN`) are server-side env vars only �
 ## 10. 90-second demo script
 
 1. **0–10 s** — Problem: "My partner's in London, I'm not. I know where she is, I can't *see* her day."
-2. **10–55 s** — Open her share link. Walk through scene 1 (London Eye, read a landmark textbox) → exit tile → **red bus** animation → scene 2 (ramen, food icon) → **Bakerloo line** animation → scene 3 (Regent's Park, walk stats).
-3. **55–80 s** — "Now me." Take a fit-check photo → (cut the wait) → sprite appears and walks into the scene.
+2. **10–55 s** — Open her share link. Walk up into scene 1 (Big Ben, London Eye, Shard on the skyline; read a textbox) → exit tile → **bus 24** animation → scene 2 (Kanada-Ya, ramen bowl on the table, textbox) → **Central → Bakerloo** animation → scene 3 (Regent's Park, walk stats).
+3. **55–80 s** — "Now me." Take a fit-check photo → (cut the wait) → back-facing sprite appears and walks into the scene.
 4. **80–90 s** — Hit **Share**, show the link. "Every day becomes a place you can visit." (World journal = one-line vision.)
 
 ## 11. Submission checklist
